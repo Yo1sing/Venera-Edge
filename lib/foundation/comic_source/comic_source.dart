@@ -7,9 +7,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:venera/src/rust/api/script.dart' as script_backend;
+import 'package:venera/src/rust/api/sources.dart' as sources_backend;
+import 'package:venera/src/rust/api/http.dart' show HttpCancellation;
 import 'package:venera/src/rust/api/follow_updates.dart' as follow_backend;
 import 'package:venera/foundation/source_data.dart';
 import 'package:venera/foundation/app.dart';
+import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
 import 'package:venera/foundation/res.dart';
@@ -18,7 +21,6 @@ import 'package:venera/pages/search_result_page.dart';
 import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/init.dart';
-import 'package:venera/utils/io.dart';
 
 import '../js_engine.dart';
 import '../log.dart';
@@ -35,6 +37,7 @@ part 'types.dart';
 
 class ComicSourceManager with ChangeNotifier, Init {
   final List<ComicSource> _sources = [];
+  late sources_backend.SourceManager _backend;
 
   static ComicSourceManager? _instance;
 
@@ -54,48 +57,128 @@ class ComicSourceManager with ChangeNotifier, Init {
   @protected
   Future<void> doInit() async {
     await JsEngine().ensureInit();
-    for (final path in await script_backend.sourceFiles(
-      directory: App.dataPath,
-    )) {
-      try {
-        _sources.add(
-          await ComicSourceParser().parse(
-            await script_backend.readSourceFile(path: path),
-            path,
-          ),
-        );
-      } catch (e, s) {
-        Log.error('ComicSource', '$e\n$s');
+    _backend = await sources_backend.SourceManager.open(
+      runtime: JsEngine().runtime,
+    );
+    await reload();
+  }
+
+  Future<void> reload() async {
+    final cancellation = HttpCancellation();
+    try {
+      final result = jsonDecode(
+        await _backend.load(cancellation: cancellation),
+      );
+      for (final error in result['errors']) {
+        Log.error('ComicSource', error);
       }
+      await _refresh();
+    } finally {
+      cancellation.dispose();
     }
   }
 
-  Future reload() async {
-    _sources.clear();
-    JsEngine().runCode("ComicSource.sources = {};");
-    await doInit();
-    notifyListeners();
+  Future<void> _refresh({String? added}) async {
+    while (true) {
+      final encoded = _backend.snapshot();
+      final snapshot = jsonDecode(encoded);
+      final sources = <ComicSource>[];
+      try {
+        for (final metadata in snapshot['sources']) {
+          sources.add(
+            await ComicSourceParser().fromMetadata(
+              Map<String, dynamic>.from(metadata),
+            ),
+          );
+        }
+      } catch (_) {
+        if (_backend.snapshot() != encoded) continue;
+        rethrow;
+      }
+      if (_backend.snapshot() != encoded) continue;
+      _sources
+        ..clear()
+        ..addAll(sources);
+      _availableUpdates = Map<String, String>.from(snapshot['updates']);
+      final pages =
+          jsonDecode(
+                _backend.reconcilePages(
+                  settingsJson: jsonEncode(appdata.toJson()['settings']),
+                  added: added,
+                ),
+              )
+              as Map<String, dynamic>;
+      for (final entry in pages.entries) {
+        appdata.settings[entry.key] = entry.value;
+      }
+      notifyListeners();
+      return;
+    }
   }
 
-  void add(ComicSource source) {
-    _sources.add(source);
-    notifyListeners();
+  Future<void> _apply(Future<String> operation, {bool added = false}) async {
+    final metadata = jsonDecode(await operation);
+    await _refresh(added: added ? metadata['key'] : null);
+    await appdata.saveData();
   }
 
-  void remove(String key) {
-    _sources.removeWhere((element) => element.key == key);
+  Future<void> installUrl(String url, HttpCancellation cancellation) => _apply(
+    _backend.installUrl(url: url, cancellation: cancellation),
+    added: true,
+  );
+
+  Future<void> install(
+    List<int> code,
+    String name,
+    HttpCancellation cancellation,
+  ) => _apply(
+    _backend.install(code: code, name: name, cancellation: cancellation),
+    added: true,
+  );
+
+  Future<void> update(String key, HttpCancellation cancellation) =>
+      _apply(_backend.update(key: key, cancellation: cancellation));
+
+  Future<void> save(String key, String code, HttpCancellation cancellation) =>
+      _apply(_backend.save(key: key, code: code, cancellation: cancellation));
+
+  Future<String> read(String key) => _backend.read(key: key);
+  Future<String> beginEdit(String key) => _backend.beginEdit(key: key);
+  Future<void> saveEdit(
+    String key,
+    String path,
+    HttpCancellation cancellation,
+  ) => _apply(
+    _backend.saveEdit(key: key, path: path, cancellation: cancellation),
+  );
+  Future<void> discardEdit(String path) => _backend.discardEdit(path: path);
+
+  Future<void> remove(String key, HttpCancellation cancellation) async {
+    await _backend.remove(key: key, cancellation: cancellation);
+    await _refresh();
+    await appdata.saveData();
+  }
+
+  Future<List<dynamic>> catalog(
+    String url,
+    HttpCancellation cancellation,
+  ) async =>
+      jsonDecode(await _backend.catalog(url: url, cancellation: cancellation));
+
+  Future<int> checkUpdates(String url, HttpCancellation cancellation) async {
+    _availableUpdates = Map<String, String>.from(
+      jsonDecode(
+        await _backend.checkUpdates(url: url, cancellation: cancellation),
+      ),
+    );
     notifyListeners();
+    return _availableUpdates.length;
   }
 
   bool get isEmpty => _sources.isEmpty;
 
   /// Key is the source key, value is the version.
-  final _availableUpdates = <String, String>{};
-
-  void updateAvailableUpdates(Map<String, String> updates) {
-    _availableUpdates.addAll(updates);
-    notifyListeners();
-  }
+  Map<String, String> _availableUpdates = {};
 
   Map<String, String> get availableUpdates => Map.from(_availableUpdates);
 

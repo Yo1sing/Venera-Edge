@@ -19,6 +19,8 @@ use std::{
 pub struct Options {
     #[serde(default)]
     pub worker_depth: u32,
+    #[serde(default)]
+    pub validation: bool,
     pub data_path: String,
     pub version: String,
     pub locale: String,
@@ -32,6 +34,7 @@ pub struct Options {
 type Reply = mpsc::SyncSender<Result<String>>;
 enum Command {
     Eval(String, Reply),
+    PrepareSource(String, Reply),
     Configure(Box<Options>, Reply),
     Settle(u64, Result<Value>),
     Wake,
@@ -44,6 +47,8 @@ pub struct Engine {
     event_sender: tokio::sync::mpsc::Sender<String>,
     options: Mutex<Options>,
     stopped: tokio::sync::watch::Receiver<bool>,
+    source_locks: Mutex<HashMap<String, Arc<tokio::sync::RwLock<()>>>>,
+    pub(crate) source_management: Mutex<Option<crate::sources::Shared>>,
 }
 
 fn platform_replies() -> &'static Mutex<HashMap<u64, mpsc::Sender<Command>>> {
@@ -158,6 +163,13 @@ impl Engine {
                                 let result = context.with(|ctx| evaluate(&ctx, &code));
                                 let _ = reply.send(result);
                             }
+                            Ok(Command::PrepareSource(code, reply)) => {
+                                let previous = host.borrow().options.validation;
+                                host.borrow_mut().options.validation = true;
+                                let result = context.with(|ctx| evaluate(&ctx, &code));
+                                host.borrow_mut().options.validation = previous;
+                                let _ = reply.send(result);
+                            }
                             Ok(Command::Configure(options, reply)) => {
                                 host.borrow_mut().options = *options;
                                 let _ = reply.send(Ok("null".into()));
@@ -215,7 +227,35 @@ impl Engine {
             event_sender,
             options: Mutex::new(saved_options),
             stopped,
+            source_locks: Mutex::new(HashMap::new()),
+            source_management: Mutex::new(None),
         })
+    }
+    pub fn options(&self) -> Result<Options> {
+        Ok(self
+            .options
+            .lock()
+            .map_err(|_| anyhow!("Script options poisoned"))?
+            .clone())
+    }
+    pub fn prepare_source(&self, code: String) -> Result<String> {
+        ensure!(
+            !self.closed.load(Ordering::Relaxed),
+            "JavaScript runtime is closed"
+        );
+        let (reply, receive) = mpsc::sync_channel(1);
+        self.commands
+            .send(Command::PrepareSource(code, reply))
+            .context("Script worker stopped")?;
+        receive.recv().context("Script worker stopped")?
+    }
+    pub fn source_lock(&self, key: &str) -> Arc<tokio::sync::RwLock<()>> {
+        self.source_locks
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .entry(key.into())
+            .or_default()
+            .clone()
     }
     /// A cancellable source worker has its own JS heap and host requests. Account,
     /// settings and cookies still use the same persistent stores. Platform events
@@ -431,6 +471,24 @@ impl Host {
         let method = data["method"]
             .as_str()
             .context("Missing script host method")?;
+        if self.options.validation {
+            ensure!(
+                [
+                    "html",
+                    "convert",
+                    "random",
+                    "uuid",
+                    "getLocale",
+                    "getPlatform",
+                    "load_data",
+                    "isLogged",
+                    "log"
+                ]
+                .contains(&method)
+                    || (method == "cookie" && data["function"] == "get"),
+                "Side effects are unavailable during source validation"
+            );
+        }
         let value = match method {
             "modify_image" => {
                 let bytes = crate::script_crypto::bytes(&data["data"])?;
@@ -825,6 +883,7 @@ mod tests {
     fn options(path: &str) -> Options {
         Options {
             worker_depth: 0,
+            validation: false,
             data_path: path.into(),
             version: "1.6.3".into(),
             locale: "zh_CN".into(),

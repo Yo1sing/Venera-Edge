@@ -554,10 +554,9 @@ class UpdateTest extends ComicSource {
     name='Updates'; key='updates'; version='1.0.0';
     comic={loadInfo:async(id)=>{
         const s=ComicSource.sources.updates;
-        const attempts=s.loadData('attempts')??{};
-        attempts[id]=(attempts[id]??0)+1;
-        s.saveData('attempts',attempts);
-        if(id==='bad'||(id==='retry'&&attempts[id]<3)) throw Error('temporary failure');
+        const attempt=(s.loadData('attempt_'+id)??0)+1;
+        s.saveData('attempt_'+id,attempt);
+        if(id==='bad'||(id==='retry'&&attempt<3)) throw Error('temporary failure');
         if(id==='hang') await new Promise(()=>{});
         if(id==='busy') {while(true) {}}
         if(id==='slow') {
@@ -605,7 +604,24 @@ class UpdateTest extends ComicSource {
             Ok(Self { directory, service })
         }
         fn data(&self) -> Value {
-            crate::script::source_data(self.directory.path().to_str().unwrap(), "updates").unwrap()
+            let mut data =
+                crate::script::source_data(self.directory.path().to_str().unwrap(), "updates")
+                    .unwrap();
+            // Each independent worker updates its own key. A read/modify/write
+            // of one shared attempts map would lose counters across workers.
+            let attempts: serde_json::Map<String, Value> = data
+                .as_object()
+                .unwrap()
+                .iter()
+                .filter_map(|(key, value)| {
+                    key.strip_prefix("attempt_")
+                        .map(|id| (id.to_owned(), value.clone()))
+                })
+                .collect();
+            if !attempts.is_empty() {
+                data["attempts"] = attempts.into();
+            }
+            data
         }
         async fn started(&self, id: &str) -> Result<()> {
             tokio::time::timeout(Duration::from_secs(3), async {
@@ -656,7 +672,13 @@ class UpdateTest extends ComicSource {
         let f = Fixture::open(&["ok", "retry", "bad"]).await?;
         let job = f.service.start("Follow".into(), true, None).await?;
         let p = finished(&job).await;
-        assert_eq!((p.total, p.current, p.updated, p.errors), (3, 3, 2, 1));
+        assert_eq!(
+            (p.total, p.current, p.updated, p.errors),
+            (3, 3, 2, 1),
+            "progress={} data={}",
+            serde_json::to_string(&p)?,
+            f.data()
+        );
         assert_eq!(p.status, "completed");
         assert_eq!(f.data()["attempts"], json!({"ok":1,"retry":3,"bad":3}));
         let rows = f.comics();

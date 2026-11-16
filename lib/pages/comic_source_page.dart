@@ -8,10 +8,9 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/log.dart';
-import 'package:venera/network/app_dio.dart';
+import 'package:venera/src/rust/api/http.dart' show HttpCancellation;
 import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/pages/webview.dart';
-import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/translations.dart';
 
@@ -21,83 +20,50 @@ class ComicSourcePage extends StatelessWidget {
   static Future<void> update(
     ComicSource source, [
     bool showLoading = true,
+    HttpCancellation? cancellation,
+    bool Function()? isActive,
   ]) async {
-    if (!source.url.isURL) {
-      if (showLoading) {
-        App.rootContext.showMessage(message: "Invalid url config");
-        return;
-      } else {
-        throw Exception("Invalid url config");
-      }
-    }
-    ComicSourceManager().remove(source.key);
-    bool cancel = false;
-    LoadingDialogController? controller;
-    if (showLoading) {
-      controller = showLoadingDialog(
-        App.rootContext,
-        onCancel: () => cancel = true,
-        barrierDismissible: false,
-      );
-    }
+    final token = cancellation ?? HttpCancellation();
+    var cancelled = false;
+    final controller = showLoading
+        ? showLoadingDialog(
+            App.rootContext,
+            barrierDismissible: false,
+            onCancel: () {
+              cancelled = true;
+              token.cancel();
+            },
+          )
+        : null;
     try {
-      var res = await AppDio().get<String>(
-        source.url,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {"cache-time": "no"},
-        ),
-      );
-      if (cancel) return;
+      await ComicSourceManager().update(source.key, token);
+      if (showLoading) App.forceRebuild();
+    } catch (error) {
+      if (cancelled || isActive?.call() == false) return;
+      if (!showLoading) rethrow;
+      App.rootContext.showMessage(message: error.toString());
+    } finally {
       controller?.close();
-      await ComicSourceParser().parse(res.data!, source.filePath);
-      await io.File(source.filePath).writeAsString(res.data!);
-      if (ComicSourceManager().availableUpdates.containsKey(source.key)) {
-        ComicSourceManager().availableUpdates.remove(source.key);
-      }
-    } catch (e) {
-      if (cancel) return;
-      if (showLoading) {
-        App.rootContext.showMessage(message: e.toString());
-      } else {
-        rethrow;
-      }
-    }
-    await ComicSourceManager().reload();
-    if (showLoading) {
-      App.forceRebuild();
+      if (cancellation == null) token.dispose();
     }
   }
 
-  static Future<int> checkComicSourceUpdate() async {
-    if (ComicSource.all().isEmpty) {
-      return 0;
-    }
-    var dio = AppDio();
-    var res = await dio.get<String>(appdata.settings['comicSourceListUrl']);
-    if (res.statusCode != 200) {
+  static Future<int> checkComicSourceUpdate([
+    HttpCancellation? cancellation,
+  ]) async {
+    if (ComicSource.all().isEmpty) return 0;
+    final token = cancellation ?? HttpCancellation();
+    try {
+      return await ComicSourceManager().checkUpdates(
+        appdata.settings['comicSourceListUrl'],
+        token,
+      );
+    } catch (error, stack) {
+      Log.error('Check source updates', error, stack);
       return -1;
+    } finally {
+      if (cancellation == null) token.dispose();
     }
-    var list = jsonDecode(res.data!) as List;
-    var versions = <String, String>{};
-    for (var source in list) {
-      versions[source['key']] = source['version'];
-    }
-    var shouldUpdate = <String>[];
-    for (var source in ComicSource.all()) {
-      if (versions.containsKey(source.key) &&
-          compareSemVer(versions[source.key]!, source.version)) {
-        shouldUpdate.add(source.key);
-      }
-    }
-    if (shouldUpdate.isNotEmpty) {
-      var updates = <String, String>{};
-      for (var key in shouldUpdate) {
-        updates[key] = versions[key]!;
-      }
-      ComicSourceManager().updateAvailableUpdates(updates);
-    }
-    return shouldUpdate.length;
   }
 
   @override
@@ -115,6 +81,7 @@ class _Body extends StatefulWidget {
 
 class _BodyState extends State<_Body> {
   var url = "";
+  final _operations = <HttpCancellation>{};
 
   void updateUI() {
     setState(() {});
@@ -130,6 +97,9 @@ class _BodyState extends State<_Body> {
   void dispose() {
     super.dispose();
     ComicSourceManager().removeListener(updateUI);
+    for (final operation in _operations) {
+      operation.cancel();
+    }
   }
 
   @override
@@ -157,54 +127,89 @@ class _BodyState extends State<_Body> {
       title: "Delete".tl,
       content: "Delete comic source '@n' ?".tlParams({"n": source.name}),
       btnColor: context.colorScheme.error,
-      onConfirm: () {
-        var file = File(source.filePath);
-        file.delete();
-        ComicSourceManager().remove(source.key);
-        _validatePages();
-        App.forceRebuild();
+      onConfirm: () async {
+        final cancellation = HttpCancellation();
+        _operations.add(cancellation);
+        try {
+          await ComicSourceManager().remove(source.key, cancellation);
+          App.forceRebuild();
+        } catch (error) {
+          if (mounted) context.showMessage(message: error.toString());
+        } finally {
+          _operations.remove(cancellation);
+          cancellation.dispose();
+        }
       },
     );
   }
 
   void edit(ComicSource source) async {
     if (App.isDesktop) {
+      String? draft;
       try {
-        await Process.run("code", [source.filePath], runInShell: true);
-        await showDialog(
-          context: App.rootContext,
-          builder: (context) => AlertDialog(
-            title: const Text("Reload Configs"),
+        draft = await ComicSourceManager().beginEdit(source.key);
+        final process = await io.Process.run("code", [draft], runInShell: true);
+        if (process.exitCode != 0) throw StateError(process.stderr.toString());
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text("Reload Configs".tl),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("cancel"),
+                onPressed: () => dialogContext.pop(),
+                child: Text("Cancel".tl),
               ),
               TextButton(
                 onPressed: () async {
-                  await ComicSourceManager().reload();
-                  App.forceRebuild();
+                  final cancellation = HttpCancellation();
+                  _operations.add(cancellation);
+                  try {
+                    await ComicSourceManager().saveEdit(
+                      source.key,
+                      draft!,
+                      cancellation,
+                    );
+                    if (dialogContext.mounted) dialogContext.pop();
+                    App.forceRebuild();
+                  } catch (error) {
+                    if (dialogContext.mounted) {
+                      dialogContext.showMessage(message: error.toString());
+                    }
+                  } finally {
+                    _operations.remove(cancellation);
+                    cancellation.dispose();
+                  }
                 },
-                child: const Text("continue"),
+                child: Text("Confirm".tl),
               ),
             ],
           ),
         );
         return;
-      } catch (e) {
-        //
+      } catch (error, stack) {
+        Log.error('Source editor', error, stack);
+      } finally {
+        if (draft != null) await ComicSourceManager().discardEdit(draft);
       }
     }
-    context.to(
-      () => _EditFilePage(source.filePath, () async {
-        await ComicSourceManager().reload();
-        setState(() {});
-      }),
-    );
+    if (mounted) context.to(() => _EditFilePage(source.key));
   }
 
-  void update(ComicSource source, [bool showLoading = true]) {
-    ComicSourcePage.update(source, showLoading);
+  void update(ComicSource source, [bool showLoading = true]) async {
+    final cancellation = HttpCancellation();
+    _operations.add(cancellation);
+    try {
+      await ComicSourcePage.update(
+        source,
+        showLoading,
+        cancellation,
+        () => mounted,
+      );
+    } finally {
+      _operations.remove(cancellation);
+      cancellation.dispose();
+    }
   }
 
   Widget buildCard(BuildContext context) {
@@ -270,15 +275,22 @@ class _BodyState extends State<_Body> {
 
   void _selectFile() async {
     final file = await selectFile(ext: ["js"]);
-    if (file == null) return;
+    if (file == null || !mounted) return;
+    final cancellation = HttpCancellation();
+    _operations.add(cancellation);
     try {
-      var fileName = file.name;
-      var bytes = await file.readAsBytes();
-      var content = utf8.decode(bytes);
-      await addSource(content, fileName);
-    } catch (e, s) {
-      App.rootContext.showMessage(message: e.toString());
-      Log.error("Add comic source", "$e\n$s");
+      await ComicSourceManager().install(
+        await file.readAsBytes(),
+        file.name,
+        cancellation,
+      );
+      App.forceRebuild();
+    } catch (error, stack) {
+      if (mounted) context.showMessage(message: error.toString());
+      Log.error('Add comic source', error, stack);
+    } finally {
+      _operations.remove(cancellation);
+      cancellation.dispose();
     }
   }
 
@@ -289,42 +301,29 @@ class _BodyState extends State<_Body> {
   }
 
   Future<void> handleAddSource(String url) async {
-    if (url.isEmpty) {
-      return;
-    }
-    var splits = url.split("/");
-    splits.removeWhere((element) => element == "");
-    var fileName = splits.last;
-    bool cancel = false;
-    var controller = showLoadingDialog(
-      App.rootContext,
-      onCancel: () => cancel = true,
+    if (url.isEmpty) return;
+    final cancellation = HttpCancellation();
+    _operations.add(cancellation);
+    var cancelled = false;
+    final controller = showLoadingDialog(
+      context,
       barrierDismissible: false,
+      onCancel: () {
+        cancelled = true;
+        cancellation.cancel();
+      },
     );
     try {
-      var res = await AppDio().get<String>(
-        url,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {"cache-time": "no"},
-        ),
-      );
-      if (cancel) return;
+      await ComicSourceManager().installUrl(url, cancellation);
+      App.forceRebuild();
+    } catch (error, stack) {
+      if (mounted && !cancelled) context.showMessage(message: error.toString());
+      Log.error('Add comic source', error, stack);
+    } finally {
       controller.close();
-      await addSource(res.data!, fileName);
-    } catch (e, s) {
-      if (cancel) return;
-      context.showMessage(message: e.toString());
-      Log.error("Add comic source", "$e\n$s");
+      _operations.remove(cancellation);
+      cancellation.dispose();
     }
-  }
-
-  Future<void> addSource(String js, String fileName) async {
-    var comicSource = await ComicSourceParser().createAndParse(js, fileName);
-    ComicSourceManager().add(comicSource);
-    _addAllPagesWithComicSource(comicSource);
-    appdata.saveData();
-    App.forceRebuild();
   }
 }
 
@@ -340,38 +339,35 @@ class _ComicSourceList extends StatefulWidget {
 class _ComicSourceListState extends State<_ComicSourceList> {
   List? json;
   bool changed = false;
+  HttpCancellation? _loading;
   var controller = TextEditingController();
 
   void load() async {
-    if (json != null) {
-      setState(() {
-        json = null;
-      });
-    }
-    if (controller.text.isEmpty) {
-      setState(() {
-        json = [];
-      });
-      return;
-    }
-    var dio = AppDio();
+    _loading?.cancel();
+    final cancellation = HttpCancellation();
+    _loading = cancellation;
+    setState(() {
+      json = null;
+    });
     try {
-      var res = await dio.get<String>(controller.text);
-      if (res.statusCode != 200) {
-        throw "error";
-      }
-      if (mounted) {
+      final entries = controller.text.isEmpty
+          ? <dynamic>[]
+          : await ComicSourceManager().catalog(controller.text, cancellation);
+      if (mounted && identical(_loading, cancellation)) {
         setState(() {
-          json = jsonDecode(res.data!);
+          json = entries;
         });
       }
-    } catch (e) {
-      context.showMessage(message: "Network error".tl);
-      if (mounted) {
+    } catch (error) {
+      if (mounted && identical(_loading, cancellation)) {
+        context.showMessage(message: error.toString());
         setState(() {
           json = [];
         });
       }
+    } finally {
+      if (identical(_loading, cancellation)) _loading = null;
+      cancellation.dispose();
     }
   }
 
@@ -385,10 +381,12 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   @override
   void dispose() {
     super.dispose();
+    _loading?.cancel();
     if (changed) {
       appdata.settings['comicSourceListUrl'] = controller.text;
       appdata.saveData();
     }
+    controller.dispose();
   }
 
   @override
@@ -477,24 +475,9 @@ class _ComicSourceListState extends State<_ComicSourceList> {
             : Button.filled(
                 child: Text("Add".tl),
                 onPressed: () async {
-                  var fileName = json![index]["fileName"];
-                  var url = json![index]["url"];
-                  if (url == null || !(url.toString()).isURL) {
-                    var listUrl =
-                        appdata.settings['comicSourceListUrl'] as String;
-                    if (listUrl
-                        .replaceFirst("https://", "")
-                        .replaceFirst("http://", "")
-                        .contains("/")) {
-                      url =
-                          listUrl.substring(0, listUrl.lastIndexOf("/") + 1) +
-                          fileName;
-                    } else {
-                      url = '$listUrl/$fileName';
-                    }
-                  }
+                  final String url = json![index]["url"];
                   await widget.onAdd(url);
-                  setState(() {});
+                  if (mounted) setState(() {});
                 },
               ).fixHeight(32);
 
@@ -513,126 +496,79 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   }
 }
 
-void _validatePages() {
-  List explorePages = appdata.settings['explore_pages'];
-  List categoryPages = appdata.settings['categories'];
-  List networkFavorites = appdata.settings['favorites'];
-
-  var totalExplorePages = ComicSource.all()
-      .map((e) => e.explorePages.map((e) => e.title))
-      .expand((element) => element)
-      .toList();
-  var totalCategoryPages = ComicSource.all()
-      .map((e) => e.categoryData?.key)
-      .where((element) => element != null)
-      .map((e) => e!)
-      .toList();
-  var totalNetworkFavorites = ComicSource.all()
-      .map((e) => e.favoriteData?.key)
-      .where((element) => element != null)
-      .map((e) => e!)
-      .toList();
-
-  for (var page in List.from(explorePages)) {
-    if (!totalExplorePages.contains(page)) {
-      explorePages.remove(page);
-    }
-  }
-  for (var page in List.from(categoryPages)) {
-    if (!totalCategoryPages.contains(page)) {
-      categoryPages.remove(page);
-    }
-  }
-  for (var page in List.from(networkFavorites)) {
-    if (!totalNetworkFavorites.contains(page)) {
-      networkFavorites.remove(page);
-    }
-  }
-
-  appdata.settings['explore_pages'] = explorePages.toSet().toList();
-  appdata.settings['categories'] = categoryPages.toSet().toList();
-  appdata.settings['favorites'] = networkFavorites.toSet().toList();
-
-  appdata.saveData();
-}
-
-void _addAllPagesWithComicSource(ComicSource source) {
-  var explorePages = appdata.settings['explore_pages'];
-  var categoryPages = appdata.settings['categories'];
-  var networkFavorites = appdata.settings['favorites'];
-  var searchPages = appdata.settings['searchSources'];
-
-  if (source.explorePages.isNotEmpty) {
-    for (var page in source.explorePages) {
-      if (!explorePages.contains(page.title)) {
-        explorePages.add(page.title);
-      }
-    }
-  }
-  if (source.categoryData != null &&
-      !categoryPages.contains(source.categoryData!.key)) {
-    categoryPages.add(source.categoryData!.key);
-  }
-  if (source.favoriteData != null &&
-      !networkFavorites.contains(source.favoriteData!.key)) {
-    networkFavorites.add(source.favoriteData!.key);
-  }
-  if (source.searchPageData != null && !searchPages.contains(source.key)) {
-    searchPages.add(source.key);
-  }
-
-  appdata.settings['explore_pages'] = explorePages.toSet().toList();
-  appdata.settings['categories'] = categoryPages.toSet().toList();
-  appdata.settings['favorites'] = networkFavorites.toSet().toList();
-  appdata.settings['searchSources'] = searchPages.toSet().toList();
-
-  appdata.saveData();
-}
-
 class _EditFilePage extends StatefulWidget {
-  const _EditFilePage(this.path, this.onExit);
-
-  final String path;
-
-  final void Function() onExit;
-
+  const _EditFilePage(this.sourceKey);
+  final String sourceKey;
   @override
   State<_EditFilePage> createState() => __EditFilePageState();
 }
 
 class __EditFilePageState extends State<_EditFilePage> {
-  var current = '';
+  String? current;
+  HttpCancellation? _saving;
 
   @override
   void initState() {
     super.initState();
-    current = File(widget.path).readAsStringSync();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final code = await ComicSourceManager().read(widget.sourceKey);
+      if (mounted) {
+        setState(() {
+          current = code;
+        });
+      }
+    } catch (error) {
+      if (mounted) context.showMessage(message: error.toString());
+    }
+  }
+
+  Future<void> _save() async {
+    if (current == null || _saving != null) return;
+    final cancellation = HttpCancellation();
+    setState(() {
+      _saving = cancellation;
+    });
+    try {
+      await ComicSourceManager().save(widget.sourceKey, current!, cancellation);
+      if (mounted) context.pop();
+      App.forceRebuild();
+    } catch (error) {
+      if (mounted) context.showMessage(message: error.toString());
+    } finally {
+      _saving = null;
+      cancellation.dispose();
+      if (mounted) setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    File(widget.path).writeAsStringSync(current);
-    widget.onExit();
+    _saving?.cancel();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: Appbar(title: Text("Edit".tl)),
-      body: Column(
-        children: [
-          Container(height: 0.6, color: context.colorScheme.outlineVariant),
-          Expanded(
-            child: CodeEditor(
-              initialValue: current,
-              onChanged: (value) => current = value,
-            ),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: Appbar(
+      title: Text("Edit".tl),
+      actions: [
+        IconButton(
+          onPressed: current == null || _saving != null ? null : _save,
+          icon: const Icon(Icons.save),
+        ),
+      ],
+    ),
+    body: current == null
+        ? const Center(child: CircularProgressIndicator())
+        : CodeEditor(
+            initialValue: current!,
+            onChanged: (value) => current = value,
           ),
-        ],
-      ),
-    );
-  }
+  );
 }
 
 class _CheckUpdatesButton extends StatefulWidget {
@@ -643,13 +579,27 @@ class _CheckUpdatesButton extends StatefulWidget {
 }
 
 class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
+  HttpCancellation? _updating;
+  HttpCancellation? _checking;
+  @override
+  void dispose() {
+    _updating?.cancel();
+    _checking?.cancel();
+    super.dispose();
+  }
+
   bool isLoading = false;
 
   void check() async {
     setState(() {
       isLoading = true;
     });
-    var count = await ComicSourcePage.checkComicSourceUpdate();
+    final cancellation = HttpCancellation();
+    _checking = cancellation;
+    final count = await ComicSourcePage.checkComicSourceUpdate(cancellation);
+    _checking = null;
+    cancellation.dispose();
+    if (!mounted) return;
     if (count == -1) {
       context.showMessage(message: "Network error".tl);
     } else if (count == 0) {
@@ -687,11 +637,19 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
         );
       },
     );
-    if (doUpdate) {
+    if (doUpdate && mounted) {
+      final cancellation = HttpCancellation();
+      _updating = cancellation;
+      var cancelled = false;
       var loadingController = showLoadingDialog(
         context,
         message: "Updating".tl,
         withProgress: true,
+        barrierDismissible: false,
+        onCancel: () {
+          cancelled = true;
+          cancellation.cancel();
+        },
       );
       int current = 0;
       int total = ComicSourceManager().availableUpdates.length;
@@ -699,14 +657,18 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
         var shouldUpdate = ComicSourceManager().availableUpdates.keys.toList();
         for (var key in shouldUpdate) {
           var source = ComicSource.find(key)!;
-          await ComicSourcePage.update(source, false);
+          if (cancelled) break;
+          await ComicSourcePage.update(source, false, cancellation);
           current++;
           loadingController.setProgress(current / total);
         }
       } catch (e) {
-        context.showMessage(message: e.toString());
+        if (mounted && !cancelled) context.showMessage(message: e.toString());
+      } finally {
+        loadingController.close();
+        _updating = null;
+        cancellation.dispose();
       }
-      loadingController.close();
     }
   }
 
@@ -721,7 +683,7 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
             )
           : Icon(Icons.update),
       label: Text("Check updates".tl),
-      onPressed: check,
+      onPressed: isLoading ? null : check,
     );
   }
 }
@@ -801,8 +763,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
   @override
   Widget build(BuildContext context) {
     var newVersion = ComicSourceManager().availableUpdates[source.key];
-    bool hasUpdate =
-        newVersion != null && compareSemVer(newVersion, source.version);
+    bool hasUpdate = newVersion != null;
 
     return SliverMainAxisGroup(
       slivers: [
@@ -899,7 +860,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
   Iterable<Widget> buildSourceSettings() sync* {
     // Try to get dynamic settings first (for getters), fall back to cached settings
     var settingsMap = source.getSettingsDynamic() ?? source.settings;
-    
+
     if (settingsMap == null) {
       return;
     } else if (source.data['settings'] == null) {

@@ -11,6 +11,7 @@ mod script;
 mod script_crypto;
 mod script_html;
 mod settings;
+mod sources;
 mod text;
 
 mod archives;

@@ -68,6 +68,7 @@ impl Task {
         comic: String,
         chapter: String,
         thumbnail: bool,
+        coordinate_source: bool,
     ) -> Result<Self> {
         let (sender, receiver) = tokio::sync::mpsc::channel(8);
         let state = Arc::new(Request {
@@ -88,6 +89,8 @@ impl Task {
             let source_text=source.as_deref().unwrap_or("null");
             let key=if thumbnail {format!("{image}@{source_text}{}",if comic.is_empty(){String::new()}else{format!("@{comic}")})} else {format!("{image}@{source_text}@{comic}@{chapter}")};
             let work=async {
+                let source_lock=source.as_deref().filter(|_|coordinate_source).map(|key|engine.source_lock(key));
+                let _source_guard=match source_lock {Some(lock)=>Some(lock.read_owned().await),None=>None};
                 let _lock=crate::http_policy::serial(&format!("image:{key}")).await;
                 let cache=crate::cache::shared(&data_path,&cache_path)?;
                 let hit=cache.lock().map_err(|_|anyhow::anyhow!("Cache poisoned"))?.find(&key)?;

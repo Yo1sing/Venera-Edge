@@ -296,6 +296,7 @@ impl Queue {
                 comic.into(),
                 chapter.into(),
                 thumbnail,
+                false,
             )?;
             let result=async {
                 let mut receiver=task.receiver.lock().await;let started=Instant::now();let mut last=Instant::now();
@@ -319,6 +320,11 @@ impl Queue {
             .as_str()
             .context("Missing source")?
             .to_owned();
+        // Hold the source through all chapter/image calls and final registration.
+        // Child image tasks reuse this protection rather than acquiring a nested
+        // read lock while an update is waiting for the download to finish.
+        let source_lock = self.engine.source_lock(&source);
+        let _source_guard = source_lock.read_owned().await;
         let comic_id = item["comicId"]
             .as_str()
             .context("Missing comic id")?

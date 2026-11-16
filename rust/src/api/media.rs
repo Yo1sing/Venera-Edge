@@ -32,6 +32,7 @@ impl ImageTransfer {
                 comic,
                 chapter,
                 thumbnail,
+                true,
             )?,
         })
     }

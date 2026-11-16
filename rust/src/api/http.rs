@@ -116,6 +116,10 @@ pub struct HttpCancellation {
 }
 
 impl HttpCancellation {
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn is_cancelled(&self) -> bool {
+        *self.sender.borrow()
+    }
     #[flutter_rust_bridge::frb(sync)]
     pub fn new() -> Self {
         Self {

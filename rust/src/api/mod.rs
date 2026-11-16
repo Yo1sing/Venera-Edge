@@ -4,6 +4,7 @@ pub mod history;
 pub mod http;
 pub mod script;
 pub mod settings;
+pub mod sources;
 pub mod tags;
 pub mod text;
 

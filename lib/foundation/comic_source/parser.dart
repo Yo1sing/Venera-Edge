@@ -1,10 +1,5 @@
 part of 'comic_source.dart';
 
-/// return true if ver1 > ver2
-bool compareSemVer(String ver1, String ver2) => JsEngine().runCode(
-  '__sources.newer(${jsonEncode(ver1)}, ${jsonEncode(ver2)})',
-);
-
 class ComicSourceParseException implements Exception {
   final String message;
 
@@ -21,28 +16,21 @@ class ComicSourceParser {
   String? _key;
 
   String? _name;
+  late Map<String, dynamic> _configuration;
 
-  Future<ComicSource> createAndParse(String js, String fileName) async {
-    final file = File(
-      await script_backend.createSourceFile(
-        directory: App.dataPath,
-        name: fileName,
-        code: js,
-      ),
-    );
-    try {
-      return await parse(js, file.path);
-    } catch (e) {
-      await file.delete();
-      rethrow;
-    }
-  }
-
-  Future<ComicSource> parse(String js, String filePath) async {
-    final metadata = await JsEngine().parseSource(js);
+  Future<ComicSource> fromMetadata(
+    Map<String, dynamic> metadata, {
+    Map<String, dynamic>? configuration,
+  }) async {
+    final String filePath = metadata['file_path'];
     _name = metadata['name'];
     final String key = metadata['key'];
     _key = key;
+    _configuration =
+        configuration ??
+        Map<String, dynamic>.from(
+          JsEngine().runCode('__sources.describe(${jsonEncode(key)})'),
+        );
     final String version = metadata['version'];
     final String url = metadata['url'];
 
@@ -82,23 +70,23 @@ class ComicSourceParser {
       _parseArchiveDownloader(),
     );
 
-    await source.loadData();
-
-    await JsEngine().initializeSource(key);
     return source;
   }
 
-  bool _checkExists(String index) {
-    return JsEngine().runCode(
-      "ComicSource.sources[${jsonEncode(_key)}].$index !== null "
-      "&& ComicSource.sources[${jsonEncode(_key)}].$index !== undefined",
-    );
-  }
+  bool _checkExists(String index) => _getValue(index) != null;
 
   dynamic _getValue(String index) {
-    return JsEngine().runCode(
-      "ComicSource.sources[${jsonEncode(_key)}].$index",
-    );
+    dynamic value = _configuration;
+    final segments = index
+        .replaceAll('?', '')
+        .replaceAll('[', '.')
+        .replaceAll(']', '')
+        .split('.');
+    for (final segment in segments) {
+      if (value == null) return null;
+      value = value is List ? value[int.parse(segment)] : value[segment];
+    }
+    return value;
   }
 
   AccountConfig? _loadAccountConfig() {
@@ -182,9 +170,7 @@ class ComicSourceParser {
     if (!_checkExists("explore")) {
       return const [];
     }
-    var length = JsEngine().runCode(
-      "ComicSource.sources[${jsonEncode(_key)}].explore.length",
-    );
+    final length = (_getValue('explore') as List).length;
     var pages = <ExplorePageData>[];
     for (int i = 0; i < length; i++) {
       final String title = _getValue("explore[$i].title");
@@ -345,78 +331,37 @@ class ComicSourceParser {
 
     var categoryParts = <BaseCategoryPart>[];
 
-    for (var c in doc["parts"]) {
-      if (c["categories"] != null && c["categories"] is! List) {
-        continue;
-      }
-      List? categories = c["categories"];
-      if (categories == null || categories[0] is Map) {
-        // new format
-        final String name = c["name"];
-        final String type = c["type"];
-        final cs = categories
-            ?.map(
-              (e) => CategoryItem(
-                e['label'],
-                PageJumpTarget.parse(_key!, e['target']),
+    for (final part in doc['parts']) {
+      final String name = part['name'];
+      final categories = (part['categories'] as List?)
+          ?.map(
+            (item) => CategoryItem(
+              item['label'],
+              PageJumpTarget.parse(_key!, item['target']),
+            ),
+          )
+          .toList();
+      switch (part['type']) {
+        case 'fixed':
+          if (categories != null) {
+            categoryParts.add(FixedCategoryPart(name, categories));
+          }
+        case 'random':
+          if (categories != null) {
+            categoryParts.add(
+              RandomCategoryPart(name, categories, part['randomNumber'] ?? 1),
+            );
+          }
+        case 'dynamic':
+          if (categories == null) {
+            categoryParts.add(
+              DynamicCategoryPart(
+                name,
+                JSAutoFreeFunction(part['loader']),
+                _key!,
               ),
-            )
-            .toList();
-        if (type != "dynamic" && (cs == null || cs.isEmpty)) {
-          continue;
-        }
-        if (type == "fixed") {
-          categoryParts.add(FixedCategoryPart(name, cs!));
-        } else if (type == "random") {
-          categoryParts.add(
-            RandomCategoryPart(name, cs!, c["randomNumber"] ?? 1),
-          );
-        } else if (type == "dynamic" && categories == null) {
-          var loader = c["loader"];
-          if (loader is! JSInvokable) {
-            throw "DynamicCategoryPart loader must be a function";
+            );
           }
-          categoryParts.add(
-            DynamicCategoryPart(name, JSAutoFreeFunction(loader), _key!),
-          );
-        }
-      } else {
-        // old format
-        final String name = c["name"];
-        final String type = c["type"];
-        final List<String> tags = List.from(c["categories"]);
-        final String itemType = c["itemType"];
-        List<String>? categoryParams = ListOrNull.from(c["categoryParams"]);
-        final String? groupParam = c["groupParam"];
-        if (groupParam != null) {
-          categoryParams = List.filled(tags.length, groupParam);
-        }
-        var cs = <CategoryItem>[];
-        for (int i = 0; i < tags.length; i++) {
-          PageJumpTarget target;
-          if (itemType == 'category') {
-            target = PageJumpTarget(_key!, 'category', {
-              "category": tags[i],
-              "param": categoryParams?.elementAtOrNull(i),
-            });
-          } else if (itemType == 'search') {
-            target = PageJumpTarget(_key!, 'search', {"keyword": tags[i]});
-          } else if (itemType == 'search_with_namespace') {
-            target = PageJumpTarget(_key!, 'search', {
-              "keyword": "$name:$tags[i]",
-            });
-          } else {
-            target = PageJumpTarget(_key!, itemType, null);
-          }
-          cs.add(CategoryItem(tags[i], target));
-        }
-        if (type == "fixed") {
-          categoryParts.add(FixedCategoryPart(name, cs));
-        } else if (type == "random") {
-          categoryParts.add(
-            RandomCategoryPart(name, cs, c["randomNumber"] ?? 1),
-          );
-        }
       }
     }
 
@@ -435,16 +380,7 @@ class ComicSourceParser {
     if (_checkExists("categoryComics.optionList")) {
       options = <CategoryComicsOptions>[];
       for (var element in _getValue("categoryComics.optionList") ?? []) {
-        LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
-        for (var option in element["options"]) {
-          if (option.isEmpty || !option.contains("-")) {
-            continue;
-          }
-          var split = option.split("-");
-          var key = split.removeAt(0);
-          var value = split.join("-");
-          map[key] = value;
-        }
+        final map = LinkedHashMap<String, String>.from(element['_options']);
         options.add(
           CategoryComicsOptions(
             element["label"] ?? "",
@@ -479,16 +415,7 @@ class ComicSourceParser {
                 "Invalid option data:\nExpected: Map\nGot: ${element.runtimeType}",
               );
             }
-            LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
-            for (var option in element["options"] ?? []) {
-              if (option.isEmpty || !option.contains("-")) {
-                continue;
-              }
-              var split = option.split("-");
-              var key = split.removeAt(0);
-              var value = split.join("-");
-              map[key] = value;
-            }
+            final map = LinkedHashMap<String, String>.from(element['_options']);
             options.add(
               CategoryComicsOptions(
                 element["label"] ?? "",
@@ -510,16 +437,9 @@ class ComicSourceParser {
 
     RankingData? rankingData;
     if (_checkExists("categoryComics.ranking")) {
-      var options = <String, String>{};
-      for (var option in _getValue("categoryComics.ranking.options")) {
-        if (option.isEmpty || !option.contains("-")) {
-          continue;
-        }
-        var split = option.split("-");
-        var key = split.removeAt(0);
-        var value = split.join("-");
-        options[key] = value;
-      }
+      final options = Map<String, String>.from(
+        _getValue('categoryComics.ranking._options'),
+      );
       Future<Res<List<Comic>>> Function(String option, int page)? load;
       Future<Res<List<Comic>>> Function(String option, String? next)?
       loadWithNext;
@@ -602,16 +522,7 @@ class ComicSourceParser {
     if (!_checkExists("search")) return null;
     var options = <SearchOptions>[];
     for (var element in _getValue("search.optionList") ?? []) {
-      LinkedHashMap<String, String> map = LinkedHashMap<String, String>();
-      for (var option in element["options"]) {
-        if (option.isEmpty || !option.contains("-")) {
-          continue;
-        }
-        var split = option.split("-");
-        var key = split.removeAt(0);
-        var value = split.join("-");
-        map[key] = value;
-      }
+      final map = LinkedHashMap<String, String>.from(element['_options']);
       options.add(
         SearchOptions(
           map,

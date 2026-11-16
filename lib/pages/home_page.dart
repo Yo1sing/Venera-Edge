@@ -673,18 +673,7 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
     super.dispose();
   }
 
-  int get _availableUpdates {
-    int c = 0;
-    ComicSourceManager().availableUpdates.forEach((key, version) {
-      var source = ComicSource.find(key);
-      if (source != null) {
-        if (compareSemVer(version, source.version)) {
-          c++;
-        }
-      }
-    });
-    return c;
-  }
+  int get _availableUpdates => ComicSourceManager().availableUpdates.length;
 
   @override
   Widget build(BuildContext context) {

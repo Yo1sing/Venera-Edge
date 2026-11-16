@@ -1,0 +1,302 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:venera/src/rust/api/http.dart';
+import 'package:venera/src/rust/api/media.dart';
+import 'package:venera/src/rust/api/script.dart';
+import 'package:venera/src/rust/api/sources.dart';
+import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera/foundation/comic_source/comic_source.dart' as models;
+import 'package:venera/foundation/script_bridge.dart';
+
+String options(String directory) => jsonEncode({
+  'data_path': directory,
+  'version': '1.6.3',
+  'locale': 'zh_CN',
+  'platform': 'windows',
+  'user_agent': 'test',
+  'http': {
+    'proxy': null,
+    'dns_overrides': <String, String>{},
+    'tls_sni': true,
+    'verify_certificates': true,
+    'connect_timeout_ms': 2000,
+    'receive_timeout_ms': 10000,
+    'max_redirects': 5,
+  },
+});
+
+String source(String base, String version) =>
+    '''
+class NativeSource extends ComicSource {
+  name='Native';key='native';version='$version';url='$base/native.js';
+  comic={loadInfo:()=>({title:'Usable',cover:'cover',tags:{}}),
+    onThumbnailLoad:()=>({url:'$base/image'})};
+}
+''';
+
+void main() {
+  final library = Platform.environment['VENERA_BACKEND_LIBRARY'];
+  if (library == null) {
+    test(
+      'source management native integration',
+      () {},
+      skip: 'Set VENERA_BACKEND_LIBRARY',
+    );
+    return;
+  }
+  setUpAll(() => RustLib.init(externalLibrary: ExternalLibrary.open(library)));
+  tearDownAll(RustLib.dispose);
+
+  test(
+    'source URL operations preserve old files on download failure, invalid scripts and cancellation',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_sources_',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final base = 'http://127.0.0.1:${server.port}';
+      var code = source(base, '1.0.0');
+      var status = 200;
+      var advertised = '2.0.0';
+      var block = false;
+      final arrived = Completer<void>();
+      final disconnected = Completer<void>();
+      final subscription = server.listen((request) async {
+        if (request.uri.path == '/index.json') {
+          request.response.write(
+            jsonEncode([
+              {
+                'key': 'native',
+                'name': 'Native',
+                'version': advertised,
+                'fileName': 'native.js',
+              },
+            ]),
+          );
+        } else if (block) {
+          final socket = await request.response.detachSocket(
+            writeHeaders: false,
+          );
+          socket.listen(
+            (_) {},
+            onDone: () {
+              disconnected.complete();
+              socket.destroy();
+            },
+          );
+          arrived.complete();
+          return;
+        } else {
+          request.response.statusCode = status;
+          request.response.write(code);
+        }
+        await request.response.close();
+      });
+      final runtime = await ScriptRuntime.open(
+        optionsJson: options(directory.path),
+      );
+      final manager = await SourceManager.open(runtime: runtime);
+      final cancellation = HttpCancellation();
+      final cancelUpdate = HttpCancellation();
+      try {
+        final installed = jsonDecode(
+          await manager.installUrl(
+            url: '$base/native.js',
+            cancellation: cancellation,
+          ),
+        );
+        final path = installed['file_path'] as String;
+        final configuration = Map<String, dynamic>.from(
+          ScriptSession(runtime).decodeJson(
+            runtime.evaluate(source: '__sources.describe("native")'),
+          ),
+        );
+        final model = await models.ComicSourceParser().fromMetadata(
+          Map<String, dynamic>.from(installed),
+          configuration: configuration,
+        );
+        expect(model.name, 'Native');
+        expect(model.filePath, path);
+        expect(model.enableTagsSuggestions, false);
+        final original = await File(path).readAsString();
+        final catalog = jsonDecode(
+          await manager.catalog(
+            url: '$base/index.json',
+            cancellation: cancellation,
+          ),
+        );
+        expect(catalog.single['url'], '$base/native.js');
+        expect(
+          jsonDecode(
+            await manager.checkUpdates(
+              url: '$base/index.json',
+              cancellation: cancellation,
+            ),
+          ),
+          {'native': '2.0.0'},
+        );
+        advertised = '1.0.0';
+        expect(
+          jsonDecode(
+            await manager.checkUpdates(
+              url: '$base/index.json',
+              cancellation: cancellation,
+            ),
+          ),
+          isEmpty,
+        );
+        status = 500;
+        await expectLater(
+          manager.update(key: 'native', cancellation: cancellation),
+          throwsA(anything),
+        );
+        status = 200;
+        code = 'invalid';
+        await expectLater(
+          manager.update(key: 'native', cancellation: cancellation),
+          throwsA(anything),
+        );
+        expect(await File(path).readAsString(), original);
+        expect(
+          jsonDecode(
+            runtime.evaluate(
+              source: 'ComicSource.sources.native.comic.loadInfo().title',
+            ),
+          )[1],
+          'Usable',
+        );
+        block = true;
+        final expectation = expectLater(
+          manager.update(key: 'native', cancellation: cancelUpdate),
+          throwsA(anything),
+        );
+        await arrived.future.timeout(const Duration(seconds: 5));
+        cancelUpdate.cancel();
+        await expectation.timeout(const Duration(seconds: 5));
+        await disconnected.future.timeout(const Duration(seconds: 5));
+        expect(await File(path).readAsString(), original);
+        expect(
+          jsonDecode(
+            runtime.evaluate(source: 'ComicSource.sources.native.version'),
+          )[1],
+          '1.0.0',
+        );
+        block = false;
+        code = source(base, '2.0.0');
+        await manager.update(key: 'native', cancellation: cancellation);
+        expect(
+          jsonDecode(
+            runtime.evaluate(source: 'ComicSource.sources.native.version'),
+          )[1],
+          '2.0.0',
+        );
+        expect(await File(path).readAsString(), code);
+        await manager.remove(key: 'native', cancellation: cancellation);
+        expect(await File(path).exists(), false);
+        expect(jsonDecode(manager.snapshot())['sources'], isEmpty);
+      } finally {
+        cancellation.dispose();
+        cancelUpdate.dispose();
+        manager.dispose();
+        runtime.close();
+        runtime.dispose();
+        await subscription.cancel();
+        await server.close(force: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'source edits wait for an active native image request and cancellation leaves that request usable',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_source_image_',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final request = Completer<HttpRequest>();
+      final subscription = server.listen(request.complete);
+      final base = 'http://127.0.0.1:${server.port}';
+      final runtime = await ScriptRuntime.open(
+        optionsJson: options(directory.path),
+      );
+      final manager = await SourceManager.open(runtime: runtime);
+      final cancellation = HttpCancellation();
+      final cancelUpdate = HttpCancellation();
+      ImageTransfer? image;
+      try {
+        await manager.install(
+          code: utf8.encode(source(base, '1.0.0')),
+          name: 'legacy-file.js',
+          cancellation: cancellation,
+        );
+        image = await ImageTransfer.start(
+          runtime: runtime,
+          dataPath: directory.path,
+          cachePath: directory.path,
+          image: 'image-key',
+          source: 'native',
+          comic: 'id',
+          chapter: '',
+          thumbnail: true,
+        );
+        final pending = await request.future.timeout(
+          const Duration(seconds: 5),
+        );
+        final expectation = expectLater(
+          manager.save(
+            key: 'native',
+            code: source(base, '2.0.0'),
+            cancellation: cancelUpdate,
+          ),
+          throwsA(anything),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(
+          jsonDecode(
+            runtime.evaluate(source: 'ComicSource.sources.native.version'),
+          )[1],
+          '1.0.0',
+        );
+        cancelUpdate.cancel();
+        await expectation.timeout(const Duration(seconds: 5));
+        pending.response.add([1, 2, 3]);
+        await pending.response.close();
+        ImageProgress? progress;
+        do {
+          progress = await image.next().timeout(const Duration(seconds: 5));
+        } while (progress != null &&
+            progress.bytes == null &&
+            progress.error == null);
+        expect(progress?.error, null);
+        expect(progress?.bytes, [1, 2, 3]);
+        await manager.save(
+          key: 'native',
+          code: source(base, '2.0.0'),
+          cancellation: cancellation,
+        );
+        expect(
+          jsonDecode(
+            runtime.evaluate(source: 'ComicSource.sources.native.version'),
+          )[1],
+          '2.0.0',
+        );
+      } finally {
+        image?.cancel();
+        image?.dispose();
+        cancellation.dispose();
+        cancelUpdate.dispose();
+        manager.dispose();
+        runtime.close();
+        runtime.dispose();
+        await subscription.cancel();
+        await server.close(force: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+}

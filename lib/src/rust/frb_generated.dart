@@ -17,6 +17,7 @@ import 'api/local.dart';
 import 'api/media.dart';
 import 'api/script.dart';
 import 'api/settings.dart';
+import 'api/sources.dart';
 import 'api/tags.dart';
 import 'api/text.dart';
 import 'dart:async';
@@ -81,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -611526537;
+  int get rustContentHash => -1929709403;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -672,6 +673,89 @@ abstract class RustLibApi extends BaseApi {
     required int id,
   });
 
+  Future<String> crateApiSourcesSourceManagerBeginEdit({
+    required SourceManager that,
+    required String key,
+  });
+
+  Future<String> crateApiSourcesSourceManagerCatalog({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  });
+
+  Future<String> crateApiSourcesSourceManagerCheckUpdates({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  });
+
+  Future<void> crateApiSourcesSourceManagerDiscardEdit({
+    required SourceManager that,
+    required String path,
+  });
+
+  Future<String> crateApiSourcesSourceManagerInstall({
+    required SourceManager that,
+    required List<int> code,
+    required String name,
+    required HttpCancellation cancellation,
+  });
+
+  Future<String> crateApiSourcesSourceManagerInstallUrl({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  });
+
+  Future<String> crateApiSourcesSourceManagerLoad({
+    required SourceManager that,
+    required HttpCancellation cancellation,
+  });
+
+  Future<SourceManager> crateApiSourcesSourceManagerOpen({
+    required ScriptRuntime runtime,
+  });
+
+  Future<String> crateApiSourcesSourceManagerRead({
+    required SourceManager that,
+    required String key,
+  });
+
+  String crateApiSourcesSourceManagerReconcilePages({
+    required SourceManager that,
+    required String settingsJson,
+    String? added,
+  });
+
+  Future<void> crateApiSourcesSourceManagerRemove({
+    required SourceManager that,
+    required String key,
+    required HttpCancellation cancellation,
+  });
+
+  Future<String> crateApiSourcesSourceManagerSave({
+    required SourceManager that,
+    required String key,
+    required String code,
+    required HttpCancellation cancellation,
+  });
+
+  Future<String> crateApiSourcesSourceManagerSaveEdit({
+    required SourceManager that,
+    required String key,
+    required String path,
+    required HttpCancellation cancellation,
+  });
+
+  String crateApiSourcesSourceManagerSnapshot({required SourceManager that});
+
+  Future<String> crateApiSourcesSourceManagerUpdate({
+    required SourceManager that,
+    required String key,
+    required HttpCancellation cancellation,
+  });
+
   String crateApiLocalChapterDirectoryName({required String name});
 
   void crateApiHttpClearHttpCache();
@@ -959,6 +1043,15 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_ScriptRuntimePtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_SourceManager;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_SourceManager;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_SourceManagerPtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -5239,6 +5332,620 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiSourcesSourceManagerBeginEdit({
+    required SourceManager that,
+    required String key,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 123,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerBeginEditConstMeta,
+        argValues: [that, key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerBeginEditConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_begin_edit",
+        argNames: ["that", "key"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerCatalog({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(url, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 124,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerCatalogConstMeta,
+        argValues: [that, url, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerCatalogConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_catalog",
+        argNames: ["that", "url", "cancellation"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerCheckUpdates({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(url, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 125,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerCheckUpdatesConstMeta,
+        argValues: [that, url, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerCheckUpdatesConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_check_updates",
+        argNames: ["that", "url", "cancellation"],
+      );
+
+  @override
+  Future<void> crateApiSourcesSourceManagerDiscardEdit({
+    required SourceManager that,
+    required String path,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 126,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerDiscardEditConstMeta,
+        argValues: [that, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerDiscardEditConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_discard_edit",
+        argNames: ["that", "path"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerInstall({
+    required SourceManager that,
+    required List<int> code,
+    required String name,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_list_prim_u_8_loose(code, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 127,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerInstallConstMeta,
+        argValues: [that, code, name, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerInstallConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_install",
+        argNames: ["that", "code", "name", "cancellation"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerInstallUrl({
+    required SourceManager that,
+    required String url,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(url, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 128,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerInstallUrlConstMeta,
+        argValues: [that, url, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerInstallUrlConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_install_url",
+        argNames: ["that", "url", "cancellation"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerLoad({
+    required SourceManager that,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 129,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerLoadConstMeta,
+        argValues: [that, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerLoadConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_load",
+        argNames: ["that", "cancellation"],
+      );
+
+  @override
+  Future<SourceManager> crateApiSourcesSourceManagerOpen({
+    required ScriptRuntime runtime,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerScriptRuntime(
+            runtime,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 130,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerOpenConstMeta,
+        argValues: [runtime],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerOpenConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_open",
+        argNames: ["runtime"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerRead({
+    required SourceManager that,
+    required String key,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 131,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerReadConstMeta,
+        argValues: [that, key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerReadConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_read",
+        argNames: ["that", "key"],
+      );
+
+  @override
+  String crateApiSourcesSourceManagerReconcilePages({
+    required SourceManager that,
+    required String settingsJson,
+    String? added,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(settingsJson, serializer);
+          sse_encode_opt_String(added, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 132,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerReconcilePagesConstMeta,
+        argValues: [that, settingsJson, added],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerReconcilePagesConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_reconcile_pages",
+        argNames: ["that", "settingsJson", "added"],
+      );
+
+  @override
+  Future<void> crateApiSourcesSourceManagerRemove({
+    required SourceManager that,
+    required String key,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 133,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerRemoveConstMeta,
+        argValues: [that, key, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerRemoveConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_remove",
+        argNames: ["that", "key", "cancellation"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerSave({
+    required SourceManager that,
+    required String key,
+    required String code,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          sse_encode_String(code, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 134,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerSaveConstMeta,
+        argValues: [that, key, code, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerSaveConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_save",
+        argNames: ["that", "key", "code", "cancellation"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerSaveEdit({
+    required SourceManager that,
+    required String key,
+    required String path,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          sse_encode_String(path, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 135,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerSaveEditConstMeta,
+        argValues: [that, key, path, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerSaveEditConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_save_edit",
+        argNames: ["that", "key", "path", "cancellation"],
+      );
+
+  @override
+  String crateApiSourcesSourceManagerSnapshot({required SourceManager that}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 136,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerSnapshotConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerSnapshotConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_snapshot",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<String> crateApiSourcesSourceManagerUpdate({
+    required SourceManager that,
+    required String key,
+    required HttpCancellation cancellation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(key, serializer);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
+            cancellation,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 137,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiSourcesSourceManagerUpdateConstMeta,
+        argValues: [that, key, cancellation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSourcesSourceManagerUpdateConstMeta =>
+      const TaskConstMeta(
+        debugName: "SourceManager_update",
+        argNames: ["that", "key", "cancellation"],
+      );
+
+  @override
   String crateApiLocalChapterDirectoryName({required String name}) {
     return handler.executeSync(
       SyncTask(
@@ -5248,7 +5955,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 123,
+            funcId: 138,
           )!;
         },
         codec: SseCodec(
@@ -5277,7 +5984,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 124,
+            funcId: 139,
           )!;
         },
         codec: SseCodec(
@@ -5308,7 +6015,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 125,
+            funcId: 140,
             port: port_,
           );
         },
@@ -5345,7 +6052,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 126,
+            funcId: 141,
             port: port_,
           );
         },
@@ -5382,7 +6089,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 127,
+            funcId: 142,
             port: port_,
           );
         },
@@ -5412,7 +6119,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 128,
+            funcId: 143,
           )!;
         },
         codec: SseCodec(
@@ -5445,7 +6152,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 129,
+            funcId: 144,
             port: port_,
           );
         },
@@ -5482,7 +6189,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 130,
+            funcId: 145,
             port: port_,
           );
         },
@@ -5516,7 +6223,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 131,
+            funcId: 146,
             port: port_,
           );
         },
@@ -5547,7 +6254,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 132,
+            funcId: 147,
           )!;
         },
         codec: SseCodec(
@@ -5577,7 +6284,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 133,
+            funcId: 148,
           )!;
         },
         codec: SseCodec(
@@ -5607,7 +6314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 134,
+            funcId: 149,
           )!;
         },
         codec: SseCodec(
@@ -5659,7 +6366,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 135,
+            funcId: 150,
             port: port_,
           );
         },
@@ -5716,7 +6423,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 136,
+            funcId: 151,
             port: port_,
           );
         },
@@ -5761,7 +6468,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 137,
+            funcId: 152,
             port: port_,
           );
         },
@@ -5807,7 +6514,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 138,
+            funcId: 153,
             port: port_,
           );
         },
@@ -5835,7 +6542,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 139,
+            funcId: 154,
             port: port_,
           );
         },
@@ -5863,7 +6570,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 140,
+            funcId: 155,
             port: port_,
           );
         },
@@ -5895,7 +6602,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 141,
+            funcId: 156,
           )!;
         },
         codec: SseCodec(
@@ -5929,7 +6636,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 142,
+            funcId: 157,
           )!;
         },
         codec: SseCodec(
@@ -5963,7 +6670,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 143,
+            funcId: 158,
             port: port_,
           );
         },
@@ -6003,7 +6710,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 144,
+            funcId: 159,
           )!;
         },
         codec: SseCodec(
@@ -6035,7 +6742,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 145,
+            funcId: 160,
             port: port_,
           );
         },
@@ -6066,7 +6773,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 146,
+            funcId: 161,
             port: port_,
           );
         },
@@ -6100,7 +6807,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 147,
+            funcId: 162,
           )!;
         },
         codec: SseCodec(
@@ -6134,7 +6841,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 148,
+            funcId: 163,
             port: port_,
           );
         },
@@ -6169,7 +6876,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 149,
+            funcId: 164,
             port: port_,
           );
         },
@@ -6200,7 +6907,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 150,
+            funcId: 165,
           )!;
         },
         codec: SseCodec(
@@ -6230,7 +6937,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 151,
+            funcId: 166,
           )!;
         },
         codec: SseCodec(
@@ -6257,7 +6964,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 152,
+            funcId: 167,
             port: port_,
           );
         },
@@ -6285,7 +6992,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 153,
+            funcId: 168,
             port: port_,
           );
         },
@@ -6315,7 +7022,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 154,
+            funcId: 169,
             port: port_,
           );
         },
@@ -6349,7 +7056,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 155,
+            funcId: 170,
           )!;
         },
         codec: SseCodec(
@@ -6378,7 +7085,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 156,
+            funcId: 171,
           )!;
         },
         codec: SseCodec(
@@ -6414,7 +7121,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 157,
+            funcId: 172,
           )!;
         },
         codec: SseCodec(
@@ -6449,7 +7156,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 158,
+            funcId: 173,
           )!;
         },
         codec: SseCodec(
@@ -6487,7 +7194,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 159,
+            funcId: 174,
           )!;
         },
         codec: SseCodec(
@@ -6626,6 +7333,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
   get rust_arc_decrement_strong_count_ScriptRuntime => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerScriptRuntime;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_SourceManager => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_SourceManager => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager;
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -6769,6 +7484,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SourceManager
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   CacheStore
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCacheStore(
     dynamic raw,
@@ -6901,6 +7625,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ScriptRuntimeImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  SourceManager
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -7070,6 +7803,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ScriptRuntimeImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  SourceManager
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -7634,6 +8376,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  SourceManager
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   CacheStore
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCacheStore(
     SseDeserializer deserializer,
@@ -7808,6 +8562,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return ScriptRuntimeImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  SourceManager
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -8018,6 +8784,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return ScriptRuntimeImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  SourceManager
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return SourceManagerImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -8730,6 +9508,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SourceManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as SourceManagerImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCacheStore(
     CacheStore self,
     SseSerializer serializer,
@@ -8919,6 +9710,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as ScriptRuntimeImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SourceManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as SourceManagerImpl).frbInternalSseEncode(move: false),
       serializer,
     );
   }
@@ -9150,6 +9954,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as ScriptRuntimeImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSourceManager(
+    SourceManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as SourceManagerImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -10487,4 +11304,126 @@ class ScriptRuntimeImpl extends RustOpaque implements ScriptRuntime {
 
   void retain({required int id}) => RustLib.instance.api
       .crateApiScriptScriptRuntimeRetain(that: this, id: id);
+}
+
+@sealed
+class SourceManagerImpl extends RustOpaque implements SourceManager {
+  // Not to be used by end users
+  SourceManagerImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  SourceManagerImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_SourceManager,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_SourceManager,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_SourceManagerPtr,
+  );
+
+  Future<String> beginEdit({required String key}) => RustLib.instance.api
+      .crateApiSourcesSourceManagerBeginEdit(that: this, key: key);
+
+  Future<String> catalog({
+    required String url,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerCatalog(
+    that: this,
+    url: url,
+    cancellation: cancellation,
+  );
+
+  Future<String> checkUpdates({
+    required String url,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerCheckUpdates(
+    that: this,
+    url: url,
+    cancellation: cancellation,
+  );
+
+  Future<void> discardEdit({required String path}) => RustLib.instance.api
+      .crateApiSourcesSourceManagerDiscardEdit(that: this, path: path);
+
+  Future<String> install({
+    required List<int> code,
+    required String name,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerInstall(
+    that: this,
+    code: code,
+    name: name,
+    cancellation: cancellation,
+  );
+
+  Future<String> installUrl({
+    required String url,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerInstallUrl(
+    that: this,
+    url: url,
+    cancellation: cancellation,
+  );
+
+  Future<String> load({required HttpCancellation cancellation}) => RustLib
+      .instance
+      .api
+      .crateApiSourcesSourceManagerLoad(that: this, cancellation: cancellation);
+
+  Future<String> read({required String key}) => RustLib.instance.api
+      .crateApiSourcesSourceManagerRead(that: this, key: key);
+
+  String reconcilePages({required String settingsJson, String? added}) =>
+      RustLib.instance.api.crateApiSourcesSourceManagerReconcilePages(
+        that: this,
+        settingsJson: settingsJson,
+        added: added,
+      );
+
+  Future<void> remove({
+    required String key,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerRemove(
+    that: this,
+    key: key,
+    cancellation: cancellation,
+  );
+
+  Future<String> save({
+    required String key,
+    required String code,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerSave(
+    that: this,
+    key: key,
+    code: code,
+    cancellation: cancellation,
+  );
+
+  Future<String> saveEdit({
+    required String key,
+    required String path,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerSaveEdit(
+    that: this,
+    key: key,
+    path: path,
+    cancellation: cancellation,
+  );
+
+  String snapshot() =>
+      RustLib.instance.api.crateApiSourcesSourceManagerSnapshot(that: this);
+
+  Future<String> update({
+    required String key,
+    required HttpCancellation cancellation,
+  }) => RustLib.instance.api.crateApiSourcesSourceManagerUpdate(
+    that: this,
+    key: key,
+    cancellation: cancellation,
+  );
 }
