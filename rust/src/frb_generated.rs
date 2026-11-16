@@ -31,6 +31,7 @@ use crate::api::comic_queue::*;
 use crate::api::cookies::*;
 use crate::api::download::*;
 use crate::api::favorites::*;
+use crate::api::follow_updates::*;
 use crate::api::history::*;
 use crate::api::http::*;
 use crate::api::local::*;
@@ -48,7 +49,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 443359916;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -611526537;
 
 // Section: executor
 
@@ -3015,6 +3016,491 @@ fn wire__crate__api__download__FileDownload_stop_impl(
                         let api_that_guard = api_that_guard.unwrap();
                         let output_ok =
                             crate::api::download::FileDownload::stop(&*api_that_guard).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateService_close_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_close",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::follow_updates::FollowUpdateService::close(
+                                &*api_that_guard,
+                            )
+                            .await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateService_configure_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_configure",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+            >>::sse_decode(&mut deserializer);
+            let api_folder = <Option<String>>::sse_decode(&mut deserializer);
+            let api_paused = <bool>::sse_decode(&mut deserializer);
+            let api_traditional = <bool>::sse_decode(&mut deserializer);
+            let api_source_types_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = crate::api::follow_updates::FollowUpdateService::configure(
+                            &*api_that_guard,
+                            api_folder,
+                            api_paused,
+                            api_traditional,
+                            api_source_types_json,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateService_next_event_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_next_event",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::follow_updates::FollowUpdateService::next_event(
+                                &*api_that_guard,
+                            )
+                            .await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateService_open_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_open",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_runtime = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ScriptRuntime>,
+            >>::sse_decode(&mut deserializer);
+            let api_favorites = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let mut api_runtime_guard = None;
+                    let mut api_favorites_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_runtime,
+                                0,
+                                false,
+                            ),
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_favorites,
+                                1,
+                                false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_runtime_guard = Some(api_runtime.lockable_decode_sync_ref()),
+                            1 => {
+                                api_favorites_guard = Some(api_favorites.lockable_decode_sync_ref())
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_runtime_guard = api_runtime_guard.unwrap();
+                    let api_favorites_guard = api_favorites_guard.unwrap();
+                    let output_ok = Result::<_, ()>::Ok(
+                        crate::api::follow_updates::FollowUpdateService::open(
+                            &*api_runtime_guard,
+                            &*api_favorites_guard,
+                        ),
+                    )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateService_start_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_start",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+            >>::sse_decode(&mut deserializer);
+            let api_folder = <String>::sse_decode(&mut deserializer);
+            let api_force = <bool>::sse_decode(&mut deserializer);
+            let api_keys_json = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = crate::api::follow_updates::FollowUpdateService::start(
+                            &*api_that_guard,
+                            api_folder,
+                            api_force,
+                            api_keys_json,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateTask_cancel_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateTask_cancel",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::follow_updates::FollowUpdateTask::cancel(&*api_that_guard);
+                })?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateTask_next_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateTask_next_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::follow_updates::FollowUpdateTask::next_snapshot(
+                                &*api_that_guard,
+                            )
+                            .await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__follow_updates__FollowUpdateTask_wait_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateTask_wait",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::follow_updates::FollowUpdateTask::wait(&*api_that_guard)
+                                .await;
+                        })?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -6266,6 +6752,38 @@ fn wire__crate__api__archive__extract_archive_impl(
         },
     )
 }
+fn wire__crate__api__follow_updates__find_update_time_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "find_update_time",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_info_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let output_ok = crate::api::follow_updates::find_update_time(api_info_json)?;
+                    Ok(output_ok)
+                })(),
+            )
+        },
+    )
+}
 fn wire__crate__api__text__has_chinese_simplified_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7311,6 +7829,12 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FileDownload>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryStore>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
@@ -7390,6 +7914,26 @@ impl SseDecode for FileDownload {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FileDownload>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for FollowUpdateService {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for FollowUpdateTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -7533,6 +8077,26 @@ impl SseDecode
 
 impl SseDecode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FileDownload>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -8163,90 +8727,132 @@ fn pde_ffi_dispatcher_primary_impl(
             wire__crate__api__download__FileDownload_start_impl(port, ptr, rust_vec_len, data_len)
         }
         56 => wire__crate__api__download__FileDownload_stop_impl(port, ptr, rust_vec_len, data_len),
-        68 => wire__crate__api__history__HistoryStore_image_statistics_impl(
+        57 => wire__crate__api__follow_updates__FollowUpdateService_close_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        70 => wire__crate__api__history__HistoryStore_open_impl(port, ptr, rust_vec_len, data_len),
-        71 => wire__crate__api__history__HistoryStore_save_impl(port, ptr, rust_vec_len, data_len),
-        74 => {
+        58 => wire__crate__api__follow_updates__FollowUpdateService_configure_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        59 => wire__crate__api__follow_updates__FollowUpdateService_next_event_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        60 => wire__crate__api__follow_updates__FollowUpdateService_open_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        61 => wire__crate__api__follow_updates__FollowUpdateService_start_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        63 => wire__crate__api__follow_updates__FollowUpdateTask_next_snapshot_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        64 => wire__crate__api__follow_updates__FollowUpdateTask_wait_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        76 => wire__crate__api__history__HistoryStore_image_statistics_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        78 => wire__crate__api__history__HistoryStore_open_impl(port, ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__history__HistoryStore_save_impl(port, ptr, rust_vec_len, data_len),
+        82 => {
             wire__crate__api__http__HttpCancellation_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        76 => wire__crate__api__http__HttpResponse_close_impl(port, ptr, rust_vec_len, data_len),
-        78 => {
+        84 => wire__crate__api__http__HttpResponse_close_impl(port, ptr, rust_vec_len, data_len),
+        86 => {
             wire__crate__api__http__HttpResponse_next_chunk_impl(port, ptr, rust_vec_len, data_len)
         }
-        82 => wire__crate__api__http__HttpUpload_default_impl(port, ptr, rust_vec_len, data_len),
-        83 => wire__crate__api__http__HttpUpload_fail_impl(port, ptr, rust_vec_len, data_len),
-        86 => wire__crate__api__http__HttpUpload_write_impl(port, ptr, rust_vec_len, data_len),
-        88 => wire__crate__api__media__ImageTransfer_next_impl(port, ptr, rust_vec_len, data_len),
-        89 => wire__crate__api__media__ImageTransfer_start_impl(port, ptr, rust_vec_len, data_len),
-        99 => wire__crate__api__local__LocalStore_open_impl(port, ptr, rust_vec_len, data_len),
-        101 => {
+        90 => wire__crate__api__http__HttpUpload_default_impl(port, ptr, rust_vec_len, data_len),
+        91 => wire__crate__api__http__HttpUpload_fail_impl(port, ptr, rust_vec_len, data_len),
+        94 => wire__crate__api__http__HttpUpload_write_impl(port, ptr, rust_vec_len, data_len),
+        96 => wire__crate__api__media__ImageTransfer_next_impl(port, ptr, rust_vec_len, data_len),
+        97 => wire__crate__api__media__ImageTransfer_start_impl(port, ptr, rust_vec_len, data_len),
+        107 => wire__crate__api__local__LocalStore_open_impl(port, ptr, rust_vec_len, data_len),
+        109 => {
             wire__crate__api__backup__PreparedBackup_apply_impl(port, ptr, rust_vec_len, data_len)
         }
-        102 => {
+        110 => {
             wire__crate__api__backup__PreparedBackup_open_impl(port, ptr, rust_vec_len, data_len)
         }
-        103 => wire__crate__api__script__ScriptRuntime_await_promise_impl(
+        111 => wire__crate__api__script__ScriptRuntime_await_promise_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        105 => wire__crate__api__script__ScriptRuntime_configure_impl(
+        113 => wire__crate__api__script__ScriptRuntime_configure_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        107 => wire__crate__api__script__ScriptRuntime_initialize_source_impl(
+        115 => wire__crate__api__script__ScriptRuntime_initialize_source_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        109 => wire__crate__api__script__ScriptRuntime_next_event_impl(
+        117 => wire__crate__api__script__ScriptRuntime_next_event_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        110 => wire__crate__api__script__ScriptRuntime_open_impl(port, ptr, rust_vec_len, data_len),
-        111 => wire__crate__api__script__ScriptRuntime_parse_source_impl(
+        118 => wire__crate__api__script__ScriptRuntime_open_impl(port, ptr, rust_vec_len, data_len),
+        119 => wire__crate__api__script__ScriptRuntime_parse_source_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        117 => wire__crate__api__archive__compress_folder_impl(port, ptr, rust_vec_len, data_len),
-        118 => wire__crate__api__script__compute_script_impl(port, ptr, rust_vec_len, data_len),
-        119 => wire__crate__api__script__create_source_file_impl(port, ptr, rust_vec_len, data_len),
-        121 => wire__crate__api__backup__export_app_data_impl(port, ptr, rust_vec_len, data_len),
-        122 => wire__crate__api__media__export_book_impl(port, ptr, rust_vec_len, data_len),
-        123 => wire__crate__api__archive__extract_archive_impl(port, ptr, rust_vec_len, data_len),
-        126 => wire__crate__api__http__http_request_impl(port, ptr, rust_vec_len, data_len),
-        127 => {
+        125 => wire__crate__api__archive__compress_folder_impl(port, ptr, rust_vec_len, data_len),
+        126 => wire__crate__api__script__compute_script_impl(port, ptr, rust_vec_len, data_len),
+        127 => wire__crate__api__script__create_source_file_impl(port, ptr, rust_vec_len, data_len),
+        129 => wire__crate__api__backup__export_app_data_impl(port, ptr, rust_vec_len, data_len),
+        130 => wire__crate__api__media__export_book_impl(port, ptr, rust_vec_len, data_len),
+        131 => wire__crate__api__archive__extract_archive_impl(port, ptr, rust_vec_len, data_len),
+        135 => wire__crate__api__http__http_request_impl(port, ptr, rust_vec_len, data_len),
+        136 => {
             wire__crate__api__archive__import_comic_archive_impl(port, ptr, rust_vec_len, data_len)
         }
-        128 => wire__crate__api__backup__import_pica_data_impl(port, ptr, rust_vec_len, data_len),
-        129 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-        130 => wire__crate__api__local__list_comic_images_impl(port, ptr, rust_vec_len, data_len),
-        131 => wire__crate__api__settings__load_app_data_impl(port, ptr, rust_vec_len, data_len),
-        134 => wire__crate__api__media__modify_image_impl(port, ptr, rust_vec_len, data_len),
-        136 => {
+        137 => wire__crate__api__backup__import_pica_data_impl(port, ptr, rust_vec_len, data_len),
+        138 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+        139 => wire__crate__api__local__list_comic_images_impl(port, ptr, rust_vec_len, data_len),
+        140 => wire__crate__api__settings__load_app_data_impl(port, ptr, rust_vec_len, data_len),
+        143 => wire__crate__api__media__modify_image_impl(port, ptr, rust_vec_len, data_len),
+        145 => {
             wire__crate__api__archive__read_ehviewer_library_impl(port, ptr, rust_vec_len, data_len)
         }
-        137 => wire__crate__api__script__read_source_file_impl(port, ptr, rust_vec_len, data_len),
-        139 => wire__crate__api__settings__save_app_data_impl(port, ptr, rust_vec_len, data_len),
-        140 => {
+        146 => wire__crate__api__script__read_source_file_impl(port, ptr, rust_vec_len, data_len),
+        148 => wire__crate__api__settings__save_app_data_impl(port, ptr, rust_vec_len, data_len),
+        149 => {
             wire__crate__api__settings__save_implicit_data_impl(port, ptr, rust_vec_len, data_len)
         }
-        143 => wire__crate__api__script__source_files_impl(port, ptr, rust_vec_len, data_len),
-        144 => wire__crate__api__backup__sync_download_impl(port, ptr, rust_vec_len, data_len),
-        145 => wire__crate__api__backup__sync_upload_impl(port, ptr, rust_vec_len, data_len),
+        152 => wire__crate__api__script__source_files_impl(port, ptr, rust_vec_len, data_len),
+        153 => wire__crate__api__backup__sync_download_impl(port, ptr, rust_vec_len, data_len),
+        154 => wire__crate__api__backup__sync_upload_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8320,64 +8926,72 @@ fn pde_ffi_dispatcher_sync_impl(
         53 => {
             wire__crate__api__favorites__FavoriteStore_update_info_impl(ptr, rust_vec_len, data_len)
         }
-        57 => wire__crate__api__history__HistoryStore_clear_impl(ptr, rust_vec_len, data_len),
-        58 => wire__crate__api__history__HistoryStore_close_impl(ptr, rust_vec_len, data_len),
-        59 => wire__crate__api__history__HistoryStore_count_impl(ptr, rust_vec_len, data_len),
-        60 => wire__crate__api__history__HistoryStore_delete_impl(ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__history__HistoryStore_find_impl(ptr, rust_vec_len, data_len),
-        62 => wire__crate__api__history__HistoryStore_image_count_impl(ptr, rust_vec_len, data_len),
-        63 => {
+        62 => wire__crate__api__follow_updates__FollowUpdateTask_cancel_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        65 => wire__crate__api__history__HistoryStore_clear_impl(ptr, rust_vec_len, data_len),
+        66 => wire__crate__api__history__HistoryStore_close_impl(ptr, rust_vec_len, data_len),
+        67 => wire__crate__api__history__HistoryStore_count_impl(ptr, rust_vec_len, data_len),
+        68 => wire__crate__api__history__HistoryStore_delete_impl(ptr, rust_vec_len, data_len),
+        69 => wire__crate__api__history__HistoryStore_find_impl(ptr, rust_vec_len, data_len),
+        70 => wire__crate__api__history__HistoryStore_image_count_impl(ptr, rust_vec_len, data_len),
+        71 => {
             wire__crate__api__history__HistoryStore_image_delete_impl(ptr, rust_vec_len, data_len)
         }
-        64 => wire__crate__api__history__HistoryStore_image_find_impl(ptr, rust_vec_len, data_len),
-        65 => wire__crate__api__history__HistoryStore_image_has_impl(ptr, rust_vec_len, data_len),
-        66 => wire__crate__api__history__HistoryStore_image_list_impl(ptr, rust_vec_len, data_len),
-        67 => wire__crate__api__history__HistoryStore_image_save_impl(ptr, rust_vec_len, data_len),
-        69 => wire__crate__api__history__HistoryStore_list_impl(ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__history__HistoryStore_save_sync_impl(ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__http__HttpCancellation_cancel_impl(ptr, rust_vec_len, data_len),
-        75 => wire__crate__api__http__HttpCancellation_new_impl(ptr, rust_vec_len, data_len),
-        77 => wire__crate__api__http__HttpResponse_headers_impl(ptr, rust_vec_len, data_len),
-        79 => wire__crate__api__http__HttpResponse_status_impl(ptr, rust_vec_len, data_len),
-        80 => wire__crate__api__http__HttpResponse_url_impl(ptr, rust_vec_len, data_len),
-        81 => wire__crate__api__http__HttpUpload_abort_impl(ptr, rust_vec_len, data_len),
-        84 => wire__crate__api__http__HttpUpload_finish_impl(ptr, rust_vec_len, data_len),
-        85 => wire__crate__api__http__HttpUpload_new_impl(ptr, rust_vec_len, data_len),
-        87 => wire__crate__api__media__ImageTransfer_cancel_impl(ptr, rust_vec_len, data_len),
-        90 => wire__crate__api__local__LocalStore_close_impl(ptr, rust_vec_len, data_len),
-        91 => wire__crate__api__local__LocalStore_count_impl(ptr, rust_vec_len, data_len),
-        92 => wire__crate__api__local__LocalStore_delete_impl(ptr, rust_vec_len, data_len),
-        93 => wire__crate__api__local__LocalStore_delete_chapters_impl(ptr, rust_vec_len, data_len),
-        94 => wire__crate__api__local__LocalStore_downloaded_impl(ptr, rust_vec_len, data_len),
-        95 => wire__crate__api__local__LocalStore_find_impl(ptr, rust_vec_len, data_len),
-        96 => wire__crate__api__local__LocalStore_find_name_impl(ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__local__LocalStore_list_impl(ptr, rust_vec_len, data_len),
-        98 => wire__crate__api__local__LocalStore_next_id_impl(ptr, rust_vec_len, data_len),
-        100 => wire__crate__api__local__LocalStore_save_impl(ptr, rust_vec_len, data_len),
-        104 => wire__crate__api__script__ScriptRuntime_close_impl(ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__script__ScriptRuntime_evaluate_impl(ptr, rust_vec_len, data_len),
-        108 => wire__crate__api__script__ScriptRuntime_invoke_impl(ptr, rust_vec_len, data_len),
-        112 => wire__crate__api__script__ScriptRuntime_release_impl(ptr, rust_vec_len, data_len),
-        113 => {
+        72 => wire__crate__api__history__HistoryStore_image_find_impl(ptr, rust_vec_len, data_len),
+        73 => wire__crate__api__history__HistoryStore_image_has_impl(ptr, rust_vec_len, data_len),
+        74 => wire__crate__api__history__HistoryStore_image_list_impl(ptr, rust_vec_len, data_len),
+        75 => wire__crate__api__history__HistoryStore_image_save_impl(ptr, rust_vec_len, data_len),
+        77 => wire__crate__api__history__HistoryStore_list_impl(ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__history__HistoryStore_save_sync_impl(ptr, rust_vec_len, data_len),
+        81 => wire__crate__api__http__HttpCancellation_cancel_impl(ptr, rust_vec_len, data_len),
+        83 => wire__crate__api__http__HttpCancellation_new_impl(ptr, rust_vec_len, data_len),
+        85 => wire__crate__api__http__HttpResponse_headers_impl(ptr, rust_vec_len, data_len),
+        87 => wire__crate__api__http__HttpResponse_status_impl(ptr, rust_vec_len, data_len),
+        88 => wire__crate__api__http__HttpResponse_url_impl(ptr, rust_vec_len, data_len),
+        89 => wire__crate__api__http__HttpUpload_abort_impl(ptr, rust_vec_len, data_len),
+        92 => wire__crate__api__http__HttpUpload_finish_impl(ptr, rust_vec_len, data_len),
+        93 => wire__crate__api__http__HttpUpload_new_impl(ptr, rust_vec_len, data_len),
+        95 => wire__crate__api__media__ImageTransfer_cancel_impl(ptr, rust_vec_len, data_len),
+        98 => wire__crate__api__local__LocalStore_close_impl(ptr, rust_vec_len, data_len),
+        99 => wire__crate__api__local__LocalStore_count_impl(ptr, rust_vec_len, data_len),
+        100 => wire__crate__api__local__LocalStore_delete_impl(ptr, rust_vec_len, data_len),
+        101 => {
+            wire__crate__api__local__LocalStore_delete_chapters_impl(ptr, rust_vec_len, data_len)
+        }
+        102 => wire__crate__api__local__LocalStore_downloaded_impl(ptr, rust_vec_len, data_len),
+        103 => wire__crate__api__local__LocalStore_find_impl(ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__local__LocalStore_find_name_impl(ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__local__LocalStore_list_impl(ptr, rust_vec_len, data_len),
+        106 => wire__crate__api__local__LocalStore_next_id_impl(ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__local__LocalStore_save_impl(ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__script__ScriptRuntime_close_impl(ptr, rust_vec_len, data_len),
+        114 => wire__crate__api__script__ScriptRuntime_evaluate_impl(ptr, rust_vec_len, data_len),
+        116 => wire__crate__api__script__ScriptRuntime_invoke_impl(ptr, rust_vec_len, data_len),
+        120 => wire__crate__api__script__ScriptRuntime_release_impl(ptr, rust_vec_len, data_len),
+        121 => {
             wire__crate__api__script__ScriptRuntime_resolve_event_impl(ptr, rust_vec_len, data_len)
         }
-        114 => wire__crate__api__script__ScriptRuntime_retain_impl(ptr, rust_vec_len, data_len),
-        115 => wire__crate__api__local__chapter_directory_name_impl(ptr, rust_vec_len, data_len),
-        116 => wire__crate__api__http__clear_http_cache_impl(ptr, rust_vec_len, data_len),
-        120 => wire__crate__api__settings__default_settings_json_impl(ptr, rust_vec_len, data_len),
-        124 => wire__crate__api__text__has_chinese_simplified_impl(ptr, rust_vec_len, data_len),
-        125 => wire__crate__api__text__has_chinese_traditional_impl(ptr, rust_vec_len, data_len),
-        132 => wire__crate__api__script__load_source_data_impl(ptr, rust_vec_len, data_len),
-        133 => wire__crate__api__settings__merge_synced_data_impl(ptr, rust_vec_len, data_len),
-        135 => wire__crate__api__settings__mutate_settings_impl(ptr, rust_vec_len, data_len),
-        138 => wire__crate__api__settings__reader_setting_impl(ptr, rust_vec_len, data_len),
-        141 => wire__crate__api__text__simplified_to_traditional_impl(ptr, rust_vec_len, data_len),
-        142 => wire__crate__api__local__sort_comic_images_impl(ptr, rust_vec_len, data_len),
-        146 => wire__crate__api__tags__tag_suggestions_impl(ptr, rust_vec_len, data_len),
-        147 => wire__crate__api__text__traditional_to_simplified_impl(ptr, rust_vec_len, data_len),
-        148 => wire__crate__api__tags__translate_tag_impl(ptr, rust_vec_len, data_len),
-        149 => wire__crate__api__settings__update_search_history_impl(ptr, rust_vec_len, data_len),
-        150 => wire__crate__api__script__update_source_data_impl(ptr, rust_vec_len, data_len),
+        122 => wire__crate__api__script__ScriptRuntime_retain_impl(ptr, rust_vec_len, data_len),
+        123 => wire__crate__api__local__chapter_directory_name_impl(ptr, rust_vec_len, data_len),
+        124 => wire__crate__api__http__clear_http_cache_impl(ptr, rust_vec_len, data_len),
+        128 => wire__crate__api__settings__default_settings_json_impl(ptr, rust_vec_len, data_len),
+        132 => wire__crate__api__follow_updates__find_update_time_impl(ptr, rust_vec_len, data_len),
+        133 => wire__crate__api__text__has_chinese_simplified_impl(ptr, rust_vec_len, data_len),
+        134 => wire__crate__api__text__has_chinese_traditional_impl(ptr, rust_vec_len, data_len),
+        141 => wire__crate__api__script__load_source_data_impl(ptr, rust_vec_len, data_len),
+        142 => wire__crate__api__settings__merge_synced_data_impl(ptr, rust_vec_len, data_len),
+        144 => wire__crate__api__settings__mutate_settings_impl(ptr, rust_vec_len, data_len),
+        147 => wire__crate__api__settings__reader_setting_impl(ptr, rust_vec_len, data_len),
+        150 => wire__crate__api__text__simplified_to_traditional_impl(ptr, rust_vec_len, data_len),
+        151 => wire__crate__api__local__sort_comic_images_impl(ptr, rust_vec_len, data_len),
+        155 => wire__crate__api__tags__tag_suggestions_impl(ptr, rust_vec_len, data_len),
+        156 => wire__crate__api__text__traditional_to_simplified_impl(ptr, rust_vec_len, data_len),
+        157 => wire__crate__api__tags__translate_tag_impl(ptr, rust_vec_len, data_len),
+        158 => wire__crate__api__settings__update_search_history_impl(ptr, rust_vec_len, data_len),
+        159 => wire__crate__api__script__update_source_data_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -8458,6 +9072,39 @@ impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<
 
 impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FileDownload>> for FileDownload {
     fn into_into_dart(self) -> FrbWrapper<FileDownload> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<FollowUpdateService> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<FollowUpdateService>
+{
+}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FollowUpdateService>> for FollowUpdateService {
+    fn into_into_dart(self) -> FrbWrapper<FollowUpdateService> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<FollowUpdateTask> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<FollowUpdateTask> {}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FollowUpdateTask>> for FollowUpdateTask {
+    fn into_into_dart(self) -> FrbWrapper<FollowUpdateTask> {
         self.into()
     }
 }
@@ -8808,6 +9455,20 @@ impl SseEncode for FileDownload {
     }
 }
 
+impl SseEncode for FollowUpdateService {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
+impl SseEncode for FollowUpdateTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for HistoryStore {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -8924,6 +9585,28 @@ impl SseEncode
 
 impl SseEncode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FileDownload>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -9400,6 +10083,7 @@ mod io {
     use crate::api::cookies::*;
     use crate::api::download::*;
     use crate::api::favorites::*;
+    use crate::api::follow_updates::*;
     use crate::api::history::*;
     use crate::api::http::*;
     use crate::api::local::*;
@@ -9483,6 +10167,34 @@ mod io {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FileDownload>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateService(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateService(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>::decrement_strong_count(ptr as _);
     }
 
     #[unsafe(no_mangle)]

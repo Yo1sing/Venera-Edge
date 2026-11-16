@@ -463,6 +463,36 @@ impl Favorites {
         Ok(())
     }
 
+    /// Read the current row in the same transaction as the write: a concurrent
+    /// mark-as-read must not be overwritten by the task's initial snapshot.
+    pub fn apply_follow(
+        &self,
+        folder: &str,
+        comic: &Favorite,
+        update_time: Option<&str>,
+        traditional: bool,
+    ) -> Result<bool> {
+        let transaction = self.db.unchecked_transaction()?;
+        let table = self.table(folder)?;
+        let current: Option<Option<String>> = self
+            .db
+            .query_row(
+                &format!("SELECT last_update_time FROM {table} WHERE id=? AND type=?"),
+                params![comic.id, comic.comic_type],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(previous) = current else {
+            transaction.commit()?;
+            return Ok(false);
+        };
+        let updated = update_time.is_some_and(|time| Some(time) != previous.as_deref());
+        self.update_info(folder, comic, traditional)?;
+        self.update_check(folder, &comic.id, comic.comic_type, update_time)?;
+        transaction.commit()?;
+        Ok(updated)
+    }
+
     pub fn update_check(
         &self,
         folder: &str,

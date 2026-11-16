@@ -14,6 +14,7 @@ pub fn init_app() {
 
 pub mod download;
 pub mod favorites;
+pub mod follow_updates;
 pub mod local;
 
 pub mod archive;

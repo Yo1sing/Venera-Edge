@@ -4,6 +4,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/favorites.dart';
+import 'package:venera/foundation/follow_updates.dart';
 import 'package:venera/foundation/history.dart';
 import 'package:venera/network/cookie_jar.dart';
 import 'package:venera/src/rust/api/backup.dart' as backend;
@@ -25,7 +26,11 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
     currentVersion: checkVersion ? appdata.settings['dataVersion'] : null,
   );
   if (prepared == null) return;
+  final wasPaused = FollowUpdatesBackend.paused;
+  FollowUpdatesBackend.restoring = true;
+  FollowUpdatesBackend.paused = true;
   try {
+    await FollowUpdatesBackend.close();
     HistoryManager().close();
     LocalFavoritesManager().close();
     SingleInstanceCookieJar.instance?.dispose();
@@ -42,6 +47,9 @@ Future<void> importAppData(File file, [bool checkVersion = false]) async {
     }
   } finally {
     prepared.dispose();
+    FollowUpdatesBackend.paused = wasPaused;
+    FollowUpdatesBackend.restoring = false;
+    await FollowUpdatesBackend.configure();
   }
 }
 

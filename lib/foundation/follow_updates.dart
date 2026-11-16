@@ -1,191 +1,214 @@
 import 'dart:async';
 import 'dart:convert';
+
+import 'package:venera/foundation/app.dart';
+import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/favorites.dart';
+import 'package:venera/foundation/js_engine.dart';
 import 'package:venera/foundation/log.dart';
-import 'package:venera/utils/channel.dart';
+import 'package:venera/src/rust/api/follow_updates.dart' as backend;
 
 class ComicUpdateResult {
   final bool updated;
   final String? errorMessage;
-
   ComicUpdateResult(this.updated, this.errorMessage);
-}
-
-Future<ComicUpdateResult> updateComic(
-    FavoriteItemWithUpdateInfo c, String folder) async {
-  int retries = 3;
-  while (true) {
-    try {
-      var comicSource = c.type.comicSource;
-      if (comicSource == null) {
-        return ComicUpdateResult(false, "Comic source not found");
-      }
-      var newInfo = (await comicSource.loadComicInfo!(c.id)).data;
-
-      var newTags = <String>[];
-      for (var entry in newInfo.tags.entries) {
-        const shouldIgnore = ['author', 'artist', 'time'];
-        var namespace = entry.key;
-        if (shouldIgnore.contains(namespace.toLowerCase())) {
-          continue;
-        }
-        for (var tag in entry.value) {
-          newTags.add("$namespace:$tag");
-        }
-      }
-
-      var item = FavoriteItem(
-        id: c.id,
-        name: newInfo.title,
-        coverPath: newInfo.cover,
-        author: newInfo.subTitle ??
-            newInfo.tags['author']?.firstOrNull ??
-            c.author,
-        type: c.type,
-        tags: newTags,
-      );
-
-      LocalFavoritesManager().updateInfo(folder, item, false);
-
-      var updated = false;
-      var updateTime = newInfo.findUpdateTime();
-      if (updateTime != null && updateTime != c.updateTime) {
-        LocalFavoritesManager().updateUpdateTime(
-          folder,
-          c.id,
-          c.type,
-          updateTime,
-        );
-        updated = true;
-      } else {
-        LocalFavoritesManager().updateCheckTime(folder, c.id, c.type);
-      }
-      return ComicUpdateResult(updated, null);
-    } catch (e, s) {
-      Log.error("Check Updates", e, s);
-      await Future.delayed(const Duration(seconds: 2));
-      retries--;
-      if (retries == 0) {
-        return ComicUpdateResult(false, e.toString());
-      }
-    }
-  }
 }
 
 class UpdateProgress {
   final int total;
   final int current;
+  final int skipped;
   final int errors;
   final int updated;
+  final String status;
   final FavoriteItemWithUpdateInfo? comic;
   final String? errorMessage;
 
-  UpdateProgress(this.total, this.current, this.errors, this.updated,
-      [this.comic, this.errorMessage]);
+  UpdateProgress.fromJson(Map<String, dynamic> json)
+    : total = json['total'],
+      current = json['current'],
+      skipped = json['skipped'],
+      errors = json['errors'],
+      updated = json['updated'],
+      status = json['status'],
+      errorMessage = json['error_message'],
+      comic = json['comic'] == null ? null : _comic(json['comic']);
+
+  static FavoriteItemWithUpdateInfo _comic(Map<String, dynamic> row) =>
+      FavoriteItemWithUpdateInfo(
+        FavoriteItem.fromRow(row),
+        row['last_update_time'],
+        row['has_new_update'],
+        row['last_check_time'],
+      );
+
+  double get fraction => total == 0 ? 1 : current / total;
+  bool get isDone => status != 'running';
 }
 
-void updateFolderBase(
-  String folder,
-  StreamController<UpdateProgress> stream,
-  bool ignoreCheckTime,
-) async {
-  var comics = LocalFavoritesManager().getComicsWithUpdatesInfo(folder);
-  int total = comics.length;
-  int current = 0;
-  int errors = 0;
-  int updated = 0;
+/// Bridges settings, task handles and snapshots. Rust owns scheduling and rules.
+abstract class FollowUpdatesBackend {
+  static Future<backend.FollowUpdateService>? _opening;
+  static bool paused = false;
+  static bool restoring = false;
+  static String? automaticFolder;
 
-  stream.add(UpdateProgress(total, current, errors, updated));
+  static String get _sourceTypes => jsonEncode({
+    for (final source in ComicSource.all())
+      '${source.key.hashCode}': source.key,
+  });
 
-  var comicsToUpdate = <FavoriteItemWithUpdateInfo>[];
-
-  for (var comic in comics) {
-    if (!ignoreCheckTime) {
-      var lastCheckTime = comic.lastCheckTime;
-      if (lastCheckTime != null &&
-          DateTime.now().difference(lastCheckTime).inDays < 1) {
-        current++;
-        stream.add(UpdateProgress(total, current, errors, updated));
-        continue;
-      }
-    }
-    comicsToUpdate.add(comic);
+  static Future<backend.FollowUpdateService> _service() {
+    if (restoring) throw StateError('Data restore in progress');
+    return _opening ??= _open();
   }
 
-  total = comicsToUpdate.length;
-  current = 0;
-  stream.add(UpdateProgress(total, current, errors, updated));
-
-  var channel = Channel<FavoriteItemWithUpdateInfo>(10);
-
-  // Producer
-  () async {
-    var c = 0;
-    for (var comic in comicsToUpdate) {
-      await channel.push(comic);
-      c++;
-      // Throttle
-      if (c % 5 == 0) {
-        var delay = c % 100 + 1;
-        if (delay > 10) {
-          delay = 10;
-        }
-        await Future.delayed(Duration(seconds: delay));
-      }
+  static Future<backend.FollowUpdateService> _open() async {
+    final service = await backend.FollowUpdateService.open(
+      runtime: JsEngine().runtime,
+      favorites: LocalFavoritesManager().backendStore,
+    );
+    try {
+      unawaited(_listen(service));
+      await _configure(service);
+      return service;
+    } catch (_) {
+      await service.close();
+      service.dispose();
+      _opening = null;
+      rethrow;
     }
-    channel.close();
-  }();
+  }
 
-  // Consumers
-  var updateFutures = <Future>[];
-  for (var i = 0; i < 5; i++) {
-    var f = () async {
+  static Future<void> _listen(backend.FollowUpdateService service) async {
+    try {
       while (true) {
-        var comic = await channel.pop();
-        if (comic == null) {
+        final event = await service.nextEvent();
+        if (event == null) break;
+        final progress = UpdateProgress.fromJson(jsonDecode(event));
+        if (progress.isDone && !restoring) {
+          LocalFavoritesManager().notifyChanges();
+        }
+        if (progress.errorMessage != null) {
+          Log.error(
+            'Check Updates',
+            progress.errorMessage ?? 'Update check failed',
+          );
+        }
+      }
+    } catch (error, stack) {
+      Log.error('Check Updates', error, stack);
+    }
+  }
+
+  static Future<void> _configure(backend.FollowUpdateService service) =>
+      service.configure(
+        folder: automaticFolder,
+        paused: paused,
+        traditional: App.locale.countryCode == 'TW',
+        sourceTypesJson: _sourceTypes,
+      );
+
+  static Future<void> configure() async {
+    if (restoring) return;
+    final service = await _service();
+    if (!restoring) await _configure(service);
+  }
+
+  /// Await before closing/replacing the favorite database during a restore.
+  static Future<void> close() async {
+    final opening = _opening;
+    _opening = null;
+    if (opening == null) return;
+    final service = await opening;
+    await service.close();
+    service.dispose();
+  }
+}
+
+/// A page can cancel this handle while the native task is being created.
+class UpdateSession {
+  final String folder;
+  final bool force;
+  final List<Map<String, dynamic>>? keys;
+  backend.FollowUpdateTask? _task;
+  bool _cancelled = false;
+
+  UpdateSession(this.folder, this.force, {this.keys});
+
+  void cancel() {
+    _cancelled = true;
+    _task?.cancel();
+  }
+
+  Stream<UpdateProgress> get progress async* {
+    final service = await FollowUpdatesBackend._service();
+    if (_cancelled) return;
+    final task = await service.start(
+      folder: folder,
+      force: force,
+      keysJson: keys == null ? null : jsonEncode(keys),
+    );
+    _task = task;
+    try {
+      if (_cancelled) task.cancel();
+      while (true) {
+        final snapshot = await task.nextSnapshot();
+        if (snapshot == null) break;
+        final progress = UpdateProgress.fromJson(jsonDecode(snapshot));
+        yield progress;
+        if (progress.isDone) {
+          if (progress.status == 'failed') {
+            throw StateError(progress.errorMessage ?? 'Update check failed');
+          }
           break;
         }
-        var result = await updateComic(comic, folder);
-        current++;
-        if (result.updated) {
-          updated++;
-        }
-        if (result.errorMessage != null) {
-          errors++;
-        }
-        stream.add(UpdateProgress(total, current, errors, updated, comic, result.errorMessage));
       }
-    }();
-    updateFutures.add(f);
+    } finally {
+      task.cancel();
+      await task.wait();
+      _task = null;
+      task.dispose();
+      if (!FollowUpdatesBackend.restoring) {
+        LocalFavoritesManager().notifyChanges();
+      }
+    }
   }
+}
 
-  await Future.wait(updateFutures);
+Stream<UpdateProgress> updateFolder(String folder, bool ignoreCheckTime) =>
+    UpdateSession(folder, ignoreCheckTime).progress;
 
-  if (updated > 0) {
-    LocalFavoritesManager().notifyChanges();
+Future<ComicUpdateResult> updateComic(
+  FavoriteItemWithUpdateInfo comic,
+  String folder,
+) async {
+  UpdateProgress? result;
+  await for (final progress in UpdateSession(
+    folder,
+    true,
+    keys: [
+      {'id': comic.id, 'type': comic.type.value},
+    ],
+  ).progress) {
+    result = progress;
   }
-
-  stream.close();
+  return ComicUpdateResult((result?.updated ?? 0) > 0, result?.errorMessage);
 }
 
-
-Stream<UpdateProgress> updateFolder(String folder, bool ignoreCheckTime) {
-  var stream = StreamController<UpdateProgress>();
-  updateFolderBase(folder, stream, ignoreCheckTime);
-  return stream.stream;
-}
-
-Future<String> getUpdatedComicsAsJson(String folder) async {
-  var comics = LocalFavoritesManager().getComicsWithUpdatesInfo(folder);
-  var updatedComics = comics.where((c) => c.hasNewUpdate).toList();
-  var jsonList = updatedComics.map((c) => {
-    'id': c.id,
-    'name': c.name,
-    'coverUrl': c.coverPath,
-    'author': c.author,
-    'type': c.type.sourceKey,
-    'updateTime': c.updateTime,
-    'tags': c.tags,
-  }).toList();
-  return jsonEncode(jsonList);
-}
+Future<String> getUpdatedComicsAsJson(String folder) async => jsonEncode(
+  LocalFavoritesManager()
+      .getUpdates(folder)
+      .map(
+        (comic) => {
+          'id': comic.id,
+          'name': comic.name,
+          'coverUrl': comic.coverPath,
+          'author': comic.author,
+          'type': comic.type.sourceKey,
+          'updateTime': comic.updateTime,
+          'tags': comic.tags,
+        },
+      )
+      .toList(),
+);

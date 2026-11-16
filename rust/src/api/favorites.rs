@@ -3,13 +3,16 @@ use std::sync::Mutex;
 
 #[flutter_rust_bridge::frb(opaque)]
 pub struct FavoriteStore {
-    inner: Mutex<Option<crate::favorites::Favorites>>,
+    pub(crate) inner: std::sync::Arc<Mutex<Option<crate::favorites::Favorites>>>,
 }
 
 impl FavoriteStore {
     pub fn open(path: String, traditional: bool) -> Result<Self> {
         Ok(Self {
-            inner: Mutex::new(Some(crate::favorites::Favorites::open(&path, traditional)?)),
+            inner: std::sync::Arc::new(Mutex::new(Some(crate::favorites::Favorites::open(
+                &path,
+                traditional,
+            )?))),
         })
     }
 

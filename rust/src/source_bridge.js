@@ -1,5 +1,7 @@
 // Source loading, validation and account state execute inside Rust's QuickJS worker.
 globalThis.__sources = {
+    codes: new Map(),
+    snapshot() {return Object.keys(ComicSource.sources).map(key=>this.codes.get(key)).filter(code=>typeof code==='string');},
     newer(a,b) {
         const x=a.replace('-', '.').split('.'), y=b.replace('-', '.').split('.');
         for(let i=0;i<3;i++) { const l=Number(x[i]??0), r=Number(y[i]??0); if(!Number.isFinite(l)||!Number.isFinite(r)) throw Error('Invalid source version'); if(l!==r) return l>r; }
@@ -41,6 +43,7 @@ globalThis.__sources = {
         for(const name of Object.keys(source.favorites??{})) wrap(source.favorites,name,true);
         for(const name of ['sendComment','sendChapterComment']) wrap(source.comic,name,false);
         Object.defineProperty(ComicSource.sources,source.key,{value:source,writable:true,configurable:true,enumerable:true});
+        this.codes.set(source.key,code);
         return {name:source.name,key:source.key,version:source.version,url:source.url??''};
     },
     init(key) {

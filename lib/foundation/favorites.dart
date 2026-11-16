@@ -203,6 +203,7 @@ class LocalFavoritesManager with ChangeNotifier {
   LocalFavoritesManager._create();
   static LocalFavoritesManager? cache;
   late backend.FavoriteStore _store;
+  backend.FavoriteStore get backendStore => _store;
   Map<String, int> counts = {};
   int _total = 0;
   bool get _traditional => App.locale.countryCode == 'TW';

@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:venera/src/rust/api/script.dart' as script_backend;
+import 'package:venera/src/rust/api/follow_updates.dart' as follow_backend;
 import 'package:venera/foundation/source_data.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_type.dart';

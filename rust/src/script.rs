@@ -9,7 +9,7 @@ use std::{
     path::PathBuf,
     rc::Rc,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc, Mutex, OnceLock,
     },
     time::{Duration, Instant},
@@ -41,6 +41,19 @@ pub struct Engine {
     commands: mpsc::Sender<Command>,
     closed: Arc<AtomicBool>,
     pub events: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>,
+    event_sender: tokio::sync::mpsc::Sender<String>,
+    options: Mutex<Options>,
+    stopped: tokio::sync::watch::Receiver<bool>,
+}
+
+fn platform_replies() -> &'static Mutex<HashMap<u64, mpsc::Sender<Command>>> {
+    static REPLIES: OnceLock<Mutex<HashMap<u64, mpsc::Sender<Command>>>> = OnceLock::new();
+    REPLIES.get_or_init(Default::default)
+}
+
+fn next_ticket() -> u64 {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 pub(crate) fn executor() -> &'static tokio::runtime::Runtime {
@@ -75,8 +88,18 @@ fn evaluate(ctx: &Ctx<'_>, code: &str) -> Result<String> {
 
 impl Engine {
     pub fn open(options: Options) -> Result<Self> {
-        let (commands, incoming) = mpsc::channel();
         let (events, event_receiver) = tokio::sync::mpsc::channel(256);
+        Self::open_with_events(options, events, event_receiver)
+    }
+    fn open_with_events(
+        options: Options,
+        events: tokio::sync::mpsc::Sender<String>,
+        event_receiver: tokio::sync::mpsc::Receiver<String>,
+    ) -> Result<Self> {
+        let saved_options = options.clone();
+        let event_sender = events.clone();
+        let (stopped_sender, stopped) = tokio::sync::watch::channel(false);
+        let (commands, incoming) = mpsc::channel();
         let closed = Arc::new(AtomicBool::new(false));
         let stop = closed.clone();
         let sender = commands.clone();
@@ -154,18 +177,33 @@ impl Engine {
                             Err(mpsc::RecvTimeoutError::Disconnected) => break,
                         }
                         for _ in 0..1024 {
-                            match runtime.execute_pending_job() {
-                                Ok(true) => {}
-                                _ => break,
+                            if stop.load(Ordering::Relaxed) {
+                                break;
+                            }
+                            // rquickjs 0.9's Runtime API wraps a borrowed error
+                            // context as owned. Run jobs through our existing
+                            // context so an interrupted async job cannot release
+                            // it a second time during error cleanup.
+                            let executed = context.with(|ctx| {
+                                let executed = ctx.execute_pending_job();
+                                if executed {
+                                    let _ = ctx.catch();
+                                }
+                                executed
+                            });
+                            if !executed {
+                                break;
                             }
                         }
                     }
+                    runtime.set_interrupt_handler(None);
                     Ok(())
                 })();
                 if let Err(e) = result {
                     let _ = ready.send(Err(e));
                 }
                 stop.store(true, Ordering::Relaxed);
+                stopped_sender.send_replace(true);
             })?;
         initialized
             .recv()
@@ -174,7 +212,38 @@ impl Engine {
             commands,
             closed,
             events: tokio::sync::Mutex::new(event_receiver),
+            event_sender,
+            options: Mutex::new(saved_options),
+            stopped,
         })
+    }
+    /// A cancellable source worker has its own JS heap and host requests. Account,
+    /// settings and cookies still use the same persistent stores. Platform events
+    /// are delivered through the application's existing event listener.
+    pub fn fork_sources(&self) -> Result<Self> {
+        let codes = unpack(&serde_json::from_str(
+            &self.evaluate("__sources.snapshot()")?,
+        )?)?;
+        let (_, receiver) = tokio::sync::mpsc::channel(1);
+        let engine = Self::open_with_events(
+            self.options
+                .lock()
+                .map_err(|_| anyhow!("Script options poisoned"))?
+                .clone(),
+            self.event_sender.clone(),
+            receiver,
+        )?;
+        for code in codes.as_array().context("Invalid source snapshot")? {
+            engine.evaluate(&format!("__sources.install({})", code))?;
+        }
+        Ok(engine)
+    }
+    pub async fn shutdown(&self) {
+        self.close();
+        let mut stopped = self.stopped.clone();
+        if !*stopped.borrow_and_update() {
+            let _ = stopped.changed().await;
+        }
     }
     pub fn query(&self, code: String) -> Result<String> {
         ensure!(
@@ -188,6 +257,10 @@ impl Engine {
         receive.recv().context("Script worker stopped")?
     }
     pub fn configure(&self, options: Options) -> Result<()> {
+        *self
+            .options
+            .lock()
+            .map_err(|_| anyhow!("Script options poisoned"))? = options.clone();
         let (reply, receive) = mpsc::sync_channel(1);
         self.commands
             .send(Command::Configure(Box::new(options), reply))
@@ -202,7 +275,13 @@ impl Engine {
         ))
     }
     pub fn settle(&self, id: u64, value: Value, error: Option<String>) -> Result<()> {
-        self.commands
+        let target = platform_replies()
+            .lock()
+            .map_err(|_| anyhow!("Platform replies poisoned"))?
+            .remove(&id);
+        target
+            .as_ref()
+            .unwrap_or(&self.commands)
             .send(Command::Settle(
                 id,
                 error.map_or(Ok(value), |e| Err(anyhow!(e))),
@@ -304,13 +383,18 @@ struct Host {
     documents: crate::script_html::Documents,
     commands: mpsc::Sender<Command>,
     events: tokio::sync::mpsc::Sender<String>,
-    next: u64,
+    platform_tickets: Vec<u64>,
     tasks: Vec<tokio::task::JoinHandle<()>>,
 }
 impl Drop for Host {
     fn drop(&mut self) {
         for task in &self.tasks {
             task.abort();
+        }
+        if let Ok(mut replies) = platform_replies().lock() {
+            for id in &self.platform_tickets {
+                replies.remove(id);
+            }
         }
     }
 }
@@ -326,7 +410,7 @@ impl Host {
             documents: Default::default(),
             commands,
             events,
-            next: 1,
+            platform_tickets: vec![],
             tasks: vec![],
         })
     }
@@ -334,8 +418,7 @@ impl Host {
         &mut self,
         future: impl std::future::Future<Output = Result<Value>> + Send + 'static,
     ) -> Value {
-        let ticket = self.next;
-        self.next += 1;
+        let ticket = next_ticket();
         let commands = self.commands.clone();
         self.tasks.retain(|task| !task.is_finished());
         self.tasks.push(executor().spawn(async move {
@@ -450,13 +533,19 @@ impl Host {
                     self.options.worker_depth == 0,
                     "Platform UI is unavailable inside compute workers"
                 );
-                let ticket = self.next;
-                self.next += 1;
+                let ticket = next_ticket();
                 let immediate = method == "UI"
                     && matches!(
                         data["function"].as_str(),
                         Some("showMessage" | "launchUrl" | "cancelLoading" | "showLoading")
                     );
+                if !immediate {
+                    platform_replies()
+                        .lock()
+                        .map_err(|_| anyhow!("Platform replies poisoned"))?
+                        .insert(ticket, self.commands.clone());
+                    self.platform_tickets.push(ticket);
+                }
                 self.events.try_send(json!({"event":"platform","ticket":ticket,"data":pack(data),"reply":!immediate}).to_string()).context("Script event queue full")?;
                 if !immediate {
                     return Ok(json!({"ticket":ticket}));
