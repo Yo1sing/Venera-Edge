@@ -36,7 +36,7 @@ pub struct Key {
 }
 
 pub struct Favorites {
-    db: Connection,
+    pub(crate) db: Connection,
 }
 
 fn quoted(name: &str) -> String {
@@ -60,6 +60,7 @@ impl Favorites {
         let store = Self {
             db: Connection::open(path)?,
         };
+        store.db.busy_timeout(std::time::Duration::from_secs(5))?;
         store.db.execute_batch("CREATE TABLE IF NOT EXISTS folder_order (folder_name TEXT PRIMARY KEY, order_value INT);
             CREATE TABLE IF NOT EXISTS folder_sync (folder_name TEXT PRIMARY KEY, source_key TEXT, source_folder TEXT);")?;
         let transaction = store.db.unchecked_transaction()?;
@@ -307,11 +308,17 @@ impl Favorites {
     }
 
     pub fn delete(&self, folder: Option<&str>, keys: &[Key]) -> Result<()> {
+        let transaction = self.db.unchecked_transaction()?;
+        self.delete_rows(folder, keys)?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub(crate) fn delete_rows(&self, folder: Option<&str>, keys: &[Key]) -> Result<()> {
         let folders = match folder {
             Some(v) => vec![v.to_owned()],
             None => self.folders()?,
         };
-        let transaction = self.db.unchecked_transaction()?;
         for folder in folders {
             let table = self.table(&folder)?;
             for key in keys {
@@ -321,7 +328,6 @@ impl Favorites {
                 )?;
             }
         }
-        transaction.commit()?;
         Ok(())
     }
 

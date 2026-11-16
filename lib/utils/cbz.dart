@@ -1,8 +1,5 @@
-import 'package:flutter_saf/flutter_saf.dart';
 import 'package:venera/utils/book_export.dart';
-import 'dart:convert';
 import 'package:venera/src/rust/api/archive.dart' as archive;
-import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/local.dart';
 import 'package:venera/utils/io.dart';
 
@@ -63,39 +60,13 @@ abstract class CBZ {
       archive.extractArchive(input: file.path, output: out.path);
 
   static Future<LocalComic> import(File file) async {
-    final staging = await Directory(App.cachePath).createTemp('comic_import_');
-    try {
-      var input = file.path;
-      if (file is AndroidFile) {
-        final copy = staging.joinFile(file.name);
-        await copy.writeAsBytes(await file.readAsBytes());
-        input = copy.path;
-      }
-      final saf = LocalManager().directory is AndroidDirectory;
-      final root = saf ? staging.path : LocalManager().path;
-      final row = jsonDecode(
-        await archive.importComicArchive(
-          input: input,
-          cache: App.cachePath,
-          local: root,
-          database: '${App.dataPath}/local.db',
-        ),
-      );
-      final comic = LocalComic.fromBackend(Map<String, dynamic>.from(row));
-      if (saf) {
-        final target = Directory(
-          FilePath.join(LocalManager().path, comic.directory),
-        );
-        await target.create(recursive: true);
-        await copyDirectoryIsolate(
-          Directory(FilePath.join(root, comic.directory)),
-          target,
-        );
-      }
-      return comic;
-    } finally {
-      await staging.delete(recursive: true);
-    }
+    final result = await LocalManager().runOperation({
+      'mode': 'archive',
+      'path': file.path,
+    });
+    final comics = result['imported'] as List;
+    if (comics.isEmpty) throw StateError('Comic archive was not imported');
+    return LocalComic.fromBackend(Map<String, dynamic>.from(comics.first));
   }
 
   static Future<File> export(LocalComic comic, String output) =>

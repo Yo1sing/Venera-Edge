@@ -172,19 +172,20 @@ async fn local(
         format!(
             "{}/{}",
             directory.trim_end_matches(['/', '\\']),
-            crate::api::local::chapter_directory_name(favorite.eid.clone())
+            if comic_type == 0 && crate::archives::safe_relative(&favorite.eid).is_ok() {
+                favorite.eid.clone()
+            } else {
+                crate::api::local::chapter_directory_name(favorite.eid.clone())
+            }
         )
     };
     let result = async {
         let paths = if is_saf(&directory) {
-            let value = evaluate(
-                engine,
-                &format!(
-                    "sendMessage({})",
-                    json!({"method":"imageFavoriteFile", "operation":"list", "path":directory})
-                ),
-            )
-            .await?;
+            let value = engine
+                .request_platform(
+                    json!({"method":"imageFavoriteFile", "operation":"list", "path":directory}),
+                )
+                .await?;
             crate::api::local::sort_comic_images(serde_json::from_value(value)?)
         } else {
             crate::api::local::list_comic_images(directory)?
@@ -194,14 +195,11 @@ async fn local(
         };
         let path = path.strip_prefix("file://").unwrap_or(path);
         if is_saf(path) {
-            let value = evaluate(
-                engine,
-                &format!(
-                    "sendMessage({})",
-                    json!({"method":"imageFavoriteFile", "operation":"read", "path":path})
-                ),
-            )
-            .await?;
+            let value = engine
+                .request_platform(
+                    json!({"method":"imageFavoriteFile", "operation":"read", "path":path}),
+                )
+                .await?;
             return Ok(Some(crate::script_crypto::bytes(&value)?));
         }
         read(Path::new(path))

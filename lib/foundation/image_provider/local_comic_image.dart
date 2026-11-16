@@ -1,4 +1,5 @@
 import 'dart:async' show Future;
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:venera/foundation/local.dart';
@@ -63,5 +64,7 @@ class LocalComicImageProvider
   }
 
   @override
-  String get key => "local${comic.id}${comic.comicType.value}";
+  String get key => jsonEncode([
+    'local', comic.id, comic.comicType.value, comic.coverFile.path,
+  ]);
 }

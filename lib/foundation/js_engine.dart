@@ -12,6 +12,7 @@ import 'package:venera/foundation/script_bridge.dart';
 import 'package:venera/network/proxy.dart';
 import 'package:venera/src/rust/api/script.dart' as backend;
 import 'package:venera/utils/init.dart';
+import 'package:venera/utils/io.dart' show FileExtension;
 
 export 'script_bridge.dart' show JSInvokable;
 
@@ -122,6 +123,49 @@ class JsEngine with JsUiApi, Init {
     String? error;
     try {
       switch (data['method']) {
+        case 'localFile':
+          final path = data['path'] as String;
+          final to = data['to'] as String?;
+          if (!path.startsWith('android://') &&
+              !(to?.startsWith('android://') ?? false)) {
+            throw StateError('Expected SAF file operation');
+          }
+          switch (data['operation']) {
+            case 'list':
+              result = await Directory(path)
+                  .list()
+                  .map(
+                    (entry) => {
+                      'path': entry.path,
+                      'is_dir': entry is Directory,
+                    },
+                  )
+                  .toList();
+            case 'exists':
+              result =
+                  await Directory(path).exists() || await File(path).exists();
+            case 'modified':
+              result = (await Directory(
+                path,
+              ).stat()).modified.millisecondsSinceEpoch;
+            case 'mkdir':
+              await Directory(path).create();
+            case 'copy':
+              await File(path).copyMem(to!);
+            case 'rename':
+              await Directory(path).rename(to!);
+              if (!await Directory(to).exists() ||
+                  await Directory(path).exists()) {
+                throw StateError('Directory rename was not completed');
+              }
+            case 'remove':
+              await Directory(path).delete(recursive: true);
+              if (await Directory(path).exists()) {
+                throw StateError('Directory deletion was not completed');
+              }
+            default:
+              throw StateError('Unknown local file operation');
+          }
         case 'imageFavoriteFile':
           final path = data['path'] as String;
           if (!path.startsWith('android://')) {

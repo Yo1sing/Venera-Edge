@@ -71,6 +71,7 @@ pub(crate) fn chapter_ids(chapters: &Value) -> Vec<String> {
 impl LocalLibrary {
     pub fn open(path: &str) -> Result<Self> {
         let db = Connection::open(path)?;
+        db.busy_timeout(std::time::Duration::from_secs(5))?;
         db.execute_batch("CREATE TABLE IF NOT EXISTS comics (id TEXT NOT NULL,title TEXT NOT NULL,subtitle TEXT NOT NULL,
             tags TEXT NOT NULL,directory TEXT NOT NULL,chapters TEXT NOT NULL,cover TEXT NOT NULL,comic_type INTEGER NOT NULL,
             downloadedChapters TEXT NOT NULL,created_at INTEGER,PRIMARY KEY(id,comic_type))")?;
@@ -151,21 +152,7 @@ impl LocalLibrary {
             comic.chapters.is_null() || comic.chapters.is_object(),
             "Invalid chapters"
         );
-        self.db.execute(
-            "INSERT OR REPLACE INTO comics VALUES (?,?,?,?,?,?,?,?,?,?)",
-            params![
-                comic.id,
-                comic.title,
-                comic.subtitle,
-                serde_json::to_string(&comic.tags)?,
-                comic.directory,
-                serde_json::to_string(&comic.chapters)?,
-                comic.cover,
-                comic.comic_type,
-                serde_json::to_string(&comic.downloaded_chapters)?,
-                comic.created_at
-            ],
-        )?;
+        write_row(&self.db, "comics", &comic)?;
         Ok(())
     }
     pub fn list(
@@ -258,6 +245,13 @@ impl LocalLibrary {
             .and_then(|index| chapter_ids(&comic.chapters).get(index as usize).cloned())
             .is_some_and(|id| comic.downloaded_chapters.contains(&id)))
     }
+}
+
+pub(crate) fn write_row(db: &Connection, table: &str, comic: &LocalComic) -> Result<()> {
+    db.execute(&format!("INSERT OR REPLACE INTO {table} (id,title,subtitle,tags,directory,chapters,cover,comic_type,downloadedChapters,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)"),
+        params![comic.id,comic.title,comic.subtitle,serde_json::to_string(&comic.tags)?,comic.directory,
+            serde_json::to_string(&comic.chapters)?,comic.cover,comic.comic_type,serde_json::to_string(&comic.downloaded_chapters)?,comic.created_at])?;
+    Ok(())
 }
 
 #[cfg(test)]

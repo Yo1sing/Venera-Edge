@@ -535,6 +535,12 @@ impl Queue {
             .as_str()
             .context("Missing comic id")?
             .to_owned();
+        let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
+        let comic_lock = format!("local-comic:{}:{comic_type}:{comic_id}", options.data_path);
+        let _comic_guard = tokio::select! {
+            _ = cancellation.cancelled() => return Err(anyhow!("Download cancelled")),
+            guard = crate::http_policy::serial(&comic_lock) => guard,
+        };
         if item["comic"].is_null() {
             let mut comic = evaluate_with_retry(
                 &self.engine,
@@ -553,9 +559,6 @@ impl Queue {
         }
         let comic = item["comic"].clone();
         let title = comic["title"].as_str().context("Missing comic title")?;
-        let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
-        let comic_lock = format!("local-comic:{}:{comic_type}:{comic_id}", options.data_path);
-        let _comic_guard = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), guard=crate::http_policy::serial(&comic_lock)=>guard };
         let library = crate::local::LocalLibrary::open(&format!("{}/local.db", options.data_path))?;
         let existing = library.find(&comic_id, comic_type)?;
         drop(library);
