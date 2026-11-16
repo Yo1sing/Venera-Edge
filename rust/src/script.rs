@@ -586,7 +586,7 @@ impl Host {
                     .context("Script event queue full")?;
                 Value::Null
             }
-            "UI" | "setClipboard" | "getClipboard" => {
+            "UI" | "setClipboard" | "getClipboard" | "imageFavoriteFile" => {
                 ensure!(
                     self.options.worker_depth == 0,
                     "Platform UI is unavailable inside compute workers"
@@ -946,6 +946,14 @@ mod tests {
         let temp = tempfile::tempdir()?;
         let options = options(temp.path().to_str().unwrap());
         let engine = Engine::open(options.clone())?;
+        let rejected: Value =
+            serde_json::from_str(&engine.evaluate("Promise.reject(new Error('HTTP 404'))")?)?;
+        assert!(engine
+            .promise(rejected[1].as_u64().unwrap())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("HTTP 404"));
         let promise: Value = serde_json::from_str(
             &engine.evaluate("new Promise(resolve=>setTimeout(()=>resolve(42),5))")?,
         )?;

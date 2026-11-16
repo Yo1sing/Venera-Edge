@@ -11,6 +11,26 @@ pub struct ImageTransfer {
     pub(crate) inner: crate::image_tasks::Task,
 }
 impl ImageTransfer {
+    pub fn start_favorite(
+        runtime: &crate::api::script::ScriptRuntime,
+        data_path: String,
+        cache_path: String,
+        local_path: String,
+        comic_type: i32,
+        favorite_json: String,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: crate::favorite_images::start(
+                runtime.inner.clone(),
+                data_path,
+                cache_path,
+                local_path,
+                comic_type,
+                serde_json::from_str(&favorite_json)?,
+            )?,
+        })
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn start(
         runtime: &crate::api::script::ScriptRuntime,
@@ -43,6 +63,10 @@ impl ImageTransfer {
     pub fn cancel(&self) {
         self.inner.cancel();
     }
+}
+
+pub async fn delete_favorite_image_cache(cache_path: String, favorite_json: String) -> Result<()> {
+    crate::favorite_images::delete(&cache_path, &serde_json::from_str(&favorite_json)?).await
 }
 
 pub fn export_book(book_json: String, output: String, format: String) -> Result<()> {

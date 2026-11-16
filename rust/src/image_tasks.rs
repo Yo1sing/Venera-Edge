@@ -70,6 +70,61 @@ impl Task {
         thumbnail: bool,
         coordinate_source: bool,
     ) -> Result<Self> {
+        Self::spawn(engine.clone(), move |state, id| async move {
+            let source_text = source.as_deref().unwrap_or("null");
+            let key = if thumbnail {
+                format!(
+                    "{image}@{source_text}{}",
+                    if comic.is_empty() {
+                        String::new()
+                    } else {
+                        format!("@{comic}")
+                    }
+                )
+            } else {
+                format!("{image}@{source_text}@{comic}@{chapter}")
+            };
+            let source_lock = source
+                .as_deref()
+                .filter(|_| coordinate_source)
+                .map(|key| engine.source_lock(key));
+            let _source_guard = match source_lock {
+                Some(lock) => Some(lock.read_owned().await),
+                None => None,
+            };
+            let _lock = crate::http_policy::serial(&format!("image:{key}")).await;
+            let cache = crate::cache::shared(&data_path, &cache_path)?;
+            let hit = cache
+                .lock()
+                .map_err(|_| anyhow::anyhow!("Cache poisoned"))?
+                .find(&key)?;
+            if let Some(path) = hit {
+                return Ok(std::fs::read(path)?);
+            }
+            let bytes = fetch(
+                &engine,
+                &state,
+                &id,
+                &image,
+                source.as_deref(),
+                &comic,
+                &chapter,
+                thumbnail,
+            )
+            .await?;
+            cache
+                .lock()
+                .map_err(|_| anyhow::anyhow!("Cache poisoned"))?
+                .write(&key, &bytes, 7 * 24 * 60 * 60 * 1000)?;
+            Ok(bytes)
+        })
+    }
+
+    pub(crate) fn spawn<F, Fut>(engine: Arc<crate::script::Engine>, work: F) -> Result<Self>
+    where
+        F: FnOnce(Arc<Request>, String) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<Vec<u8>>> + Send + 'static,
+    {
         let (sender, receiver) = tokio::sync::mpsc::channel(8);
         let state = Arc::new(Request {
             cancellation: Arc::new(HttpCancellation::new()),
@@ -86,28 +141,28 @@ impl Task {
             .unwrap_or_else(|e| e.into_inner())
             .insert(id.clone(), Arc::downgrade(&state));
         crate::script::executor().spawn(async move {
-            let source_text=source.as_deref().unwrap_or("null");
-            let key=if thumbnail {format!("{image}@{source_text}{}",if comic.is_empty(){String::new()}else{format!("@{comic}")})} else {format!("{image}@{source_text}@{comic}@{chapter}")};
-            let work=async {
-                let source_lock=source.as_deref().filter(|_|coordinate_source).map(|key|engine.source_lock(key));
-                let _source_guard=match source_lock {Some(lock)=>Some(lock.read_owned().await),None=>None};
-                let _lock=crate::http_policy::serial(&format!("image:{key}")).await;
-                let cache=crate::cache::shared(&data_path,&cache_path)?;
-                let hit=cache.lock().map_err(|_|anyhow::anyhow!("Cache poisoned"))?.find(&key)?;
-                if let Some(path)=hit{return Ok::<_,anyhow::Error>(std::fs::read(path)?);}
-                let code=format!("__images.fetch({},{},{},{},{},{})",json!(image),json!(source),json!(comic),json!(chapter),thumbnail,json!(id));
-                let bytes=crate::script_crypto::bytes(&evaluate(&engine,&code).await?)?;
-                cache.lock().map_err(|_|anyhow::anyhow!("Cache poisoned"))?.write(&key,&bytes,7*24*60*60*1000)?;
-                Ok(bytes)
+            let result = tokio::select! {
+                biased;
+                _ = worker.cancellation.cancelled() => Err(anyhow::anyhow!("Image request cancelled")),
+                result = work(worker.clone(), id.clone()) => result,
             };
-            let result=tokio::select!{ _=worker.cancellation.cancelled()=>Err(anyhow::anyhow!("Image request cancelled")), result=work=>result };
-            let progress=match result {
-                Ok(bytes)=>ImageProgress{current:bytes.len() as u64,total:Some(bytes.len() as u64),bytes:Some(bytes),error:None},
-                Err(error)=>ImageProgress{current:0,total:None,bytes:None,error:Some(format!("{error:#}"))},
+            let progress = match result {
+                Ok(bytes) => ImageProgress {
+                    current: bytes.len() as u64,
+                    total: Some(bytes.len() as u64),
+                    bytes: Some(bytes),
+                    error: None,
+                },
+                Err(error) => ImageProgress {
+                    current: 0,
+                    total: None,
+                    bytes: None,
+                    error: Some(format!("{error:#}")),
+                },
             };
-            worker_finished.store(true,std::sync::atomic::Ordering::Relaxed);
-            let _=worker.sender.send(progress).await;
-            registry().lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
+            worker_finished.store(true, std::sync::atomic::Ordering::Relaxed);
+            let _ = worker.sender.send(progress).await;
+            registry().lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         });
         Ok(Self {
             state,
@@ -117,4 +172,31 @@ impl Task {
             receiver: tokio::sync::Mutex::new(receiver),
         })
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn fetch(
+    engine: &crate::script::Engine,
+    state: &Request,
+    id: &str,
+    image: &str,
+    source: Option<&str>,
+    comic: &str,
+    chapter: &str,
+    thumbnail: bool,
+) -> Result<Vec<u8>> {
+    anyhow::ensure!(
+        !state.cancellation.is_cancelled(),
+        "Image request cancelled"
+    );
+    let code = format!(
+        "__images.fetch({},{},{},{},{},{})",
+        json!(image),
+        json!(source),
+        json!(comic),
+        json!(chapter),
+        thumbnail,
+        json!(id)
+    );
+    crate::script_crypto::bytes(&evaluate(engine, &code).await?)
 }

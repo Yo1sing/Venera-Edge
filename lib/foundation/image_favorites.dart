@@ -279,7 +279,14 @@ class ImageFavoriteManager with ChangeNotifier {
       imagesJson: jsonEncode(images.map((e) => e.toJson()).toList()),
     );
     for (final image in images) {
-      ImageFavoritesProvider.deleteFromCache(image);
+      unawaited(
+        ImageFavoritesProvider.deleteFromCache(image).catchError((
+          Object error,
+          StackTrace stack,
+        ) {
+          Log.error('Image Favorites Cache', error, stack);
+        }),
+      );
     }
     notifyListeners();
   }

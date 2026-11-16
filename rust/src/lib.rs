@@ -1,6 +1,7 @@
 pub mod api;
 mod cache;
 mod cookies;
+mod favorite_images;
 mod favorites;
 mod follow_updates;
 mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */

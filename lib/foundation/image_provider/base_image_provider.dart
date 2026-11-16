@@ -75,6 +75,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
         } on _ImageLoadingStopException {
           rethrow;
         } catch (e) {
+          if (!retryOnError) rethrow;
           if (e.toString().contains("Invalid Status Code: 404")) {
             rethrow;
           }
@@ -109,7 +110,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
           getTargetSize: enableResize ? _getTargetSize : null,
         );
       } catch (e) {
-        await CacheManager().delete(this.key);
+        await invalidateCache();
         if (data.length < 2 * 1024) {
           // data is too short, it's likely that the data is text, not image
           try {
@@ -141,6 +142,10 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
   );
 
   String get key;
+
+  bool get retryOnError => true;
+
+  Future<void> invalidateCache() => CacheManager().delete(key);
 
   @override
   bool operator ==(Object other) {

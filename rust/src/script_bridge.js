@@ -17,7 +17,13 @@ globalThis.__venera = (() => {
         if (value instanceof Promise) {
             const id = next++;
             promises.set(id, null);
-            value.then(v => {if(promises.has(id)) promises.set(id, {value: pack(v)});}, e => {if(promises.has(id)) promises.set(id, {error: String(e?.stack ?? e)});});
+            value.then(v => {
+                if (promises.has(id)) promises.set(id, {value: pack(v)});
+            }, e => {
+                if (promises.has(id)) {
+                    promises.set(id, {error: [String(e), e?.stack].filter(Boolean).join('\n')});
+                }
+            });
             return ['promise', id];
         }
         if (value instanceof ArrayBuffer) return ['bytes', Array.from(new Uint8Array(value))];

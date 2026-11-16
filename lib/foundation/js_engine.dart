@@ -122,6 +122,21 @@ class JsEngine with JsUiApi, Init {
     String? error;
     try {
       switch (data['method']) {
+        case 'imageFavoriteFile':
+          final path = data['path'] as String;
+          if (!path.startsWith('android://')) {
+            throw StateError('Expected SAF URI');
+          }
+          result = switch (data['operation']) {
+            'list' =>
+              await Directory(path)
+                  .list()
+                  .where((entry) => entry is File)
+                  .map((entry) => entry.path)
+                  .toList(),
+            'read' => await File(path).readAsBytes(),
+            _ => throw StateError('Unknown favorite file operation'),
+          };
         case 'UI':
           data['_bridgeLoadingId'] = event['ticket'];
           result = await handleUIMessage(data);

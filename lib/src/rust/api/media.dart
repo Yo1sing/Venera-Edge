@@ -7,6 +7,14 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'script.dart';
 
+Future<void> deleteFavoriteImageCache({
+  required String cachePath,
+  required String favoriteJson,
+}) => RustLib.instance.api.crateApiMediaDeleteFavoriteImageCache(
+  cachePath: cachePath,
+  favoriteJson: favoriteJson,
+);
+
 Future<void> exportBook({
   required String bookJson,
   required String output,
@@ -46,6 +54,22 @@ abstract class ImageTransfer implements RustOpaqueInterface {
     comic: comic,
     chapter: chapter,
     thumbnail: thumbnail,
+  );
+
+  static Future<ImageTransfer> startFavorite({
+    required ScriptRuntime runtime,
+    required String dataPath,
+    required String cachePath,
+    required String localPath,
+    required int comicType,
+    required String favoriteJson,
+  }) => RustLib.instance.api.crateApiMediaImageTransferStartFavorite(
+    runtime: runtime,
+    dataPath: dataPath,
+    cachePath: cachePath,
+    localPath: localPath,
+    comicType: comicType,
+    favoriteJson: favoriteJson,
   );
 }
 
