@@ -86,8 +86,3 @@ impl SyncController {
         self.inner.finish(id, error)
     }
 }
-
-#[flutter_rust_bridge::frb(sync)]
-pub fn cookie_restore_epoch() -> u64 {
-    crate::backup_storage::restore_epoch()
-}

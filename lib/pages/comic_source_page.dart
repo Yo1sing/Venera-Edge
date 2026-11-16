@@ -1201,14 +1201,21 @@ class _LoginPageState extends State<_LoginPage> {
   }
 
   void loginWithWebview() async {
+    final jar = SingleInstanceCookieJar.instance!;
+    final generation = jar.generation;
     var url = widget.config.loginWebsite!;
     var title = '';
     bool success = false;
+    bool open = true;
 
     void validate(InAppWebViewController c) async {
-      if (widget.config.checkLoginStatus != null &&
+      if (open &&
+          !success &&
+          widget.config.checkLoginStatus != null &&
           widget.config.checkLoginStatus!(url, title)) {
-        var cookies = (await c.getCookies(url)) ?? [];
+        final loginUrl = url;
+        final cookies = await c.getCookies(loginUrl);
+        final userAgent = await c.getUA();
         var localStorageItems = await c.webStorage.localStorage.getItems();
         var mappedLocalStorage = <String, dynamic>{};
         for (var item in localStorageItems) {
@@ -1216,13 +1223,20 @@ class _LoginPageState extends State<_LoginPage> {
             mappedLocalStorage[item.key!] = item.value;
           }
         }
+        if (!open ||
+            !mounted ||
+            success ||
+            !jar.saveFromWebview(
+              Uri.parse(loginUrl),
+              cookies,
+              generation: generation,
+              userAgent: userAgent,
+            )) {
+          return;
+        }
+        success = true;
         widget.source.data['_localStorage'] = mappedLocalStorage;
         await widget.source.saveData();
-        SingleInstanceCookieJar.instance?.saveFromResponse(
-          Uri.parse(url),
-          cookies,
-        );
-        success = true;
         widget.config.onLoginWithWebviewSuccess?.call();
         App.mainNavigatorKey?.currentContext?.pop();
       }
@@ -1242,6 +1256,7 @@ class _LoginPageState extends State<_LoginPage> {
         },
       ),
     );
+    open = false;
     if (success) {
       widget.source.data['account'] = 'ok';
       widget.source.saveData();
@@ -1255,11 +1270,15 @@ class _LoginPageState extends State<_LoginPage> {
       context.showMessage(message: "Webview is not available".tl);
     }
 
+    final jar = SingleInstanceCookieJar.instance!;
+    final generation = jar.generation;
     var url = widget.config.loginWebsite!;
     var title = '';
     bool success = false;
+    bool open = true;
 
     void onClose() {
+      open = false;
       if (success) {
         widget.source.data['account'] = 'ok';
         widget.source.saveData();
@@ -1268,17 +1287,12 @@ class _LoginPageState extends State<_LoginPage> {
     }
 
     void validate(DesktopWebview webview) async {
-      if (widget.config.checkLoginStatus != null &&
+      if (open &&
+          !success &&
+          widget.config.checkLoginStatus != null &&
           widget.config.checkLoginStatus!(url, title)) {
-        var cookiesMap = await webview.getCookies(url);
-        var cookies = <io.Cookie>[];
-        cookiesMap.forEach((key, value) {
-          cookies.add(io.Cookie(key, value));
-        });
-        SingleInstanceCookieJar.instance?.saveFromResponse(
-          Uri.parse(url),
-          cookies,
-        );
+        final loginUrl = url;
+        final cookies = await webview.readCookies();
         var localStorageJson = await webview.evaluateJavascript(
           "JSON.stringify(window.localStorage);",
         );
@@ -1291,12 +1305,22 @@ class _LoginPageState extends State<_LoginPage> {
         } catch (e) {
           Log.error("ComicSourcePage", "Failed to parse localStorage JSON\n$e");
         }
+        if (!open ||
+            !mounted ||
+            success ||
+            !jar.saveFromWebview(
+              Uri.parse(loginUrl),
+              cookies,
+              generation: generation,
+              userAgent: webview.userAgent,
+            )) {
+          return;
+        }
+        success = true;
         widget.source.data['_localStorage'] = localStorage;
         await widget.source.saveData();
-        success = true;
         widget.config.onLoginWithWebviewSuccess?.call();
         webview.close();
-        onClose();
       }
     }
 

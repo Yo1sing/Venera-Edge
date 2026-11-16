@@ -255,8 +255,6 @@ impl Prepared {
                 names.extend(["appdata.json".into(), "syncdata.json".into()]);
             }
             crate::backup_storage::disconnect(root)?;
-            // In-flight responses from the previous cookie store cannot write to the restored store.
-            crate::backup_storage::restored();
             let mut installed = Vec::new();
             let mut saved = Vec::new();
             let result = (|| -> Result<()> {
@@ -335,7 +333,15 @@ mod tests {
         assert!(error.to_string().contains("Local data changed"));
         assert_eq!(cookies.header(url.clone())?, "session=local-edit");
 
+        let old_generation = cookies.generation()?;
         prepared.apply_checked(path, None)?;
+        assert_ne!(cookies.generation()?, old_generation);
+        cookies.save_response(
+            &url,
+            vec!["session=stale-response".into()],
+            None,
+            old_generation,
+        )?;
         assert_eq!(cookies.header(url)?, "session=from-backup");
         Ok(())
     }

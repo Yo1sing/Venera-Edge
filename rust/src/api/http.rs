@@ -1,3 +1,4 @@
+use crate::api::cookies::CookieStore;
 use anyhow::{anyhow, Context, Result};
 use std::{
     collections::HashMap,
@@ -9,10 +10,23 @@ use tokio::sync::{watch, Mutex as AsyncMutex};
 
 type UploadChunk = std::result::Result<Vec<u8>, String>;
 
+pub(crate) fn transport_error(error: reqwest::Error) -> anyhow::Error {
+    if error.is_timeout() {
+        let message = if error.is_connect() {
+            "HTTP connection timed out"
+        } else {
+            "HTTP response timed out"
+        };
+        return anyhow::Error::new(error).context(message);
+    }
+    error.into()
+}
+
 #[flutter_rust_bridge::frb(opaque)]
 pub struct HttpUpload {
     sender: Mutex<Option<tokio::sync::mpsc::Sender<UploadChunk>>>,
     receiver: Mutex<Option<tokio::sync::mpsc::Receiver<UploadChunk>>>,
+    aborted: HttpCancellation,
 }
 
 impl HttpUpload {
@@ -22,6 +36,7 @@ impl HttpUpload {
         Self {
             sender: Mutex::new(Some(sender)),
             receiver: Mutex::new(Some(receiver)),
+            aborted: HttpCancellation::new(),
         }
     }
 
@@ -32,10 +47,11 @@ impl HttpUpload {
             .map_err(|_| anyhow!("upload lock poisoned"))?
             .clone()
             .context("upload closed")?;
-        sender
-            .send(Ok(bytes))
-            .await
-            .map_err(|_| anyhow!("upload request closed"))
+        tokio::select! {
+            biased;
+            _ = self.aborted.cancelled() => Err(anyhow!("upload request closed")),
+            result = sender.send(Ok(bytes)) => result.map_err(|_| anyhow!("upload request closed")),
+        }
     }
 
     pub async fn fail(&self, message: String) -> Result<()> {
@@ -45,7 +61,11 @@ impl HttpUpload {
             .map_err(|_| anyhow!("upload lock poisoned"))?
             .take();
         if let Some(sender) = sender {
-            let _ = sender.send(Err(message)).await;
+            tokio::select! {
+                biased;
+                _ = self.aborted.cancelled() => {},
+                _ = sender.send(Err(message)) => {},
+            }
         }
         Ok(())
     }
@@ -61,6 +81,7 @@ impl HttpUpload {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn abort(&self) -> Result<()> {
+        self.aborted.cancel();
         self.finish()?;
         self.receiver
             .lock()
@@ -108,6 +129,23 @@ pub struct HttpOptions {
     pub connect_timeout_ms: u32,
     pub receive_timeout_ms: u32,
     pub max_redirects: u32,
+}
+
+#[derive(Clone)]
+pub struct SourceHttpOptions {
+    pub cookie_path: String,
+    pub user_agent: String,
+    pub legacy_clearance_user_agent: Option<String>,
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn configure_source_http(cookie_path: String, options: HttpOptions) {
+    crate::http_policy::configure_source(&cookie_path, options);
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn is_cloudflare_challenge_page(head: String, body: String) -> bool {
+    crate::http_policy::is_challenge_page(&head, &body)
 }
 
 #[flutter_rust_bridge::frb(opaque)]
@@ -182,7 +220,11 @@ impl HttpResponse {
     // Pull-based streaming provides backpressure: Dart requests the next chunk
     // only after its consumer has processed the previous chunk.
     pub async fn next_chunk(&self, cancellation: &HttpCancellation) -> Result<Option<Vec<u8>>> {
-        let mut guard = self.response.lock().await;
+        let mut guard = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => return Err(anyhow!("Request cancelled")),
+            guard = self.response.lock() => guard,
+        };
         if let Some(bytes) = guard.cached.take() {
             return Ok(Some(bytes));
         }
@@ -191,8 +233,9 @@ impl HttpResponse {
             return Ok(None);
         };
         let result = tokio::select! {
+            biased;
             _ = cancellation.cancelled() => Err(anyhow!("Request cancelled")),
-            chunk = response.chunk() => chunk.map(|value| value.map(|bytes| bytes.to_vec())).map_err(Into::into),
+            chunk = response.chunk() => chunk.map(|value| value.map(|bytes| bytes.to_vec())).map_err(transport_error),
         };
         match &result {
             Ok(Some(bytes)) => {
@@ -237,10 +280,10 @@ impl HttpResponse {
 
 static CLIENTS: OnceLock<Mutex<HashMap<String, reqwest::Client>>> = OnceLock::new();
 
-pub(crate) fn client(options: &HttpOptions) -> Result<reqwest::Client> {
+fn partition(options: &HttpOptions) -> String {
     let mut dns: Vec<_> = options.dns_overrides.iter().collect();
     dns.sort();
-    let key = format!(
+    format!(
         "{:?}|{:?}|{}|{}|{}|{}|{}",
         options.proxy,
         dns,
@@ -249,7 +292,11 @@ pub(crate) fn client(options: &HttpOptions) -> Result<reqwest::Client> {
         options.connect_timeout_ms,
         options.receive_timeout_ms,
         options.max_redirects
-    );
+    )
+}
+
+pub(crate) fn client(options: &HttpOptions) -> Result<reqwest::Client> {
+    let key = partition(options);
     let mut clients = CLIENTS
         .get_or_init(Default::default)
         .lock()
@@ -303,36 +350,104 @@ pub async fn http_request(
     options: HttpOptions,
     cancellation: &HttpCancellation,
 ) -> Result<HttpResponse> {
+    request(
+        url,
+        method,
+        headers,
+        body,
+        upload,
+        has_upload,
+        options,
+        None,
+        cancellation,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn source_http_request(
+    url: String,
+    method: String,
+    headers: Vec<HttpHeader>,
+    body: Option<Vec<u8>>,
+    upload: &HttpUpload,
+    has_upload: bool,
+    options: HttpOptions,
+    source: SourceHttpOptions,
+    cancellation: &HttpCancellation,
+) -> Result<HttpResponse> {
+    request(
+        url,
+        method,
+        headers,
+        body,
+        upload,
+        has_upload,
+        options,
+        Some(source),
+        cancellation,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn request(
+    url: String,
+    method: String,
+    headers: Vec<HttpHeader>,
+    body: Option<Vec<u8>>,
+    upload: &HttpUpload,
+    has_upload: bool,
+    mut options: HttpOptions,
+    source: Option<SourceHttpOptions>,
+    cancellation: &HttpCancellation,
+) -> Result<HttpResponse> {
     use crate::http_policy as policy;
-    anyhow::ensure!(!*cancellation.sender.borrow(), "Request cancelled");
-    if policy::header(&headers, "cache-time") == Some("no") {
-        policy::remove(&policy::key(
-            &url,
-            &headers,
-            &serde_json::to_string(&options)?,
-        ));
-    }
+    anyhow::ensure!(!cancellation.is_cancelled(), "Request cancelled");
+    let url = reqwest::Url::parse(&url)?;
     let serial = if policy::header(&headers, "prevent-parallel") == Some("true") {
-        Some(
-            tokio::select! {_=cancellation.cancelled()=>return Err(anyhow!("Request cancelled")),guard=policy::serial(&url)=>guard},
-        )
+        Some(tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => return Err(anyhow!("Request cancelled")),
+            guard = policy::serial(url.as_str()) => guard,
+        })
     } else {
         None
     };
+    let store = source
+        .as_ref()
+        .map(|s| CookieStore::open(s.cookie_path.clone()))
+        .transpose()?;
+    let generation = store.as_ref().map(CookieStore::generation).transpose()?;
+    let session =
+        source
+            .as_ref()
+            .zip(store.as_ref())
+            .zip(generation)
+            .map(|((config, store), generation)| policy::Session {
+                config,
+                store,
+                generation,
+            });
+    let cache_partition = format!("{}|{generation:?}", partition(&options));
+    let initial_headers = match &session {
+        Some(session) => session.headers(url.as_str(), &headers)?,
+        None => headers.clone(),
+    };
+    let bypass_cache = policy::header(&headers, "cache-time") == Some("no");
+    if bypass_cache {
+        policy::remove(&policy::key(
+            url.as_str(),
+            &initial_headers,
+            &cache_partition,
+        ));
+    }
     let cacheable = method.eq_ignore_ascii_case("GET")
         && !has_upload
         && body.is_none()
         && policy::header(&headers, "range").is_none()
-        && policy::header(&headers, "cache-time") != Some("no");
-    let key = if cacheable {
-        Some(policy::key(
-            &url,
-            &headers,
-            &serde_json::to_string(&options)?,
-        ))
-    } else {
-        None
-    };
+        && !bypass_cache;
+    let key = cacheable.then(|| policy::key(url.as_str(), &initial_headers, &cache_partition));
     if let Some(cached) = key
         .as_ref()
         .and_then(|k| policy::get(k, policy::header(&headers, "cache-time") == Some("long")))
@@ -355,21 +470,34 @@ pub async fn http_request(
             }),
         });
     }
-    let mut request = client(&options)?.request(method.parse()?, url);
-    for header in headers {
-        if !policy::is_policy(&header.name) {
-            request = request.header(header.name, header.value);
-        }
+    let redirects = options.max_redirects;
+    if session.is_some() {
+        options.max_redirects = 0;
     }
-    if has_upload {
-        request = request.body(upload.body()?);
-    } else if let Some(body) = body {
-        request = request.body(body);
-    }
-    let response = tokio::select! {
-        _ = cancellation.cancelled() => return Err(anyhow!("Request cancelled")),
-        response = request.send() => response?,
+    let client = client(&options)?;
+    let method = method.parse()?;
+    let body = if has_upload {
+        Some(upload.body()?)
+    } else {
+        body.map(reqwest::Body::from)
     };
+    let (response, redirected) = tokio::select! {
+        biased;
+        _ = cancellation.cancelled() => return Err(anyhow!("Request cancelled")),
+        response = async {
+            if let Some(session) = session {
+                session.send(&client, url.clone(), method, headers, initial_headers, body, redirects).await
+            } else {
+                let response = policy::request(&client, method, url.clone(), &initial_headers, body)
+                    .send().await.map_err(transport_error)?;
+                Ok((response, false))
+            }
+        } => response?,
+    };
+    let key = key.filter(|_| {
+        store.is_none()
+            || (!redirected && !response.headers().contains_key(reqwest::header::SET_COOKIE))
+    });
     let headers = response
         .headers()
         .iter()
@@ -401,6 +529,7 @@ pub fn clear_http_cache() {
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     fn options() -> HttpOptions {
         HttpOptions {
@@ -475,5 +604,251 @@ mod tests {
         )
         .await
         .is_err());
+    }
+
+    async fn server(
+        replies: Vec<String>,
+    ) -> Result<(SocketAddr, tokio::task::JoinHandle<Result<Vec<String>>>)> {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let address = listener.local_addr()?;
+        let task = tokio::spawn(async move {
+            tokio::time::timeout(Duration::from_secs(10), async move {
+                let mut requests = Vec::new();
+                for reply in replies {
+                    let (mut socket, _) = listener.accept().await?;
+                    let mut request = Vec::new();
+                    let mut chunk = [0; 4096];
+                    while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                        let size = socket.read(&mut chunk).await?;
+                        anyhow::ensure!(size != 0, "Client closed before sending headers");
+                        request.extend_from_slice(&chunk[..size]);
+                    }
+                    socket.write_all(reply.as_bytes()).await?;
+                    requests.push(String::from_utf8(request)?.to_ascii_lowercase());
+                }
+                Ok(requests)
+            })
+            .await?
+        });
+        Ok((address, task))
+    }
+
+    fn source(path: String) -> SourceHttpOptions {
+        SourceHttpOptions {
+            cookie_path: path,
+            user_agent: "source-agent".into(),
+            legacy_clearance_user_agent: Some("legacy-agent".into()),
+        }
+    }
+
+    async fn source_get(
+        url: &str,
+        headers: Vec<HttpHeader>,
+        options: HttpOptions,
+        source: SourceHttpOptions,
+    ) -> Result<HttpResponse> {
+        source_http_request(
+            url.into(),
+            "GET".into(),
+            headers,
+            None,
+            &HttpUpload::new(),
+            false,
+            options,
+            source,
+            &HttpCancellation::new(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn source_redirects_scope_credentials_and_report_the_effective_challenge_url(
+    ) -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory
+            .path()
+            .join("cookie.db")
+            .to_string_lossy()
+            .into_owned();
+        let jar = CookieStore::open(path.clone())?;
+        let (address, target) = server(vec![
+            "HTTP/1.1 403 Forbidden\r\ncf-mitigated: challenge\r\nSet-Cookie: ignored=1; Path=/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+            "HTTP/1.1 403 Forbidden\r\ncf-mitigated: challenge\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".into(),
+        ]).await?;
+        let destination = format!("http://other.example:{}/challenge", address.port());
+        let (initial, origin) = server(vec![format!(
+            "HTTP/1.1 302 Found\r\nLocation: {destination}\r\nSet-Cookie: origin=1; Path=/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        )]).await?;
+        let original = format!("http://source.example:{}/", initial.port());
+        jar.save_headers(destination.clone(), vec!["target=1; Path=/".into()])?;
+        let mut transport = options();
+        transport.dns_overrides = ["source.example", "other.example"]
+            .into_iter()
+            .map(|host| (host.into(), "127.0.0.1".into()))
+            .collect();
+        let error = source_get(
+            &original,
+            vec![HttpHeader {
+                name: "Authorization".into(),
+                value: "secret".into(),
+            }],
+            transport.clone(),
+            source(path),
+        )
+        .await
+        .err()
+        .context("Expected challenge")?;
+        assert_eq!(
+            error.to_string(),
+            format!("CloudflareException: {destination}")
+        );
+        assert_eq!(jar.header(original)?, "origin=1");
+        assert_eq!(jar.header(destination.clone())?, "target=1");
+
+        let response = http_request(
+            destination,
+            "GET".into(),
+            vec![],
+            None,
+            &HttpUpload::new(),
+            false,
+            transport,
+            &HttpCancellation::new(),
+        )
+        .await?;
+        assert_eq!(response.status(), 403);
+        let origin_requests = origin.await??;
+        assert!(origin_requests[0].contains("authorization: secret"));
+        let target_requests = target.await??;
+        assert!(target_requests[0].contains("cookie: target=1"));
+        assert!(!target_requests[0].contains("authorization:"));
+        assert!(!target_requests[0].contains("origin=1"));
+        assert!(!target_requests[1].contains("cookie:"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn source_cache_follows_account_and_transport_changes() -> Result<()> {
+        let (address, origin) = server(
+            ["first", "second", "direct"]
+                .map(|body| {
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    )
+                })
+                .into(),
+        )
+        .await?;
+        let directory = tempfile::tempdir()?;
+        let path = directory
+            .path()
+            .join("cookie.db")
+            .to_string_lossy()
+            .into_owned();
+        let jar = CookieStore::open(path.clone())?;
+        let url = format!("http://source.example:{}/", address.port());
+        let source = source(path);
+        let mut transport = options();
+        transport
+            .dns_overrides
+            .insert("source.example".into(), "127.0.0.1".into());
+        let headers = vec![HttpHeader {
+            name: "cache-time".into(),
+            value: "long".into(),
+        }];
+        let body = |transport| {
+            let url = &url;
+            let headers = headers.clone();
+            let source = source.clone();
+            async move {
+                let response = source_get(url, headers, transport, source).await?;
+                let cancellation = HttpCancellation::new();
+                let mut bytes = Vec::new();
+                while let Some(chunk) = response.next_chunk(&cancellation).await? {
+                    bytes.extend(chunk);
+                }
+                Ok::<_, anyhow::Error>(String::from_utf8(bytes)?)
+            }
+        };
+        jar.save_headers(url.clone(), vec!["account=one; Path=/".into()])?;
+        assert_eq!(body(transport.clone()).await?, "first");
+        assert_eq!(body(transport.clone()).await?, "first");
+        jar.save_headers(url.clone(), vec!["account=two; Path=/".into()])?;
+        assert_eq!(body(transport.clone()).await?, "second");
+        transport
+            .dns_overrides
+            .insert("source.example".into(), "invalid-ip".into());
+        assert!(body(transport.clone())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid DNS"));
+        let (proxy, proxy_server) = server(vec![
+            "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nproxy".into(),
+        ])
+        .await?;
+        transport.dns_overrides.clear();
+        transport.proxy = Some(proxy.to_string());
+        assert_eq!(body(transport.clone()).await?, "proxy");
+        assert!(proxy_server.await??[0].starts_with(&format!("get {url} ")));
+        jar.clear()?;
+        transport.proxy = None;
+        transport
+            .dns_overrides
+            .insert("source.example".into(), "127.0.0.1".into());
+        assert_eq!(body(transport).await?, "direct");
+        let requests = origin.await??;
+        assert!(requests[0].contains("cookie: account=one"));
+        assert!(requests[1].contains("cookie: account=two"));
+        assert!(!requests[2].contains("cookie:"));
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cancels_serial_wait_and_blocked_upload() -> Result<()> {
+        let url = "http://localhost/serial-cancellation";
+        let guard = crate::http_policy::serial(url).await;
+        let cancellation = HttpCancellation::new();
+        let upload = HttpUpload::new();
+        let source = source("unused-while-waiting".into());
+        let request = source_http_request(
+            url.into(),
+            "GET".into(),
+            vec![HttpHeader {
+                name: "prevent-parallel".into(),
+                value: "true".into(),
+            }],
+            None,
+            &upload,
+            false,
+            options(),
+            source,
+            &cancellation,
+        );
+        tokio::pin!(request);
+        assert!(futures_util::poll!(&mut request).is_pending());
+        cancellation.cancel();
+        assert_eq!(
+            request
+                .await
+                .err()
+                .context("Expected cancellation")?
+                .to_string(),
+            "Request cancelled"
+        );
+        drop(guard);
+
+        let body = upload.body()?;
+        for _ in 0..8 {
+            upload.write(vec![1]).await?;
+        }
+        let write = upload.write(vec![2]);
+        tokio::pin!(write);
+        assert!(futures_util::poll!(&mut write).is_pending());
+        upload.abort()?;
+        assert!(write.await.is_err());
+        drop(body);
+        Ok(())
     }
 }

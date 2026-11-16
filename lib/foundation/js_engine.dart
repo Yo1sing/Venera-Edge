@@ -10,6 +10,7 @@ import 'package:venera/foundation/consts.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/foundation/script_bridge.dart';
 import 'package:venera/network/proxy.dart';
+import 'package:venera/src/rust/api/http.dart' as http_backend;
 import 'package:venera/src/rust/api/script.dart' as backend;
 import 'package:venera/utils/init.dart';
 import 'package:venera/utils/data_sync.dart';
@@ -31,6 +32,8 @@ class JsEngine with JsUiApi, Init {
   JsEngine._create();
   ScriptSession? _session;
   String? _options;
+  Timer? _systemProxyRefresh;
+  int _networkRevision = 0;
 
   backend.ScriptRuntime get runtime => _session!.runtime;
 
@@ -40,7 +43,10 @@ class JsEngine with JsUiApi, Init {
     unawaited(JsEngine().init());
   }
 
-  static Future<String> runtimeOptions() async => jsonEncode({
+  static Future<String> runtimeOptions() async =>
+      _encodeOptions(await readHttpOptions());
+
+  static String _encodeOptions(http_backend.HttpOptions http) => jsonEncode({
     'data_path': App.dataPath,
     'version': App.version,
     'locale': '${App.locale.languageCode}_${App.locale.countryCode}',
@@ -48,36 +54,62 @@ class JsEngine with JsUiApi, Init {
     'user_agent': webUA,
     'cloudflare_user_agent': appdata.implicitData['ua'] ?? webUA,
     'http': {
-      'proxy': await getProxy(),
-      'dns_overrides': appdata.settings['enableDnsOverrides'] == true
-          ? appdata.settings['dnsOverrides']
-          : <String, String>{},
-      'tls_sni': appdata.settings['sni'] != false,
-      'verify_certificates': appdata.settings['ignoreBadCertificate'] != true,
-      'connect_timeout_ms': 15000,
-      'receive_timeout_ms': 15000,
-      'max_redirects': 5,
+      'proxy': http.proxy,
+      'dns_overrides': http.dnsOverrides,
+      'tls_sni': http.tlsSni,
+      'verify_certificates': http.verifyCertificates,
+      'connect_timeout_ms': http.connectTimeoutMs,
+      'receive_timeout_ms': http.receiveTimeoutMs,
+      'max_redirects': http.maxRedirects,
     },
   });
 
   void resetDio() {
-    unawaited(() async {
-      final options = await runtimeOptions();
-      _options = options;
-      final session = _session;
-      if (session != null && !session.closed) {
-        await session.runtime.configure(optionsJson: options);
-      }
-    }());
+    if (appdata.settings['proxy'] == 'system' && !App.isLinux) {
+      _systemProxyRefresh ??= Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => unawaited(_refreshOptions()),
+      );
+    } else {
+      _systemProxyRefresh?.cancel();
+      _systemProxyRefresh = null;
+    }
+    unawaited(_refreshOptions());
   }
+
+  Future<void> _refreshOptions() async {
+    final session = _session;
+    if (session == null || session.closed) return;
+    final revision = ++_networkRevision;
+    try {
+      final http = await readHttpOptions();
+      if (revision != _networkRevision || session.closed) return;
+      final options = _encodeOptions(http);
+      if (options == _options) return;
+      _publishHttpOptions(http);
+      _options = options;
+      await session.runtime.configure(optionsJson: options);
+    } catch (error, stack) {
+      if (!session.closed) Log.error('Network', error, stack);
+    }
+  }
+
+  void _publishHttpOptions(http_backend.HttpOptions options) =>
+      http_backend.configureSourceHttp(
+        cookiePath: '${App.dataPath}/cookie.db',
+        options: options,
+      );
 
   @override
   Future<void> doInit() async {
-    _options = await runtimeOptions();
+    final http = await readHttpOptions();
+    _options = _encodeOptions(http);
     final runtime = await backend.ScriptRuntime.open(optionsJson: _options!);
     final session = ScriptSession(runtime);
     _session = session;
+    _publishHttpOptions(http);
     appdata.settings.addListener(resetDio);
+    resetDio();
     unawaited(_listen(session));
   }
 
@@ -232,6 +264,8 @@ class JsEngine with JsUiApi, Init {
 
   void dispose() {
     appdata.settings.removeListener(resetDio);
+    _systemProxyRefresh?.cancel();
+    _systemProxyRefresh = null;
     _session?.close();
     _session = null;
     if (identical(_cache, this)) _cache = null;

@@ -3,8 +3,11 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'dart:typed_data';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show AnyhowException;
 import 'package:venera/src/rust/api/http.dart' as backend;
 import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/consts.dart';
 import 'package:venera/foundation/log.dart';
 import 'package:venera/network/proxy.dart';
 
@@ -89,6 +92,7 @@ class MyLogInterceptor implements Interceptor {
       ),
     );
     headers.remove("cookie");
+    headers.remove("set-cookie");
     String content;
     if (response.data is List<int>) {
       try {
@@ -132,12 +136,9 @@ class AppDio with DioMixin {
     this.options = options ?? BaseOptions();
     httpClientAdapter = RustHttpAdapter();
     if (App.isInitialized) {
-      interceptors.add(CookieManagerSql(SingleInstanceCookieJar.instance!));
-      interceptors.add(CloudflareInterceptor());
       interceptors.add(MyLogInterceptor());
     }
   }
-
 }
 
 /// Adapts Dio's UI/source-facing API to the Rust HTTP transport.
@@ -170,6 +171,34 @@ class RustHttpAdapter implements HttpClientAdapter {
     final upload = backend.HttpUpload();
     final input = requestStream == null ? null : StreamIterator(requestStream);
     Future<void> producer = Future.value();
+
+    DioException requestError(Object error, StackTrace stack) {
+      final message = error is AnyhowException
+          ? error.message
+          : error.toString();
+      if (cancelled || message.split('\n').first == 'Request cancelled') {
+        return DioException.requestCancelled(
+          requestOptions: options,
+          reason: 'Request cancelled',
+          stackTrace: stack,
+        );
+      }
+      final challenge = CloudflareException.fromString(message);
+      if (challenge != null) {
+        return CloudflareException(challenge.url, options: options);
+      }
+      final type = message.startsWith('HTTP connection timed out')
+          ? DioExceptionType.connectionTimeout
+          : message.startsWith('HTTP response timed out')
+          ? DioExceptionType.receiveTimeout
+          : DioExceptionType.unknown;
+      return DioException(
+        requestOptions: options,
+        type: type,
+        error: error,
+        stackTrace: stack,
+      );
+    }
 
     Future<void> release() async {
       if (finished) return;
@@ -211,37 +240,53 @@ class RustHttpAdapter implements HttpClientAdapter {
       final headers = options.headers.map(
         (key, value) => MapEntry(key, value.toString().trim()),
       );
-      if (!headers.keys.any((key) => key.toLowerCase() == 'user-agent')) {
+      final jar = App.isInitialized ? SingleInstanceCookieJar.instance : null;
+      if (jar == null &&
+          !headers.keys.any((key) => key.toLowerCase() == 'user-agent')) {
         headers['User-Agent'] = 'venera-edge/v${App.version}';
       }
-      final overrides = <String, String>{};
-      final config = appdata.settings['dnsOverrides'];
-      if (appdata.settings['enableDnsOverrides'] == true && config is Map) {
-        for (final entry in config.entries) {
-          if (entry.key is String && entry.value is String) {
-            overrides[entry.key] = entry.value;
-          }
-        }
-      }
-      response = await backend.httpRequest(
-        url: options.uri.toString(),
-        method: options.method,
-        headers: headers.entries
-            .map((e) => backend.HttpHeader(name: e.key, value: e.value))
-            .toList(),
-        upload: upload,
-        hasUpload: requestStream != null,
-        options: backend.HttpOptions(
-          proxy: await getProxy(),
-          dnsOverrides: overrides,
-          tlsSni: appdata.settings['sni'] != false,
-          verifyCertificates: appdata.settings['ignoreBadCertificate'] != true,
-          connectTimeoutMs: options.connectTimeout?.inMilliseconds ?? 15000,
-          receiveTimeoutMs: options.receiveTimeout?.inMilliseconds ?? 15000,
-          maxRedirects: options.followRedirects ? options.maxRedirects : 0,
-        ),
-        cancellation: cancellation,
+      final platformOptions = readHttpOptions(
+        connectTimeoutMs: options.connectTimeout?.inMilliseconds ?? 15000,
+        receiveTimeoutMs: options.receiveTimeout?.inMilliseconds ?? 15000,
+        maxRedirects: options.followRedirects ? options.maxRedirects : 0,
       );
+      final transport = cancelFuture == null
+          ? await platformOptions
+          : await Future.any([
+              platformOptions,
+              cancelFuture.then<backend.HttpOptions>(
+                (_) => throw StateError('Request cancelled'),
+              ),
+            ]);
+      final url = options.uri.toString();
+      final requestHeaders = headers.entries
+          .map((e) => backend.HttpHeader(name: e.key, value: e.value))
+          .toList();
+      response = jar == null
+          ? await backend.httpRequest(
+              url: url,
+              method: options.method,
+              headers: requestHeaders,
+              upload: upload,
+              hasUpload: input != null,
+              options: transport,
+              cancellation: cancellation,
+            )
+          : await backend.sourceHttpRequest(
+              url: url,
+              method: options.method,
+              headers: requestHeaders,
+              upload: upload,
+              hasUpload: input != null,
+              options: transport,
+              source: backend.SourceHttpOptions(
+                cookiePath: jar.path,
+                userAgent: webUA,
+                legacyClearanceUserAgent:
+                    appdata.implicitData['ua'] as String? ?? webUA,
+              ),
+              cancellation: cancellation,
+            );
       final result = response;
       final responseHeaders = <String, List<String>>{};
       for (final header in result.headers()) {
@@ -254,6 +299,8 @@ class RustHttpAdapter implements HttpClientAdapter {
             if (chunk == null) break;
             yield Uint8List.fromList(chunk);
           }
+        } catch (error, stack) {
+          throw requestError(error, stack);
         } finally {
           await release();
         }
@@ -272,18 +319,7 @@ class RustHttpAdapter implements HttpClientAdapter {
       );
     } catch (error, stack) {
       await release();
-      if (cancelled) {
-        throw DioException.requestCancelled(
-          requestOptions: options,
-          reason: 'Request cancelled',
-          stackTrace: stack,
-        );
-      }
-      throw DioException(
-        requestOptions: options,
-        error: error,
-        stackTrace: stack,
-      );
+      throw requestError(error, stack);
     }
   }
 

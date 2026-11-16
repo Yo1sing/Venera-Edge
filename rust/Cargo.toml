@@ -16,6 +16,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 md5 = "=0.8.1"
 cookie = "=0.18.1"
+psl = "=2.1.250"
+serde_urlencoded = "=0.7.1"
 time = "=0.3.44"
 url = "2"
 uuid = { version = "1", features = ["v4", "v1"] }

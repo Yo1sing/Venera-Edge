@@ -19,8 +19,15 @@ pub fn exclusive<T>(work: impl FnOnce() -> Result<T>) -> Result<T> {
     work()
 }
 
-trait RestoreStore: Send + Sync {
+pub(crate) trait RestoreStore: Send + Sync {
     fn disconnect(&self, directory: &Path);
+}
+
+// Register while holding shared storage access so restore cannot miss a live handle.
+pub(crate) fn register(store: Arc<dyn RestoreStore>) {
+    let mut stores = STORES.lock().unwrap_or_else(|e| e.into_inner());
+    stores.retain(|store| store.strong_count() != 0);
+    stores.push(Arc::downgrade(&store));
 }
 
 type OpenDatabase<T> = dyn Fn(&str) -> Result<T> + Send + Sync;
@@ -48,10 +55,7 @@ impl<T: Send + 'static> Database<T> {
             open: Box::new(open),
             connection: Mutex::new((true, Some(db))),
         });
-        let erased: Arc<dyn RestoreStore> = store.clone();
-        let mut stores = STORES.lock().unwrap_or_else(|e| e.into_inner());
-        stores.retain(|store| store.strong_count() != 0);
-        stores.push(Arc::downgrade(&erased));
+        register(store.clone());
         Ok(store)
     }
 
@@ -91,14 +95,4 @@ pub fn disconnect(directory: &Path) -> Result<()> {
         store.disconnect(&directory);
     }
     Ok(())
-}
-
-static RESTORE_EPOCH: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
-pub fn restore_epoch() -> u64 {
-    RESTORE_EPOCH.load(std::sync::atomic::Ordering::Acquire)
-}
-
-pub fn restored() {
-    RESTORE_EPOCH.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 }

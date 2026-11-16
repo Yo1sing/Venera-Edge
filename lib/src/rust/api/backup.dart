@@ -34,9 +34,6 @@ Future<String> exportAppData({
   sync_: sync_,
 );
 
-int cookieRestoreEpoch() =>
-    RustLib.instance.api.crateApiBackupCookieRestoreEpoch();
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SyncController>>
 abstract class SyncController implements RustOpaqueInterface {
   Future<String> applyRestore({required int id});
