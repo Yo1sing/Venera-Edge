@@ -95,6 +95,8 @@ class _App {
       favorites.init(),
       local.init(),
     ]);
+    await local.runOperation({'mode': 'recover'}, showProgress: false);
+    await local.restoreDownloadingTasks();
   }
 
   Function? _forceRebuildHandler;

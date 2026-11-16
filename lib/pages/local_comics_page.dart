@@ -381,6 +381,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
       builder: (context) {
         bool removeComicFile = true;
         bool removeFavoriteAndHistory = true;
+        bool deleting = false;
         return StatefulBuilder(builder: (context, state) {
           return ContentDialog(
             title: "Delete".tl,
@@ -416,14 +417,22 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
                   },
                 ),
               FilledButton(
-                onPressed: () {
-                  context.pop();
-                  LocalManager().batchDeleteComics(
-                    comics,
-                    removeComicFile,
-                    removeFavoriteAndHistory,
-                  );
-                  isDeleted = true;
+                onPressed: deleting ? null : () async {
+                  state(() => deleting = true);
+                  try {
+                    isDeleted = await LocalManager().batchDeleteComics(
+                      comics,
+                      removeComicFile,
+                      removeFavoriteAndHistory,
+                    );
+                    if (context.mounted) context.pop();
+                  } catch (error, stack) {
+                    Log.error('Delete Local Comics', error, stack);
+                    if (context.mounted) {
+                      state(() => deleting = false);
+                      context.showMessage(message: error.toString());
+                    }
+                  }
                 },
                 child: Text("Confirm".tl),
               ),
@@ -583,6 +592,7 @@ Future<void> openComicFolder(LocalComic comic) async {
 
 void showDeleteChaptersPopWindow(BuildContext context, LocalComic comic) {
   var chapters = <String>[];
+  bool deleting = false;
 
   showPopUpWidget(
     context,
@@ -619,11 +629,18 @@ void showDeleteChaptersPopWindow(BuildContext context, LocalComic comic) {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   FilledButton(
-                    onPressed: () {
-                      Future.delayed(const Duration(milliseconds: 200), () {
-                        LocalManager().deleteComicChapters(comic, chapters);
-                      });
-                      App.rootContext.pop();
+                    onPressed: deleting ? null : () async {
+                      setState(() => deleting = true);
+                      try {
+                        await LocalManager().deleteComicChapters(comic, chapters);
+                        if (context.mounted) context.pop();
+                      } catch (error, stack) {
+                        Log.error('Delete Comic Chapters', error, stack);
+                        if (context.mounted) {
+                          setState(() => deleting = false);
+                          context.showMessage(message: error.toString());
+                        }
+                      }
                     },
                     child: Text("Submit".tl),
                   )

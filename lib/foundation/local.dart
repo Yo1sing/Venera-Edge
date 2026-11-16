@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:isolate';
+import 'package:venera/components/components.dart';
+import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/js_engine.dart';
 
 import 'package:flutter/widgets.dart' show ChangeNotifier;
-import 'package:flutter_saf/flutter_saf.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/src/rust/api/local.dart' as backend;
 import 'package:venera/foundation/comic_source/comic_source.dart';
@@ -283,28 +284,8 @@ class LocalManager with ChangeNotifier {
     await _checkPathValidation();
     _checkNoMedia();
     await ComicSourceManager().ensureInit();
-    await restoreDownloadingTasks();
   }
 
-  String findValidId(ComicType type) => _store.nextId(comicType: type.value);
-
-  Future<void> add(LocalComic comic, [String? id]) async {
-    _store.save(
-      comicJson: jsonEncode({...comic.toBackend(), 'id': id ?? comic.id}),
-    );
-    notifyListeners();
-  }
-
-  void remove(String id, ComicType comicType) {
-    _store.delete(
-      keysJson: jsonEncode([
-        {'id': id, 'type': comicType.value},
-      ]),
-    );
-    notifyListeners();
-  }
-
-  void removeComic(LocalComic comic) => remove(comic.id, comic.comicType);
   List<LocalComic> _comics(String json) => (jsonDecode(json) as List)
       .map((row) => LocalComic.fromBackend(Map<String, dynamic>.from(row)))
       .toList();
@@ -334,27 +315,15 @@ class LocalManager with ChangeNotifier {
       _comics(_store.list(sort: 'time_desc', keyword: keyword));
 
   Future<List<String>> getImages(String id, ComicType type, Object ep) async {
-    if (ep is! String && ep is! int) {
-      throw "Invalid ep";
-    }
-    var comic = find(id, type) ?? (throw "Comic Not Found");
-    var directory = Directory(comic.baseDir);
-    if (comic.hasChapters) {
-      var cid = ep is int
-          ? comic.chapters!.ids.elementAt(ep - 1)
-          : (ep as String);
-      cid = getChapterDirectoryName(cid);
-      directory = Directory(FilePath.join(directory.path, cid));
-    }
-    if (directory is! AndroidDirectory) {
-      return backend.listComicImages(path: directory.path);
-    }
-    final files = await directory
-        .list()
-        .where((e) => e is File)
-        .map((e) => e.path)
-        .toList();
-    return backend.sortComicImages(paths: files);
+    final result = await runOperation({
+      'mode': 'images',
+      'id': id,
+      'type': type.value,
+      'episode': ep,
+    }, showProgress: false);
+    final errors = result['errors'] as List;
+    if (errors.isNotEmpty) throw StateError(errors.first['error']);
+    return List<String>.from(result['images']);
   }
 
   bool isDownloaded(
@@ -377,126 +346,124 @@ class LocalManager with ChangeNotifier {
     );
   }
 
-  Future<Directory> findValidDirectory(
-    String id,
-    ComicType type,
-    String name,
-  ) async {
-    var comic = find(id, type);
-    if (comic != null) {
-      return Directory(FilePath.join(path, comic.directory));
-    }
-    const comicDirectoryMaxLength = 80;
-    if (name.length > comicDirectoryMaxLength) {
-      name = name.substring(0, comicDirectoryMaxLength);
-    }
-    var dir = findValidDirectoryName(path, name);
-    return Directory(FilePath.join(path, dir)).create().then((value) => value);
-  }
-
   void applyDownloadSnapshot(List<DownloadTask> tasks) {
     downloadingTasks = tasks;
     notifyListeners();
   }
 
   void removeTask(DownloadTask task) => task.cancel();
-  void moveToFirst(DownloadTask task) => DownloadQueueView.command(task.queueKey, 'first');
+  void moveToFirst(DownloadTask task) =>
+      DownloadQueueView.command(task.queueKey, 'first');
   Future<void> restoreDownloadingTasks() => DownloadQueueView.initialize();
   void addTask(DownloadTask task) => DownloadQueueView.add(task);
 
-  void deleteComic(LocalComic c, [bool removeFileOnDisk = true]) {
-    if (removeFileOnDisk) {
-      var dir = Directory(FilePath.join(path, c.directory));
-      dir.deleteIgnoreError(recursive: true);
-    }
-    // Deleting a local comic means that it's no longer available, thus both favorite and history should be deleted.
-    if (c.comicType == ComicType.local) {
-      if (HistoryManager().find(c.id, c.comicType) != null) {
-        HistoryManager().remove(c.id, c.comicType);
-      }
-      var folders = LocalFavoritesManager().find(c.id, c.comicType);
-      for (var f in folders) {
-        LocalFavoritesManager().deleteComicWithId(f, c.id, c.comicType);
-      }
-    }
-    remove(c.id, c.comicType);
-    notifyListeners();
-  }
-
-  void deleteComicChapters(LocalComic c, List<String> chapters) {
-    if (chapters.isEmpty) {
-      return;
-    }
-    _store.deleteChapters(
-      id: c.id,
-      comicType: c.comicType.value,
-      chapters: chapters,
+  Future<Map<String, dynamic>> runOperation(
+    Map<String, dynamic> request, {
+    bool showProgress = true,
+  }) async {
+    final operation = await backend.LocalOperation.start(
+      runtime: JsEngine().runtime,
+      optionsJson: jsonEncode({
+        'data_path': App.dataPath,
+        'cache_path': App.cachePath,
+        'local_path': path,
+        'traditional': App.locale.countryCode == 'TW',
+        'at_end': appdata.settings['newFavoriteAddTo'] == 'end',
+      }),
+      requestJson: jsonEncode(request),
     );
-    var shouldRemovedDirs = <Directory>[];
-    for (var chapter in chapters) {
-      var dir = Directory(
-        FilePath.join(c.baseDir, getChapterDirectoryName(chapter)),
-      );
-      if (dir.existsSync()) {
-        shouldRemovedDirs.add(dir);
+    final controller = showProgress
+        ? showLoadingDialog(
+            App.rootContext,
+            barrierDismissible: false,
+            onCancel: operation.cancel,
+          )
+        : null;
+    try {
+      while (true) {
+        final encoded = await operation.next();
+        if (encoded == null) throw StateError('Missing local operation result');
+        final event = jsonDecode(encoded);
+        if (event['kind'] == 'progress') {
+          controller?.setMessage(event['path']);
+          continue;
+        }
+        final result = Map<String, dynamic>.from(event['result']);
+        if (request['mode'] != 'images' && request['mode'] != 'recover') {
+          notifyListeners();
+          LocalFavoritesManager().initCounts();
+          HistoryManager().notifyExternalChanges();
+        }
+        final errors = result['errors'] as List;
+        if (errors.isNotEmpty) {
+          final message = errors
+              .map((error) {
+                final target = error['path'] ?? error['id'];
+                return target == null
+                    ? '${error['error']}'
+                    : '$target\n${error['error']}';
+              })
+              .join('\n');
+          Log.error('Local Comics', message);
+          if (showProgress) {
+            controller?.close();
+            App.rootContext.showMessage(message: message);
+          }
+        }
+        return result;
       }
+    } finally {
+      controller?.close();
+      operation.cancel();
+      operation.dispose();
     }
-    if (shouldRemovedDirs.isNotEmpty) {
-      _deleteDirectories(shouldRemovedDirs);
-    }
-    notifyListeners();
   }
 
-  void batchDeleteComics(
+  Future<bool> deleteComic(
+    LocalComic comic, [
+    bool removeFileOnDisk = true,
+  ]) async {
+    final result = await runOperation({
+      'mode': 'delete',
+      'keys': [
+        {'id': comic.id, 'type': comic.comicType.value},
+      ],
+      'remove_files': removeFileOnDisk,
+      'local_only': true,
+    });
+    return (result['removed'] as List).isNotEmpty;
+  }
+
+  Future<bool> deleteComicChapters(
+    LocalComic comic,
+    List<String> chapters,
+  ) async {
+    if (chapters.isEmpty) return false;
+    final result = await runOperation({
+      'mode': 'chapters',
+      'keys': [
+        {'id': comic.id, 'type': comic.comicType.value},
+      ],
+      'chapters': chapters,
+    });
+    return (result['removed'] as List).isNotEmpty;
+  }
+
+  Future<bool> batchDeleteComics(
     List<LocalComic> comics, [
     bool removeFileOnDisk = true,
     bool removeFavoriteAndHistory = true,
-  ]) {
-    if (comics.isEmpty) {
-      return;
-    }
-
-    var shouldRemovedDirs = <Directory>[];
-    _store.delete(
-      keysJson: jsonEncode(
-        comics.map((c) => {'id': c.id, 'type': c.comicType.value}).toList(),
-      ),
-    );
-    if (removeFileOnDisk) {
-      for (final c in comics) {
-        final dir = Directory(c.baseDir);
-        if (dir.existsSync()) shouldRemovedDirs.add(dir);
-      }
-    }
-
-    var comicIDs = comics.map((e) => ComicID(e.comicType, e.id)).toList();
-
-    if (removeFavoriteAndHistory) {
-      LocalFavoritesManager().batchDeleteComicsInAllFolders(comicIDs);
-      HistoryManager().batchDeleteHistories(comicIDs);
-    }
-
-    notifyListeners();
-
-    if (removeFileOnDisk) {
-      _deleteDirectories(shouldRemovedDirs);
-    }
-  }
-
-  /// Deletes the directories in a separate isolate to avoid blocking the UI thread.
-  static void _deleteDirectories(List<Directory> directories) {
-    Isolate.run(() async {
-      await SAFTaskWorker().init();
-      for (var dir in directories) {
-        try {
-          if (dir.existsSync()) {
-            await dir.delete(recursive: true);
-          }
-        } catch (e) {
-          continue;
-        }
-      }
+  ]) async {
+    if (comics.isEmpty) return false;
+    final result = await runOperation({
+      'mode': 'delete',
+      'keys': comics
+          .map((comic) => {'id': comic.id, 'type': comic.comicType.value})
+          .toList(),
+      'remove_files': removeFileOnDisk,
+      'clear_associations': removeFavoriteAndHistory,
     });
+    return (result['removed'] as List).isNotEmpty;
   }
 
   static String getChapterDirectoryName(String name) =>

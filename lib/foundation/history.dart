@@ -240,6 +240,11 @@ class HistoryManager with ChangeNotifier {
 
   void updateCache() => cachedHistories.clear();
 
+  void notifyExternalChanges() {
+    updateCache();
+    notifyListeners();
+  }
+
   History? find(String id, ComicType type) {
     final entry = _store.find(id: id, comicType: type.value);
     return entry == null ? null : _fromBackend(entry);

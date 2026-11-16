@@ -5,8 +5,10 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'script.dart';
 
 // These functions are ignored because they are not marked as `pub`: `with`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `drop`
 
 String chapterDirectoryName({required String name}) =>
     RustLib.instance.api.crateApiLocalChapterDirectoryName(name: name);
@@ -18,6 +20,23 @@ List<String> sortComicImages({required List<String> paths}) =>
 
 Future<List<String>> listComicImages({required String path}) =>
     RustLib.instance.api.crateApiLocalListComicImages(path: path);
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LocalOperation>>
+abstract class LocalOperation implements RustOpaqueInterface {
+  void cancel();
+
+  Future<String?> next();
+
+  static Future<LocalOperation> start({
+    required ScriptRuntime runtime,
+    required String optionsJson,
+    required String requestJson,
+  }) => RustLib.instance.api.crateApiLocalLocalOperationStart(
+    runtime: runtime,
+    optionsJson: optionsJson,
+    requestJson: requestJson,
+  );
+}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LocalStore>>
 abstract class LocalStore implements RustOpaqueInterface {

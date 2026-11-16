@@ -56,6 +56,12 @@ fn platform_replies() -> &'static Mutex<HashMap<u64, mpsc::Sender<Command>>> {
     REPLIES.get_or_init(Default::default)
 }
 
+type NativePlatformReply = tokio::sync::oneshot::Sender<Result<Value>>;
+fn native_platform_replies() -> &'static Mutex<HashMap<u64, NativePlatformReply>> {
+    static REPLIES: OnceLock<Mutex<HashMap<u64, NativePlatformReply>>> = OnceLock::new();
+    REPLIES.get_or_init(Default::default)
+}
+
 fn next_ticket() -> u64 {
     static NEXT: AtomicU64 = AtomicU64::new(1);
     NEXT.fetch_add(1, Ordering::Relaxed)
@@ -315,6 +321,14 @@ impl Engine {
         ))
     }
     pub fn settle(&self, id: u64, value: Value, error: Option<String>) -> Result<()> {
+        if let Some(reply) = native_platform_replies()
+            .lock()
+            .map_err(|_| anyhow!("Platform replies poisoned"))?
+            .remove(&id)
+        {
+            let _ = reply.send(error.map_or(Ok(value), |error| Err(anyhow!(error))));
+            return Ok(());
+        }
         let target = platform_replies()
             .lock()
             .map_err(|_| anyhow!("Platform replies poisoned"))?
@@ -327,6 +341,49 @@ impl Engine {
                 error.map_or(Ok(value), |e| Err(anyhow!(e))),
             ))
             .context("Script worker stopped")
+    }
+    pub(crate) async fn request_platform(&self, data: Value) -> Result<Value> {
+        ensure!(
+            !self.closed.load(Ordering::Relaxed),
+            "JavaScript runtime is closed"
+        );
+        struct Pending(u64);
+        impl Drop for Pending {
+            fn drop(&mut self) {
+                native_platform_replies()
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner())
+                    .remove(&self.0);
+            }
+        }
+        let ticket = next_ticket();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        native_platform_replies()
+            .lock()
+            .map_err(|_| anyhow!("Platform replies poisoned"))?
+            .insert(ticket, sender);
+        let _pending = Pending(ticket);
+        let work = async {
+            self.event_sender
+                .send(
+                    json!({"event":"platform","ticket":ticket,"data":pack(&data),"reply":true})
+                        .to_string(),
+                )
+                .await
+                .context("Platform event receiver closed")?;
+            receiver.await.context("Platform reply cancelled")?
+        };
+        let mut stopped = self.stopped.clone();
+        let shutdown = async {
+            let already_stopped = *stopped.borrow_and_update();
+            if !already_stopped {
+                let _ = stopped.changed().await;
+            }
+        };
+        tokio::select! {
+            _ = shutdown => Err(anyhow!("JavaScript runtime is closed")),
+            result = work => result,
+        }
     }
     pub async fn promise(&self, id: u64) -> Result<String> {
         struct Pending<'a>(&'a Engine, u64);
@@ -586,7 +643,7 @@ impl Host {
                     .context("Script event queue full")?;
                 Value::Null
             }
-            "UI" | "setClipboard" | "getClipboard" | "imageFavoriteFile" => {
+            "UI" | "setClipboard" | "getClipboard" => {
                 ensure!(
                     self.options.worker_depth == 0,
                     "Platform UI is unavailable inside compute workers"
@@ -937,6 +994,12 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("expected error"));
+        assert!(eval(
+            "sendMessage({method:'localFile',operation:'remove',path:'android://library'})"
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("Unknown script host method"));
         engine.close();
         assert!(engine.evaluate("1").is_err());
         Ok(())

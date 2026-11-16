@@ -329,6 +329,12 @@ impl Queue {
             .as_str()
             .context("Missing comic id")?
             .to_owned();
+        let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
+        let _local_guard = crate::http_policy::serial(&format!(
+            "local-comic:{}:{comic_type}:{comic_id}",
+            options.data_path
+        ))
+        .await;
         if item["comic"].is_null() {
             let mut comic = evaluate_with_retry(
                 &self.engine,
@@ -346,7 +352,6 @@ impl Queue {
         }
         let comic = item["comic"].clone();
         let title = comic["title"].as_str().context("Missing comic title")?;
-        let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
         let library = crate::local::LocalLibrary::open(&format!("{}/local.db", options.data_path))?;
         let existing = library.find(&comic_id, comic_type)?;
         drop(library);

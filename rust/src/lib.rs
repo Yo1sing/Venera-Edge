@@ -8,6 +8,7 @@ mod frb_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be
 mod history;
 mod image_favorites;
 mod local;
+mod local_operations;
 mod script;
 mod script_crypto;
 mod script_html;

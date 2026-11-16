@@ -2,6 +2,40 @@ use anyhow::{anyhow, Result};
 use std::sync::Mutex;
 
 #[flutter_rust_bridge::frb(opaque)]
+pub struct LocalOperation {
+    inner: std::sync::Arc<crate::local_operations::Operation>,
+}
+
+impl Drop for LocalOperation {
+    fn drop(&mut self) {
+        self.inner.cancel();
+    }
+}
+
+impl LocalOperation {
+    pub fn start(
+        runtime: &crate::api::script::ScriptRuntime,
+        options_json: String,
+        request_json: String,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: crate::local_operations::Operation::start(
+                runtime.inner.clone(),
+                serde_json::from_str(&options_json)?,
+                serde_json::from_str(&request_json)?,
+            )?,
+        })
+    }
+    pub async fn next(&self) -> Option<String> {
+        self.inner.receiver.lock().await.recv().await
+    }
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn cancel(&self) {
+        self.inner.cancel();
+    }
+}
+
+#[flutter_rust_bridge::frb(opaque)]
 pub struct LocalStore {
     inner: Mutex<Option<crate::local::LocalLibrary>>,
 }
