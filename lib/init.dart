@@ -53,7 +53,6 @@ Future<void> init() async {
     Log.error("init", "$e\n$s");
   }
   CacheManager().setLimitSize(appdata.settings['cacheSize']);
-  _checkOldConfigs();
   if (App.isAndroid) {
     handleLinks();
     handleTextShare();
@@ -76,40 +75,13 @@ Future<void> init() async {
   }
 }
 
-void _checkOldConfigs() {
-  if (appdata.settings['searchSources'] == null) {
-    appdata.settings['searchSources'] = ComicSource.all()
-        .where((e) => e.searchPageData != null)
-        .map((e) => e.key)
-        .toList();
-  }
-
-  if (appdata.implicitData['webdavAutoSync'] == null) {
-    var webdavConfig = appdata.settings['webdav'];
-    if (webdavConfig is List &&
-        webdavConfig.length == 3 &&
-        webdavConfig.whereType<String>().length == 3) {
-      appdata.implicitData['webdavAutoSync'] = true;
-    } else {
-      appdata.implicitData['webdavAutoSync'] = false;
-    }
-    appdata.writeImplicitData();
-  }
-
-  if (appdata.settings['comicSourceListUrl'].toString().contains("git.nyne.dev")) {
-    // migrate to jsdelivr cdn
-    appdata.settings['comicSourceListUrl'] = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json";
-    appdata.saveData();
-  }
-}
-
 Future<void> _checkAppUpdates() async {
   var lastCheck = appdata.implicitData['lastCheckUpdate'] ?? 0;
   var now = DateTime.now().millisecondsSinceEpoch;
   if (now - lastCheck < 24 * 60 * 60 * 1000) {
     return;
   }
-  appdata.implicitData['lastCheckUpdate'] = now;
+  appdata.setImplicitData('lastCheckUpdate', now);
   appdata.writeImplicitData();
   ComicSourcePage.checkComicSourceUpdate();
   if (appdata.settings['checkUpdateOnStart']) {

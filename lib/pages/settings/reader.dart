@@ -17,68 +17,21 @@ class ReaderSettings extends StatefulWidget {
 }
 
 class _ReaderSettingsState extends State<ReaderSettings> {
+  dynamic _effective(String key) {
+    final comic = widget.comicId;
+    final source = widget.comicSource;
+    return comic != null && source != null
+        ? appdata.settings.getReaderSetting(comic, source, key)
+        : appdata.settings.getDeviceReaderSetting(key);
+  }
+
   bool _isChapterCommentsAtEndSupported() {
-    String? readerMode;
-    bool? showChapterComments;
-
-    if (widget.comicId != null &&
-        widget.comicSource != null &&
-        appdata.settings.isComicSpecificSettingsEnabled(
-          widget.comicId,
-          widget.comicSource,
-        )) {
-      readerMode = appdata.settings.getReaderSetting(
-        widget.comicId!,
-        widget.comicSource!,
-        'readerMode',
-      );
-      showChapterComments = appdata.settings.getReaderSetting(
-        widget.comicId!,
-        widget.comicSource!,
-        'showChapterComments',
-      );
-    } else {
-      readerMode = appdata.settings['readerMode'] as String?;
-      showChapterComments = appdata.settings['showChapterComments'] as bool?;
-    }
-
-    // Must have showChapterComments enabled and be in gallery mode
-    if (showChapterComments != true) return false;
-
-    return readerMode == 'galleryLeftToRight' ||
-        readerMode == 'galleryRightToLeft';
+    if (_effective('showChapterComments') != true) return false;
+    final mode = _effective('readerMode');
+    return mode == 'galleryLeftToRight' || mode == 'galleryRightToLeft';
   }
 
   void _onShowChapterCommentsChanged() {
-    // When showChapterComments is turned off, also turn off showChapterCommentsAtEnd
-    bool? showChapterComments;
-
-    if (widget.comicId != null &&
-        widget.comicSource != null &&
-        appdata.settings.isComicSpecificSettingsEnabled(
-          widget.comicId,
-          widget.comicSource,
-        )) {
-      showChapterComments = appdata.settings.getReaderSetting(
-        widget.comicId!,
-        widget.comicSource!,
-        'showChapterComments',
-      );
-      if (showChapterComments != true) {
-        appdata.settings.setReaderSetting(
-          widget.comicId!,
-          widget.comicSource!,
-          'showChapterCommentsAtEnd',
-          false,
-        );
-      }
-    } else {
-      showChapterComments = appdata.settings['showChapterComments'] as bool?;
-      if (showChapterComments != true) {
-        appdata.settings['showChapterCommentsAtEnd'] = false;
-      }
-    }
-
     setState(() {});
     widget.onChanged?.call("showChapterComments");
   }
@@ -113,6 +66,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
                       b,
                     );
                   });
+                  appdata.saveData();
                 },
               ).toSliver(),
               if (isEnabledSpecificSettings)
@@ -122,6 +76,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
                       setState(() {
                         appdata.settings.resetComicReaderSettings(key);
                       });
+                      appdata.saveData();
                     },
                     child: Text(
                       "Clear specific reader settings for this comic".tl,
@@ -204,13 +159,6 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           },
           onChanged: () {
             setState(() {});
-            var readerMode = appdata.settings['readerMode'];
-            if (readerMode?.toLowerCase().startsWith('continuous') ?? false) {
-              appdata.settings['readerScreenPicNumberForLandscape'] = 1;
-              widget.onChanged?.call('readerScreenPicNumberForLandscape');
-              appdata.settings['readerScreenPicNumberForPortrait'] = 1;
-              widget.onChanged?.call('readerScreenPicNumberForPortrait');
-            }
             widget.onChanged?.call("readerMode");
           },
           comicId: isEnabledSpecificSettings ? widget.comicId : null,
@@ -232,7 +180,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           useDeviceSettings: useDeviceSpecificSettings,
         ).toSliver(),
         SliverAnimatedVisibility(
-          visible: appdata.settings['readerMode']!.startsWith('gallery'),
+          visible: _effective('readerMode')!.startsWith('gallery'),
           child: _SliderSetting(
             title:
                 "The number of pic in screen for landscape (Only Gallery Mode)"
@@ -251,7 +199,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           ),
         ),
         SliverAnimatedVisibility(
-          visible: appdata.settings['readerMode']!.startsWith('gallery'),
+          visible: _effective('readerMode')!.startsWith('gallery'),
           child: _SliderSetting(
             title:
                 "The number of pic in screen for portrait (Only Gallery Mode)"
@@ -270,9 +218,9 @@ class _ReaderSettingsState extends State<ReaderSettings> {
         ),
         SliverAnimatedVisibility(
           visible:
-              appdata.settings['readerMode']!.startsWith('gallery') &&
-              (appdata.settings['readerScreenPicNumberForLandscape'] > 1 ||
-                  appdata.settings['readerScreenPicNumberForPortrait'] > 1),
+              _effective('readerMode')!.startsWith('gallery') &&
+              (_effective('readerScreenPicNumberForLandscape') > 1 ||
+                  _effective('readerScreenPicNumberForPortrait') > 1),
           child: _SwitchSetting(
             title: "Show single image on first page".tl,
             settingKey: "showSingleImageOnFirstPage",
@@ -285,7 +233,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           ),
         ),
         SliverAnimatedVisibility(
-          visible: appdata.settings['readerMode']!.startsWith('continuous'),
+          visible: _effective('readerMode')!.startsWith('continuous'),
           child: _SliderSetting(
             title: "Mouse scroll speed".tl,
             settingsIndex: "readerScrollSpeed",
@@ -323,7 +271,7 @@ class _ReaderSettingsState extends State<ReaderSettings> {
           useDeviceSettings: useDeviceSpecificSettings,
         ).toSliver(),
         SliverAnimatedVisibility(
-          visible: appdata.settings['enableLongPressToZoom'] == true,
+          visible: _effective('enableLongPressToZoom') == true,
           child: SelectSetting(
             title: "Long press zoom position".tl,
             settingKey: "longPressZoomPosition",
@@ -455,18 +403,29 @@ class _CustomImageProcessing extends StatefulWidget {
 }
 
 class __CustomImageProcessingState extends State<_CustomImageProcessing> {
-  var current = '';
+  late String original;
+  late String current;
 
   @override
   void initState() {
     super.initState();
-    current = appdata.settings['customImageProcessing'];
+    original = current = appdata.settings['customImageProcessing'];
   }
 
   @override
   void dispose() {
-    appdata.settings['customImageProcessing'] = current;
-    appdata.saveData();
+    final before = original;
+    final edited = current;
+    if (before != edited) {
+      Future.microtask(() async {
+        try {
+          appdata.settings.replaceValue('customImageProcessing', previous: before, value: edited);
+          await appdata.saveData();
+        } catch (error) {
+          App.rootContext.showMessage(message: error.toString());
+        }
+      });
+    }
     super.dispose();
   }
 
@@ -480,8 +439,9 @@ class __CustomImageProcessingState extends State<_CustomImageProcessing> {
         actions: [
           TextButton(
             onPressed: () {
-              current = defaultCustomImageProcessing;
-              appdata.settings['customImageProcessing'] = current;
+              appdata.settings.reset('customImageProcessing');
+              original = current = appdata.settings['customImageProcessing'];
+              appdata.saveData();
               resetKey++;
               setState(() {});
             },

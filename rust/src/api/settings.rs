@@ -1,126 +1,38 @@
 use anyhow::Result;
-
-#[flutter_rust_bridge::frb(sync)]
-pub fn mutate_settings(
-    settings_json: String,
-    scope: String,
-    owner: Option<String>,
-    key: Option<String>,
-    value_json: Option<String>,
-) -> Result<String> {
-    use anyhow::Context;
-    use serde_json::{json, Value};
-    let mut settings: Value = serde_json::from_str(&settings_json)?;
-    let value = value_json.map(|v| serde_json::from_str(&v)).transpose()?;
-    let root = settings.as_object_mut().context("Invalid settings")?;
-    if scope == "global" {
-        let key = key.context("Missing setting key")?;
-        if let Some(value) = value {
-            root.insert(key, value);
-        } else {
-            root.remove(&key);
-        }
-    } else {
-        let (group, owner) = match scope.as_str() {
-            "comic" => ("comicSpecificSettings", owner.context("Missing comic key")?),
-            "device" => {
-                let device = root
-                    .get("deviceId")
-                    .and_then(Value::as_str)
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-                root.insert("deviceId".into(), device.clone().into());
-                ("deviceSpecificSettings", device)
-            }
-            _ => anyhow::bail!("Invalid setting scope"),
-        };
-        let group = root
-            .entry(group)
-            .or_insert_with(|| json!({}))
-            .as_object_mut()
-            .context("Invalid reader settings")?;
-        if let Some(key) = key {
-            let record = group
-                .entry(owner)
-                .or_insert_with(|| json!({}))
-                .as_object_mut()
-                .context("Invalid reader settings record")?;
-            if let Some(value) = value {
-                record.insert(key, value);
-            } else {
-                record.remove(&key);
-            }
-        } else {
-            group.remove(&owner);
-        }
-    }
-    Ok(settings.to_string())
-}
+use serde_json::{json, Value};
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn default_settings_json() -> String {
-    include_str!("../../settings_defaults.json").to_owned()
+    crate::settings_edits::DEFAULTS.to_string()
 }
 
 pub fn load_app_data(directory: String) -> Result<String> {
     let _storage = crate::backup_storage::access();
-    Ok(serde_json::to_string(&crate::settings::load(&directory)?)?)
+    Ok(crate::settings::load(&directory)?.to_string())
 }
 
-pub fn save_app_data(directory: String, data_json: String) -> Result<()> {
-    let _storage = crate::backup_storage::access();
-    crate::settings::save(&directory, serde_json::from_str(&data_json)?)
-}
-
-pub fn save_app_data_changes(
-    directory: String,
-    base_json: String,
+/// Apply the intents to a UI snapshot immediately. Disk writes reapply them
+/// against the latest saved state and return its canonical value.
+#[flutter_rust_bridge::frb(sync)]
+pub fn preview_app_data_edits(
     data_json: String,
-) -> Result<()> {
-    let _storage = crate::backup_storage::access();
-    crate::settings::save_changes(
-        &directory,
-        serde_json::from_str(&base_json)?,
-        serde_json::from_str(&data_json)?,
-    )
-}
-
-#[flutter_rust_bridge::frb(sync)]
-pub fn rebase_app_data(
-    base_json: String,
-    edited_json: String,
-    current_json: String,
+    edits_json: String,
+    strict: bool,
 ) -> Result<String> {
-    let mut current = serde_json::from_str(&current_json)?;
-    crate::settings::overlay_changes(
-        &serde_json::from_str(&base_json)?,
-        &serde_json::from_str(&edited_json)?,
-        &mut current,
-    );
-    Ok(current.to_string())
+    let mut data: Value = serde_json::from_str(&data_json)?;
+    let rejected =
+        crate::settings_edits::apply(&mut data, serde_json::from_str(&edits_json)?, strict)?;
+    Ok(json!({"data":data,"rejected":rejected}).to_string())
 }
 
-pub fn save_implicit_data(directory: String, data_json: String) -> Result<()> {
+pub fn apply_app_data_edits(directory: String, edits_json: String) -> Result<String> {
     let _storage = crate::backup_storage::access();
-    crate::settings::save_implicit(&directory, serde_json::from_str(&data_json)?)
+    crate::settings::edit(&directory, serde_json::from_str(&edits_json)?)
 }
 
-#[flutter_rust_bridge::frb(sync)]
-pub fn merge_synced_data(current_json: String, incoming_json: String) -> Result<String> {
-    Ok(serde_json::to_string(&crate::settings::merge(
-        serde_json::from_str(&current_json)?,
-        serde_json::from_str(&incoming_json)?,
-    )?)?)
-}
-
-#[flutter_rust_bridge::frb(sync)]
-pub fn update_search_history(
-    history: Vec<String>,
-    keyword: Option<String>,
-    remove: bool,
-) -> Vec<String> {
-    crate::settings::search_history(history, keyword, remove)
+pub fn apply_implicit_data_edits(directory: String, changes_json: String) -> Result<String> {
+    let _storage = crate::backup_storage::access();
+    crate::settings::edit_implicit(&directory, serde_json::from_str(&changes_json)?)
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -130,9 +42,5 @@ pub fn reader_setting(
     key: String,
 ) -> Result<String> {
     let settings = serde_json::from_str(&settings_json)?;
-    Ok(serde_json::to_string(crate::settings::reader_setting(
-        &settings,
-        comic_key.as_deref(),
-        &key,
-    ))?)
+    Ok(crate::settings::reader_setting(&settings, comic_key.as_deref(), &key).to_string())
 }

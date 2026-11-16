@@ -672,7 +672,11 @@ impl Manager {
                 }
                 available.extend(pages);
             }
-            let mut selected = settings[field].as_array().cloned().unwrap_or_default();
+            let mut selected = if field == "searchSources" && settings[field].is_null() {
+                available.clone()
+            } else {
+                settings[field].as_array().cloned().unwrap_or_default()
+            };
             selected.retain(|value| available.contains(value));
             for page in additions {
                 if !selected.contains(&page) {

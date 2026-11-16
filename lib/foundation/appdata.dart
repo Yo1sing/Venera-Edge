@@ -8,23 +8,39 @@ import 'package:venera/src/rust/api/settings.dart' as backend;
 import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/init.dart';
 
-/// Observable UI snapshot; persistence and synchronization rules live in Rust.
+typedef _Edit = Map<String, Object?>;
+
+class SettingsEditsRejected extends StateError {
+  SettingsEditsRejected(super.message);
+}
+
+Object? _freeze(Object? value) => switch (value) {
+  Map<String, dynamic> map => Map<String, dynamic>.unmodifiable(
+    map.map((key, value) => MapEntry(key, _freeze(value))),
+  ),
+  List<dynamic> list => List<dynamic>.unmodifiable(list.map(_freeze)),
+  _ => value,
+};
+
+/// Applies Rust's previews immediately and persists edits against the latest
+/// backend state. Pending edits are replayed when a save or restore returns.
 class Appdata with Init {
   Appdata._create();
-  final Settings settings = Settings._create();
-  var searchHistory = <String>[];
-  var implicitData = <String, dynamic>{};
+  late final Settings settings = Settings._create(this);
+  List<String> _searchHistory = const [];
+  List<String> get searchHistory => _searchHistory;
+  Map<String, dynamic> _implicitData = const {};
+  Map<String, dynamic> get implicitData => _implicitData;
+  final _pendingEdits = <_Edit>[];
+  final _implicitChanges = <String, Object?>{};
   Future<void> _pendingSave = Future.value();
-
-  String? _savedSnapshot;
 
   Future<T> _serialize<T>(Future<T> Function() action) {
     final operation = _pendingSave.then((_) => action());
     _pendingSave = operation.then<void>(
       (_) {},
-      onError: (Object error, StackTrace stack) {
-        Log.error('Appdata', error, stack);
-      },
+      onError: (Object error, StackTrace stack) =>
+          Log.error('Appdata', error, stack),
     );
     return operation;
   }
@@ -37,130 +53,130 @@ class Appdata with Init {
   }
 
   Future<bool> _persist() async {
-    final snapshot = jsonEncode(toJson());
-    final previous = _savedSnapshot;
-    if (previous == null) {
-      await backend.saveAppData(directory: App.dataPath, dataJson: snapshot);
-    } else if (previous != snapshot) {
-      await backend.saveAppDataChanges(
+    if (_pendingEdits.isEmpty) return false;
+    final count = _pendingEdits.length;
+    final result = jsonDecode(
+      await backend.applyAppDataEdits(
         directory: App.dataPath,
-        baseJson: previous,
-        dataJson: snapshot,
-      );
+        editsJson: jsonEncode(_pendingEdits),
+      ),
+    );
+    _pendingEdits.removeRange(0, count);
+    _applyPending(result['data']);
+    if (result['rejected'].isNotEmpty) {
+      if (result['changed'] == true) DataSync().onDataChanged();
+      throw SettingsEditsRejected(result['rejected'].join('\n'));
     }
-    _savedSnapshot = snapshot;
-    return previous != snapshot;
+    return result['changed'] as bool;
   }
 
   Future<Map<String, dynamic>> applyRestoredData(
     Future<Map<String, dynamic>> Function() apply,
   ) => _serialize(() async {
-    final base = _savedSnapshot ?? jsonEncode(toJson());
     final result = await apply();
-    final data = Map<String, dynamic>.from(result['data']);
-    final restored = jsonEncode({
-      'settings': data['settings'],
-      'searchHistory': data['searchHistory'],
-    });
-    final rebased = backend.rebaseAppData(
-      baseJson: base,
-      editedJson: jsonEncode(toJson()),
-      currentJson: restored,
-    );
-    _savedSnapshot = restored;
-    _apply(jsonDecode(rebased));
-    if (await _persist()) DataSync().onDataChanged();
+    _applyPending(result['data']);
     return result;
   });
 
-  void applyUploadRevision(int revision) {
-    settings['dataVersion'] = revision;
-    final snapshot = _savedSnapshot;
-    if (snapshot != null) {
-      final data = jsonDecode(snapshot);
-      data['settings']['dataVersion'] = revision;
-      _savedSnapshot = jsonEncode(data);
-    }
-  }
+  void applyUploadRevision(int revision) => settings._applyRevision(revision);
 
-  void addSearchHistory(String keyword) {
-    searchHistory = backend.updateSearchHistory(
-      history: searchHistory,
-      keyword: keyword,
-      remove: false,
-    );
-    unawaited(saveData());
-  }
+  void addSearchHistory(String keyword) => _editHistory(keyword, false);
+  void removeSearchHistory(String keyword) => _editHistory(keyword, true);
+  void clearSearchHistory() => _editHistory(null, true);
 
-  void removeSearchHistory(String keyword) {
-    searchHistory = backend.updateSearchHistory(
-      history: searchHistory,
-      keyword: keyword,
-      remove: true,
-    );
-    unawaited(saveData());
-  }
-
-  void clearSearchHistory() {
-    searchHistory = backend.updateSearchHistory(
-      history: searchHistory,
-      remove: true,
-    );
+  void _editHistory(String? keyword, bool remove) {
+    _edit([
+      {'scope': 'search', 'keyword': keyword, 'remove': remove},
+    ]);
     unawaited(saveData());
   }
 
   Map<String, dynamic> toJson() => {
     'settings': settings._data,
-    'searchHistory': searchHistory,
+    'searchHistory': _searchHistory,
   };
 
-  void _apply(Map<String, dynamic> data) {
-    settings._replace(Map<String, dynamic>.from(data['settings']));
-    searchHistory = List<String>.from(data['searchHistory']);
+  void _edit(List<_Edit> edits) {
+    final payload = jsonEncode(edits);
+    final next = jsonDecode(
+      backend.previewAppDataEdits(
+        dataJson: jsonEncode(toJson()),
+        editsJson: payload,
+        strict: true,
+      ),
+    )['data'];
+    _pendingEdits.addAll(List<_Edit>.from(jsonDecode(payload)));
+    _apply(next);
   }
 
-  void syncData(Map<String, dynamic> data) {
-    _apply(
-      jsonDecode(
-        backend.mergeSyncedData(
-          currentJson: jsonEncode(toJson()),
-          incomingJson: jsonEncode(data),
-        ),
-      ),
-    );
-    unawaited(saveData());
+  void _applyPending(Map<String, dynamic> data) {
+    final next = _pendingEdits.isEmpty
+        ? data
+        : jsonDecode(
+            backend.previewAppDataEdits(
+              dataJson: jsonEncode(data),
+              editsJson: jsonEncode(_pendingEdits),
+              strict: false,
+            ),
+          )['data'];
+    _apply(next);
+  }
+
+  void _apply(Map<String, dynamic> data) {
+    _searchHistory = List<String>.unmodifiable(data['searchHistory']);
+    settings._replace(data['settings']);
+  }
+
+  void setImplicitData(String key, Object? value) {
+    final frozen = _freeze(value);
+    _implicitChanges[key] = frozen;
+    _implicitData = Map.unmodifiable({..._implicitData, key: frozen});
   }
 
   void writeImplicitData() {
-    final snapshot = jsonEncode(implicitData);
     unawaited(
-      _serialize(
-        () => backend.saveImplicitData(
-          directory: App.dataPath,
-          dataJson: snapshot,
-        ),
-      ).then(
-        (_) {
-          DataSync().refreshConfiguration();
-        },
-        onError: (Object _, StackTrace _) {
-          // _serialize already logged the save failure.
-        },
-      ),
+      saveImplicitData().catchError((Object _, StackTrace _) {
+        // _serialize already logged the save failure.
+      }),
     );
   }
+
+  Future<void> saveImplicitData() => _serialize(() async {
+    if (_implicitChanges.isEmpty) return;
+    final changes = Map<String, Object?>.of(_implicitChanges);
+    final result =
+        jsonDecode(
+              await backend.applyImplicitDataEdits(
+                directory: App.dataPath,
+                changesJson: jsonEncode(changes),
+              ),
+            )
+            as Map<String, dynamic>;
+    for (final entry in changes.entries) {
+      if (_implicitChanges[entry.key] == entry.value) {
+        _implicitChanges.remove(entry.key);
+      }
+    }
+    _implicitData =
+        _freeze({...result, ..._implicitChanges})! as Map<String, dynamic>;
+    if (changes.containsKey('webdavAutoSync')) {
+      DataSync().refreshConfiguration();
+    }
+  });
 
   @override
   Future<void> doInit() async {
     try {
-      final data = jsonDecode(
-        await backend.loadAppData(directory: App.dataPath),
+      final result = jsonDecode(
+        await backend.applyAppDataEdits(
+          directory: App.dataPath,
+          editsJson: '[]',
+        ),
       );
-      _apply(data);
-      implicitData = Map<String, dynamic>.from(data['implicitData']);
-      await saveData(false);
+      final data = result['data'] as Map<String, dynamic>;
+      _implicitData = _freeze(data['implicitData'])! as Map<String, dynamic>;
+      _applyPending(data);
     } catch (error, stack) {
-      // Keep corrupt/unreadable files for recovery, and let other components initialize.
       Log.error('Appdata', error, stack);
     }
   }
@@ -169,116 +185,131 @@ class Appdata with Init {
 final appdata = Appdata._create();
 
 class Settings with ChangeNotifier {
-  Settings._create();
-
-  final Map<String, dynamic> _data = jsonDecode(backend.defaultSettingsJson());
+  Settings._create(this._app);
+  final Appdata _app;
+  Map<String, dynamic> _data =
+      _freeze(jsonDecode(backend.defaultSettingsJson()))!
+          as Map<String, dynamic>;
 
   void _replace(Map<String, dynamic> values) {
-    _data.addAll(values);
+    final revision = _data['dataVersion'] as int;
+    if (revision > (values['dataVersion'] as int)) {
+      values = {...values, 'dataVersion': revision};
+    }
+    if (jsonEncode(_data) == jsonEncode(values)) return;
+    _data = _freeze(values)! as Map<String, dynamic>;
     notifyListeners();
   }
 
-  operator [](String key) {
-    return _data[key];
-  }
-
-  operator []=(String key, dynamic value) {
-    _mutate('global', key: key, value: value);
-    if (key != "dataVersion") {
-      notifyListeners();
+  void _applyRevision(int revision) {
+    if (revision > (_data['dataVersion'] as int)) {
+      _data = Map.unmodifiable({..._data, 'dataVersion': revision});
     }
   }
+
+  dynamic operator [](String key) => _data[key];
+
+  void operator []=(String key, dynamic value) {
+    final previous = _data[key];
+    if (previous is List || previous is Map || value is List || value is Map) {
+      replaceValue(key, previous: previous, value: value);
+    } else {
+      _change(key, {'action': 'set', 'value': value});
+    }
+  }
+
+  void reset(String key) => _change(key, {'action': 'reset'});
+
+  void replaceValue(
+    String key, {
+    required Object? previous,
+    required Object? value,
+  }) =>
+      _change(key, {'action': 'replace', 'previous': previous, 'value': value});
+
+  void replaceWebDav({
+    required Object? previous,
+    required String previousExclusions,
+    required Object? config,
+    required String exclusions,
+  }) => _app._edit([
+    {
+      'scope': 'webDav',
+      'previous': previous,
+      'previousExclusions': previousExclusions,
+      'config': config,
+      'exclusions': exclusions,
+    },
+  ]);
+
+  void addBlockedWord(String key, String value) =>
+      _change(key, {'action': 'add', 'value': value});
+
+  void removeBlockedWord(String key, String value) =>
+      _change(key, {'action': 'remove', 'value': value});
+
+  void _change(String key, _Edit change) => _app._edit([
+    {'scope': 'global', 'key': key, 'change': change},
+  ]);
 
   void setEnabledComicSpecificSettings(
     String comicId,
     String sourceKey,
     bool enabled,
-  ) {
-    setReaderSetting(comicId, sourceKey, "enabled", enabled);
-  }
+  ) => setReaderSetting(comicId, sourceKey, 'enabled', enabled);
 
-  bool isComicSpecificSettingsEnabled(String? comicId, String? sourceKey) {
-    if (comicId == null || sourceKey == null) {
-      return false;
-    }
-    return _data['comicSpecificSettings']["$comicId@$sourceKey"]?["enabled"] ==
-        true;
-  }
+  bool isComicSpecificSettingsEnabled(String? comicId, String? sourceKey) =>
+      comicId != null &&
+      sourceKey != null &&
+      _data['comicSpecificSettings']['$comicId@$sourceKey']?['enabled'] == true;
 
-  dynamic getReaderSetting(String comicId, String sourceKey, String key) {
-    return jsonDecode(
-      backend.readerSetting(
-        settingsJson: jsonEncode(_data),
-        comicKey: '$comicId@$sourceKey',
-        key: key,
-      ),
-    );
-  }
+  dynamic getReaderSetting(String comicId, String sourceKey, String key) =>
+      _resolveReaderSetting(key, comicKey: '$comicId@$sourceKey');
 
   void setReaderSetting(
     String comicId,
     String sourceKey,
     String key,
     dynamic value,
-  ) {
-    _mutate('comic', owner: '$comicId@$sourceKey', key: key, value: value);
-    notifyListeners();
-  }
+  ) => _app._edit([
+    {
+      'scope': 'comic',
+      'owner': '$comicId@$sourceKey',
+      'edit': {'key': key, 'value': value},
+    },
+  ]);
 
-  void resetComicReaderSettings(String key) {
-    _mutate('comic', owner: key);
-    notifyListeners();
-  }
+  void resetComicReaderSettings(String key) => _app._edit([
+    {'scope': 'comic', 'owner': key},
+  ]);
 
-  void setEnabledDeviceSpecificSettings(bool enabled) {
-    setDeviceReaderSetting("enabled", enabled);
-  }
+  void setEnabledDeviceSpecificSettings(bool enabled) =>
+      setDeviceReaderSetting('enabled', enabled);
 
-  bool isDeviceSpecificSettingsEnabled() {
-    var deviceId = _data['deviceId'] as String;
-    if (deviceId.isEmpty) {
-      return false;
-    }
-    return _data['deviceSpecificSettings'][deviceId]?["enabled"] == true;
-  }
+  bool isDeviceSpecificSettingsEnabled() =>
+      _data['deviceSpecificSettings'][_data['deviceId']]?['enabled'] == true;
 
-  dynamic getDeviceReaderSetting(String key) {
-    return jsonDecode(
-      backend.readerSetting(settingsJson: jsonEncode(_data), key: key),
-    );
-  }
+  dynamic getDeviceReaderSetting(String key) => _resolveReaderSetting(key);
 
-  void setDeviceReaderSetting(String key, dynamic value) {
-    _mutate('device', key: key, value: value);
-    notifyListeners();
-  }
+  dynamic _resolveReaderSetting(String key, {String? comicKey}) => jsonDecode(
+    backend.readerSetting(
+      settingsJson: jsonEncode(_data),
+      comicKey: comicKey,
+      key: key,
+    ),
+  );
 
-  void resetDeviceReaderSettings() {
-    _mutate('device');
-    notifyListeners();
-  }
+  void setDeviceReaderSetting(String key, dynamic value) => _app._edit([
+    {
+      'scope': 'device',
+      'edit': {'key': key, 'value': value},
+    },
+  ]);
 
-  void _mutate(String scope, {String? owner, String? key, dynamic value}) {
-    final next = jsonDecode(
-      backend.mutateSettings(
-        settingsJson: jsonEncode(_data),
-        scope: scope,
-        owner: owner,
-        key: key,
-        valueJson: key == null ? null : jsonEncode(value),
-      ),
-    );
-    _data
-      ..clear()
-      ..addAll(Map<String, dynamic>.from(next));
-  }
+  void resetDeviceReaderSettings() => _app._edit([
+    {'scope': 'device'},
+  ]);
 
   @override
-  String toString() {
-    return _data.toString();
-  }
+  String toString() => _data.toString();
 }
-
-String get defaultCustomImageProcessing =>
-    jsonDecode(backend.defaultSettingsJson())['customImageProcessing']
-        as String;

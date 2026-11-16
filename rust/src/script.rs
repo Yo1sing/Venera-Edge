@@ -551,6 +551,7 @@ impl Host {
                     "getLocale",
                     "getPlatform",
                     "load_data",
+                    "load_setting",
                     "isLogged",
                     "log"
                 ]
@@ -590,13 +591,37 @@ impl Host {
             "load_data" => source_data(&self.options.data_path, text(data, "key")?)?
                 [text(data, "data_key")?]
             .clone(),
+            "load_setting" => {
+                let data_key = text(data, "setting_key")?;
+                let loaded = source_data(&self.options.data_path, text(data, "key")?)?;
+                crate::source_settings::effective(
+                    &data["definition"],
+                    &loaded["settings"][data_key],
+                )
+            }
+            "edit_source_setting" => {
+                let key = text(data, "key")?;
+                let setting = text(data, "setting_key")?;
+                let definition = &data["definition"];
+                crate::source_settings::ensure_editable(definition)?;
+                let value = if data["reset"] == true {
+                    None
+                } else {
+                    crate::source_settings::required_value(definition, &data["value"])?;
+                    Some(data["value"].clone())
+                };
+                write_source_setting(&self.options.data_path, key, setting, value)?;
+                let _ = self
+                    .events
+                    .try_send(json!({"event":"sourceChanged","key":key}).to_string());
+                Value::Null
+            }
             "isLogged" => (!source_data(&self.options.data_path, text(data, "key")?)?["account"]
                 .is_null())
             .into(),
             "save_data" | "delete_data" => {
                 let key = text(data, "key")?;
                 let field = text(data, "data_key")?;
-                ensure!(field != "setting", "setting is not allowed to be saved");
                 update_source(
                     &self.options.data_path,
                     key,
@@ -713,47 +738,83 @@ pub fn update_source(
     path: &[String],
     value: Option<Value>,
 ) -> Result<()> {
+    ensure!(
+        path.first()
+            .is_some_and(|key| !matches!(key.as_str(), "setting" | "settings")),
+        "Use the source settings interface for this field"
+    );
+    mutate_source_data(directory, key, |data| apply_source_data(data, path, value))
+}
+
+fn write_source_setting(
+    directory: &str,
+    key: &str,
+    setting: &str,
+    value: Option<Value>,
+) -> Result<()> {
+    mutate_source_data(directory, key, |data| {
+        let root = data.as_object_mut().context("Invalid source data")?;
+        let settings = root.entry("settings").or_insert_with(|| json!({}));
+        if !settings.is_object() {
+            *settings = json!({});
+        }
+        let fields = settings.as_object_mut().unwrap();
+        if let Some(value) = value {
+            fields.insert(setting.to_owned(), value);
+        } else {
+            fields.remove(setting);
+        }
+        Ok(())
+    })
+}
+
+fn apply_source_data(current: &mut Value, path: &[String], value: Option<Value>) -> Result<()> {
+    if path.is_empty() {
+        *current = value.unwrap_or_else(|| json!({}));
+        return Ok(());
+    }
+    if let Some(array) = current.as_array_mut() {
+        let index: usize = path[0].parse()?;
+        ensure!(index < array.len(), "Source data array index out of range");
+        if path.len() == 1 && value.is_none() {
+            array.remove(index);
+            return Ok(());
+        }
+        return apply_source_data(&mut array[index], &path[1..], value);
+    }
+    let object = current
+        .as_object_mut()
+        .context("Expected source data object")?;
+    if path.len() == 1 {
+        match value {
+            Some(value) => {
+                object.insert(path[0].clone(), value);
+            }
+            None => {
+                object.remove(&path[0]);
+            }
+        }
+    } else {
+        apply_source_data(
+            object.entry(path[0].clone()).or_insert_with(|| json!({})),
+            &path[1..],
+            value,
+        )?;
+    }
+    Ok(())
+}
+
+fn mutate_source_data(
+    directory: &str,
+    key: &str,
+    edit: impl FnOnce(&mut Value) -> Result<()>,
+) -> Result<()> {
     let _storage = crate::backup_storage::access();
     let _guard = DATA_WRITES
         .lock()
         .map_err(|_| anyhow!("Source data lock poisoned"))?;
     let mut data = read_source_data(directory, key)?;
-    fn apply(current: &mut Value, path: &[String], value: Option<Value>) -> Result<()> {
-        if path.is_empty() {
-            *current = value.unwrap_or_else(|| json!({}));
-            return Ok(());
-        }
-        if let Some(array) = current.as_array_mut() {
-            let index: usize = path[0].parse()?;
-            ensure!(index < array.len(), "Source data array index out of range");
-            if path.len() == 1 && value.is_none() {
-                array.remove(index);
-                return Ok(());
-            }
-            return apply(&mut array[index], &path[1..], value);
-        }
-        let object = current
-            .as_object_mut()
-            .context("Expected source data object")?;
-        if path.len() == 1 {
-            match value {
-                Some(value) => {
-                    object.insert(path[0].clone(), value);
-                }
-                None => {
-                    object.remove(&path[0]);
-                }
-            }
-        } else {
-            apply(
-                object.entry(path[0].clone()).or_insert_with(|| json!({})),
-                &path[1..],
-                value,
-            )?;
-        }
-        Ok(())
-    }
-    apply(&mut data, path, value)?;
+    edit(&mut data)?;
     let target = source_path(directory, key)?;
     std::fs::create_dir_all(target.parent().unwrap())?;
     let mut file = tempfile::NamedTempFile::new_in(target.parent().unwrap())?;

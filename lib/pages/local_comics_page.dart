@@ -97,7 +97,7 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
             actions: [
               FilledButton(
                 onPressed: () {
-                  appdata.implicitData["local_sort"] = sortType.value;
+                  appdata.setImplicitData("local_sort", sortType.value);
                   appdata.writeImplicitData();
                   Navigator.pop(context);
                   update();

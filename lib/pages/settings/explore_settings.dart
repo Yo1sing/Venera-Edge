@@ -140,7 +140,7 @@ class _ManageBlockingWordViewState extends State<_ManageBlockingWordView> {
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {
-                appdata.settings["blockedWords"].removeAt(index);
+                appdata.settings.removeBlockedWord("blockedWords", appdata.settings["blockedWords"][index]);
                 appdata.saveData();
                 setState(() {});
               },
@@ -185,7 +185,7 @@ class _ManageBlockingWordViewState extends State<_ManageBlockingWordView> {
                     });
                     return;
                   }
-                  appdata.settings["blockedWords"].add(controller.text);
+                  appdata.settings.addBlockedWord("blockedWords", controller.text);
                   appdata.saveData();
                   this.setState(() {});
                   context.pop();
@@ -285,7 +285,7 @@ class _ManageBlockingCommentWordViewState extends State<_ManageBlockingCommentWo
             trailing: IconButton(
               icon: const Icon(Icons.close),
               onPressed: () {
-                appdata.settings["blockedCommentWords"].removeAt(index);
+                appdata.settings.removeBlockedWord("blockedCommentWords", appdata.settings["blockedCommentWords"][index]);
                 appdata.saveData();
                 setState(() {});
               },
@@ -330,7 +330,7 @@ class _ManageBlockingCommentWordViewState extends State<_ManageBlockingCommentWo
                     });
                     return;
                   }
-                  appdata.settings["blockedCommentWords"].add(controller.text);
+                  appdata.settings.addBlockedWord("blockedCommentWords", controller.text);
                   appdata.saveData();
                   this.setState(() {});
                   context.pop();

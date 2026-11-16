@@ -13,6 +13,8 @@ mod script;
 mod script_crypto;
 mod script_html;
 mod settings;
+mod settings_edits;
+mod source_settings;
 mod sources;
 mod text;
 

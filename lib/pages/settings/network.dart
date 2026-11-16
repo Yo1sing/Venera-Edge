@@ -217,11 +217,14 @@ class _ProxySettingViewState extends State<_ProxySettingView> {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
+            onPressed: () async {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              try {
                 appdata.settings['proxy'] = toProxyStr();
-                appdata.saveData();
-                App.rootContext.pop();
+                await appdata.saveData();
+                if (mounted) App.rootContext.pop();
+              } catch (error) {
+                if (context.mounted) context.showMessage(message: error.toString());
               }
             },
             child: Text("Save".tl),
@@ -241,11 +244,13 @@ class _DNSOverrides extends StatefulWidget {
 
 class __DNSOverridesState extends State<_DNSOverrides> {
   var overrides = <(TextEditingController, TextEditingController)>[];
+  late Map<String, dynamic> original;
 
   @override
   void initState() {
-    for (var entry in (appdata.settings['dnsOverrides'] as Map).entries) {
-      if (entry.key is String && entry.value is String) {
+    original = Map<String, dynamic>.from(appdata.settings['dnsOverrides']);
+    for (var entry in original.entries) {
+      if (entry.value is String) {
         overrides.add((
           TextEditingController(text: entry.key),
           TextEditingController(text: entry.value)
@@ -257,14 +262,23 @@ class __DNSOverridesState extends State<_DNSOverrides> {
 
   @override
   void dispose() {
-    var map = <String, String>{};
-    for (var entry in overrides) {
-      map[entry.$1.text] = entry.$2.text;
+    final values = <String, String>{};
+    for (final (host, address) in overrides) {
+      if (host.text.trim().isNotEmpty || address.text.trim().isNotEmpty) {
+        values[host.text.trim()] = address.text.trim();
+      }
+      host.dispose();
+      address.dispose();
     }
-    appdata.settings['dnsOverrides'] = map;
-    appdata.saveData();
-    JsEngine().resetDio();
     super.dispose();
+    Future.microtask(() async {
+      try {
+        appdata.settings.replaceValue('dnsOverrides', previous: original, value: values);
+        await appdata.saveData();
+      } catch (error) {
+        App.rootContext.showMessage(message: error.toString());
+      }
+    });
   }
 
   @override

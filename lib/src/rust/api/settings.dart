@@ -6,78 +6,38 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-String mutateSettings({
-  required String settingsJson,
-  required String scope,
-  String? owner,
-  String? key,
-  String? valueJson,
-}) => RustLib.instance.api.crateApiSettingsMutateSettings(
-  settingsJson: settingsJson,
-  scope: scope,
-  owner: owner,
-  key: key,
-  valueJson: valueJson,
-);
-
 String defaultSettingsJson() =>
     RustLib.instance.api.crateApiSettingsDefaultSettingsJson();
 
 Future<String> loadAppData({required String directory}) =>
     RustLib.instance.api.crateApiSettingsLoadAppData(directory: directory);
 
-Future<void> saveAppData({
-  required String directory,
+/// Apply the intents to a UI snapshot immediately. Disk writes reapply them
+/// against the latest saved state and return its canonical value.
+String previewAppDataEdits({
   required String dataJson,
-}) => RustLib.instance.api.crateApiSettingsSaveAppData(
-  directory: directory,
+  required String editsJson,
+  required bool strict,
+}) => RustLib.instance.api.crateApiSettingsPreviewAppDataEdits(
   dataJson: dataJson,
+  editsJson: editsJson,
+  strict: strict,
 );
 
-Future<void> saveAppDataChanges({
+Future<String> applyAppDataEdits({
   required String directory,
-  required String baseJson,
-  required String dataJson,
-}) => RustLib.instance.api.crateApiSettingsSaveAppDataChanges(
+  required String editsJson,
+}) => RustLib.instance.api.crateApiSettingsApplyAppDataEdits(
   directory: directory,
-  baseJson: baseJson,
-  dataJson: dataJson,
+  editsJson: editsJson,
 );
 
-String rebaseAppData({
-  required String baseJson,
-  required String editedJson,
-  required String currentJson,
-}) => RustLib.instance.api.crateApiSettingsRebaseAppData(
-  baseJson: baseJson,
-  editedJson: editedJson,
-  currentJson: currentJson,
-);
-
-Future<void> saveImplicitData({
+Future<String> applyImplicitDataEdits({
   required String directory,
-  required String dataJson,
-}) => RustLib.instance.api.crateApiSettingsSaveImplicitData(
+  required String changesJson,
+}) => RustLib.instance.api.crateApiSettingsApplyImplicitDataEdits(
   directory: directory,
-  dataJson: dataJson,
-);
-
-String mergeSyncedData({
-  required String currentJson,
-  required String incomingJson,
-}) => RustLib.instance.api.crateApiSettingsMergeSyncedData(
-  currentJson: currentJson,
-  incomingJson: incomingJson,
-);
-
-List<String> updateSearchHistory({
-  required List<String> history,
-  String? keyword,
-  required bool remove,
-}) => RustLib.instance.api.crateApiSettingsUpdateSearchHistory(
-  history: history,
-  keyword: keyword,
-  remove: remove,
+  changesJson: changesJson,
 );
 
 String readerSetting({

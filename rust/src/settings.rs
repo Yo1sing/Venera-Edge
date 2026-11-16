@@ -37,25 +37,25 @@ fn read_optional(path: &Path) -> Result<Option<Value>> {
 }
 
 pub fn load(directory: &str) -> Result<Value> {
-    let mut settings: Value = serde_json::from_str(include_str!("../settings_defaults.json"))?;
     let data =
         read_optional(&Path::new(directory).join("appdata.json"))?.unwrap_or_else(|| json!({}));
-    if let Some(saved) = data["settings"].as_object() {
-        for (key, value) in saved {
-            if !value.is_null() {
-                settings[key] = value.clone();
-            }
-        }
-    }
+    let mut settings = crate::settings_edits::normalize(&data["settings"]);
     if settings["deviceId"].as_str().unwrap_or_default().is_empty() {
         settings["deviceId"] = uuid::Uuid::new_v4().to_string().into();
     }
     let history = data["searchHistory"]
         .as_array()
-        .cloned()
-        .unwrap_or_default();
-    let implicit = read_optional(&Path::new(directory).join("implicitData.json"))?
-        .unwrap_or_else(|| json!({}));
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let mut implicit = load_implicit(directory)?;
+    if !implicit["webdavAutoSync"].is_boolean() {
+        implicit["webdavAutoSync"] = json!(settings["webdav"]
+            .as_array()
+            .is_some_and(|settings| !settings.is_empty()));
+    }
     Ok(json!({ "settings":settings, "searchHistory": history, "implicitData": implicit }))
 }
 
@@ -103,7 +103,12 @@ pub fn sync_snapshot(mut data: Value) -> Value {
     let exclusions = excluded(&data["settings"]);
     if let Some(settings) = data["settings"].as_object_mut() {
         for key in exclusions {
-            settings.remove(&key);
+            if key != "dataVersion" {
+                settings.remove(&key);
+            }
+        }
+        for key in DEVICE_ONLY {
+            settings.remove(*key);
         }
     }
     if let Some(data) = data.as_object_mut() {
@@ -129,53 +134,53 @@ pub fn advance_revision(directory: &str, webdav: &Value, version: u64) -> Result
     Ok(())
 }
 
-// Rebase edits made against a Flutter snapshot onto the current Rust snapshot.
-pub fn overlay_changes(base: &Value, edited: &Value, current: &mut Value) {
-    if base == edited {
-        return;
-    }
-    if let (Some(base), Some(edited), Some(current)) = (
-        base.as_object(),
-        edited.as_object(),
-        current.as_object_mut(),
-    ) {
-        for (key, previous) in base {
-            if !edited.contains_key(key) {
-                current.remove(key);
-            } else if &edited[key] != previous {
-                overlay_changes(
-                    previous,
-                    &edited[key],
-                    current.entry(key.clone()).or_insert(Value::Null),
-                );
-            }
-        }
-        for (key, value) in edited {
-            if !base.contains_key(key) {
-                current.insert(key.clone(), value.clone());
-            }
-        }
-    } else {
-        *current = edited.clone();
-    }
-}
-
-pub fn save_changes(directory: &str, base: Value, edited: Value) -> Result<()> {
+pub fn edit(directory: &str, edits: Vec<crate::settings_edits::Edit>) -> Result<String> {
     let _guard = WRITES
         .lock()
         .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
-    let mut current = load(directory)?;
-    current.as_object_mut().unwrap().remove("implicitData");
-    overlay_changes(&base, &edited, &mut current);
-    save_locked(directory, current)
+    let mut data = load(directory)?;
+    let before = data.clone();
+    let rejected = crate::settings_edits::apply(&mut data, edits, false)?;
+    let root = Path::new(directory);
+    let changed = data != before;
+    let mut persisted = data.clone();
+    persisted.as_object_mut().unwrap().remove("implicitData");
+    if read_optional(&root.join("appdata.json"))?.as_ref() != Some(&persisted)
+        || read_optional(&root.join("syncdata.json"))?.as_ref()
+            != Some(&sync_snapshot(persisted.clone()))
+    {
+        save_locked(directory, persisted)?;
+    }
+    let mut implicit = load_implicit(directory)?;
+    if !implicit["webdavAutoSync"].is_boolean() {
+        implicit["webdavAutoSync"] = before["implicitData"]["webdavAutoSync"].clone();
+        atomic_json(&root.join("implicitData.json"), &implicit)?;
+        data["implicitData"] = implicit;
+    }
+    Ok(json!({"data":data,"changed":changed,"rejected":rejected}).to_string())
 }
 
-pub fn save_implicit(directory: &str, data: Value) -> Result<()> {
-    ensure!(data.is_object(), "Invalid implicit data snapshot");
+fn load_implicit(directory: &str) -> Result<Value> {
+    let value = read_optional(&Path::new(directory).join("implicitData.json"))?
+        .unwrap_or_else(|| json!({}));
+    ensure!(value.is_object(), "Invalid implicit data");
+    Ok(value)
+}
+
+pub fn edit_implicit(directory: &str, changes: serde_json::Map<String, Value>) -> Result<String> {
     let _guard = WRITES
         .lock()
         .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
-    atomic_json(&Path::new(directory).join("implicitData.json"), &data)
+    if let Some(value) = changes.get("webdavAutoSync") {
+        ensure!(
+            value.is_null() || value.is_boolean(),
+            "Invalid automatic WebDAV setting"
+        );
+    }
+    let mut data = load_implicit(directory)?;
+    data.as_object_mut().unwrap().extend(changes);
+    atomic_json(&Path::new(directory).join("implicitData.json"), &data)?;
+    Ok(data.to_string())
 }
 
 pub fn merge(mut current: Value, incoming: Value) -> Result<Value> {
@@ -185,16 +190,25 @@ pub fn merge(mut current: Value, incoming: Value) -> Result<Value> {
         .context("Invalid local settings")?;
     if let Some(incoming) = incoming["settings"].as_object() {
         for (key, value) in incoming {
-            if !DEVICE_ONLY.contains(&key.as_str()) && !excluded.contains(key) {
-                settings.insert(key.clone(), value.clone());
+            if !DEVICE_ONLY.contains(&key.as_str())
+                && (key == "dataVersion" || !excluded.contains(key))
+            {
+                if let Some(value) = crate::settings_edits::normalized_value(key, value) {
+                    settings.insert(key.clone(), value);
+                }
             }
         }
     }
-    current["searchHistory"] = incoming["searchHistory"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-        .into();
+    current["settings"] = crate::settings_edits::normalize(&current["settings"]);
+    if let Some(history) = incoming["searchHistory"].as_array() {
+        current["searchHistory"] = history
+            .iter()
+            .filter(|value| value.is_string())
+            .take(50)
+            .cloned()
+            .collect::<Vec<_>>()
+            .into();
+    }
     Ok(current)
 }
 
@@ -244,7 +258,13 @@ mod tests {
         save(directory, local.clone())?;
         save(directory, local.clone())?;
         let sync = read_optional(&temp.path().join("syncdata.json"))?.unwrap();
-        assert!(sync["settings"].get("language").is_none());
+        for key in ["language", "proxy", "deviceId", "disableSyncFields"] {
+            assert!(
+                sync["settings"].get(key).is_none(),
+                "{key} must not be uploaded"
+            );
+        }
+        assert_eq!(sync["settings"]["theme_mode"], "dark");
         let result = merge(
             local,
             json!({"settings":{"proxy":"remote","deviceId":"other","language":"en-US","theme_mode":"light"},"searchHistory":["two"]}),
@@ -253,6 +273,74 @@ mod tests {
         assert_eq!(result["settings"]["language"], "zh-CN");
         assert_eq!(result["settings"]["theme_mode"], "light");
         assert_eq!(load(directory)?["settings"]["deviceId"], "device");
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_settings_keep_valid_list_items_and_dns_entries() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let directory = temp.path().to_str().unwrap();
+        atomic_json(
+            &temp.path().join("appdata.json"),
+            &json!({
+                "settings": {
+                    "blockedWords": ["keep", 123],
+                    "dnsOverrides": {"valid.example": "127.0.0.1", "": ""},
+                    "downloadThreads": "wrong type",
+                    "legacyOption": true
+                },
+                "searchHistory": ["valid", null]
+            }),
+        )?;
+        let loaded = load(directory)?;
+        assert_eq!(loaded["settings"]["blockedWords"], json!(["keep"]));
+        assert_eq!(
+            loaded["settings"]["dnsOverrides"],
+            json!({"valid.example": "127.0.0.1"})
+        );
+        assert_eq!(loaded["settings"]["downloadThreads"], 5);
+        assert_eq!(loaded["settings"]["legacyOption"], true);
+        assert_eq!(loaded["searchHistory"], json!(["valid"]));
+        Ok(())
+    }
+
+    #[test]
+    fn reader_edits_resolve_and_reset_in_scope_order() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let directory = temp.path().to_str().unwrap();
+        let result: Value = serde_json::from_str(&edit(
+            directory,
+            serde_json::from_value(json!([
+                {"scope":"global","key":"readerScreenPicNumberForPortrait","change":{"action":"set","value":2}},
+                {"scope":"device","edit":{"key":"enabled","value":true}},
+                {"scope":"device","edit":{"key":"readerScreenPicNumberForPortrait","value":3}},
+                {"scope":"comic","owner":"c@s","edit":{"key":"enabled","value":true}},
+                {"scope":"comic","owner":"c@s","edit":{"key":"readerScreenPicNumberForPortrait","value":4}}
+            ]))?,
+        )?)?;
+        let key = "readerScreenPicNumberForPortrait";
+        assert_eq!(
+            reader_setting(&result["data"]["settings"], Some("c@s"), key),
+            4
+        );
+        assert_eq!(
+            reader_setting(&result["data"]["settings"], Some("other"), key),
+            3
+        );
+        edit(
+            directory,
+            serde_json::from_value(json!([
+                {"scope":"comic","owner":"c@s"}, {"scope":"device"}
+            ]))?,
+        )?;
+        assert_eq!(
+            reader_setting(&load(directory)?["settings"], Some("c@s"), key),
+            2
+        );
+        assert_eq!(
+            load(directory)?["settings"]["deviceId"],
+            result["data"]["settings"]["deviceId"]
+        );
         Ok(())
     }
 

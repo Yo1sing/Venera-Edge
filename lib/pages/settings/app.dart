@@ -354,6 +354,8 @@ class _WebdavSettingState extends State<_WebdavSetting> {
   String user = "";
   String pass = "";
   String disableSync = "";
+  late List<dynamic> originalConfig;
+  late String originalExclusions;
 
   bool autoSync = true;
 
@@ -363,28 +365,74 @@ class _WebdavSettingState extends State<_WebdavSetting> {
   @override
   void initState() {
     super.initState();
-    if (appdata.settings['webdav'] is! List) {
-      appdata.settings['webdav'] = [];
-    }
-    if (appdata.settings['disableSyncFields'].trim().isNotEmpty) {
-      disableSync = appdata.settings['disableSyncFields'];
-    }
-    var configs = appdata.settings['webdav'] as List;
-    if (configs.whereType<String>().length != 3) {
-      return;
-    }
-    url = configs[0];
-    user = configs[1];
-    pass = configs[2];
+    disableSync = originalExclusions = appdata.settings['disableSyncFields'];
+    originalConfig = appdata.settings['webdav'];
+    if (originalConfig.isEmpty) return;
+    url = originalConfig[0];
+    user = originalConfig[1];
+    pass = originalConfig[2];
     autoSync = appdata.implicitData['webdavAutoSync'] ?? true;
   }
 
   void onAutoSyncChanged(bool value) {
     setState(() {
       autoSync = value;
-      appdata.implicitData['webdavAutoSync'] = value;
+      appdata.setImplicitData('webdavAutoSync', value);
       appdata.writeImplicitData();
     });
+  }
+
+  Future<void> _saveSettings() async {
+    final oldConfig = originalConfig;
+    final oldExclusions = originalExclusions;
+    final oldAuto = appdata.implicitData['webdavAutoSync'];
+    final clear = url.trim().isEmpty && user.trim().isEmpty && pass.trim().isEmpty;
+    final config = clear ? <String>[] : [url.trim(), user, pass];
+    final exclusions = clear ? oldExclusions : disableSync;
+    final automatic = !clear && autoSync;
+    var queued = false;
+
+    setState(() => isTesting = true);
+    try {
+      appdata.settings.replaceWebDav(
+        previous: oldConfig, previousExclusions: oldExclusions,
+        config: config, exclusions: exclusions,
+      );
+      queued = true;
+      appdata.setImplicitData('webdavAutoSync', automatic);
+      await appdata.saveImplicitData();
+      await appdata.saveData(false);
+      if (automatic) {
+        final result = upload
+            ? await DataSync().uploadData()
+            : await DataSync().downloadData();
+        if (result.error) throw StateError(result.errorMessage!);
+      }
+      if (mounted) {
+        context.showMessage(message: "Saved".tl);
+        App.rootPop();
+      }
+    } catch (error) {
+      if (queued) {
+        try {
+          appdata.settings.replaceWebDav(
+            previous: config, previousExclusions: exclusions,
+            config: oldConfig, exclusions: oldExclusions,
+          );
+          if (appdata.implicitData['webdavAutoSync'] == automatic) {
+            appdata.setImplicitData('webdavAutoSync', oldAuto);
+            await appdata.saveImplicitData();
+          }
+          await appdata.saveData(false);
+        } catch (rollbackError, stack) {
+          Log.error('WebDAV', rollbackError, stack);
+        }
+      }
+      if (mounted) {
+        context.showMessage(message: error.toString());
+        setState(() => isTesting = false);
+      }
+    }
   }
 
   @override
@@ -532,57 +580,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
             Center(
               child: Button.filled(
                 isLoading: isTesting,
-                onPressed: () async {
-                  var oldConfig = appdata.settings['webdav'];
-                  var oldAutoSync = appdata.implicitData['webdavAutoSync'];
-
-                  if (url.trim().isEmpty &&
-                      user.trim().isEmpty &&
-                      pass.trim().isEmpty) {
-                    appdata.settings['webdav'] = [];
-                    appdata.implicitData['webdavAutoSync'] = false;
-                    appdata.writeImplicitData();
-                    appdata.saveData();
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                    return;
-                  }
-
-                  appdata.settings['webdav'] = [url, user, pass];
-                  appdata.settings['disableSyncFields'] = disableSync;
-                  appdata.implicitData['webdavAutoSync'] = autoSync;
-                  appdata.writeImplicitData();
-
-                  if (!autoSync) {
-                    appdata.saveData();
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                    return;
-                  }
-
-                  setState(() {
-                    isTesting = true;
-                  });
-                  await appdata.saveData(false);
-                  var testResult = upload
-                      ? await DataSync().uploadData()
-                      : await DataSync().downloadData();
-                  if (testResult.error) {
-                    setState(() {
-                      isTesting = false;
-                    });
-                    appdata.settings['webdav'] = oldConfig;
-                    appdata.implicitData['webdavAutoSync'] = oldAutoSync;
-                    appdata.writeImplicitData();
-                    appdata.saveData();
-                    context.showMessage(message: testResult.errorMessage!);
-                    context.showMessage(message: "Saved Failed".tl);
-                  } else {
-                    appdata.saveData();
-                    context.showMessage(message: "Saved".tl);
-                    App.rootPop();
-                  }
-                },
+                onPressed: _saveSettings,
                 child: Text("Continue".tl),
               ),
             )

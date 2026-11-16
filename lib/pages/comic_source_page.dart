@@ -339,6 +339,7 @@ class _ComicSourceList extends StatefulWidget {
 class _ComicSourceListState extends State<_ComicSourceList> {
   List? json;
   bool changed = false;
+  late String originalCatalogUrl;
   HttpCancellation? _loading;
   var controller = TextEditingController();
 
@@ -374,19 +375,31 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   @override
   void initState() {
     super.initState();
-    controller.text = appdata.settings['comicSourceListUrl'];
+    originalCatalogUrl = appdata.settings['comicSourceListUrl'];
+    controller.text = originalCatalogUrl;
     load();
   }
 
   @override
   void dispose() {
-    super.dispose();
     _loading?.cancel();
-    if (changed) {
-      appdata.settings['comicSourceListUrl'] = controller.text;
-      appdata.saveData();
+    final edited = controller.text.trim();
+    if (changed && edited != originalCatalogUrl) {
+      Future.microtask(() async {
+        try {
+          appdata.settings.replaceValue(
+            'comicSourceListUrl',
+            previous: originalCatalogUrl,
+            value: edited,
+          );
+          await appdata.saveData();
+        } catch (error) {
+          App.rootContext.showMessage(message: error.toString());
+        }
+      });
     }
     controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -858,100 +871,110 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
   }
 
   Iterable<Widget> buildSourceSettings() sync* {
-    // Try to get dynamic settings first (for getters), fall back to cached settings
-    var settingsMap = source.getSettingsDynamic() ?? source.settings;
-
-    if (settingsMap == null) {
+    final Map<String, Map<String, dynamic>> settings;
+    try {
+      settings = source.getSettingsDynamic();
+    } catch (error, stack) {
+      Log.error("ComicSourcePage", error, stack);
       return;
-    } else if (source.data['settings'] == null) {
-      source.data['settings'] = {};
     }
-    for (var item in settingsMap.entries) {
-      var key = item.key;
-      String type = item.value['type'];
-      try {
-        if (type == "select") {
-          var current = source.data['settings'][key];
-          if (current == null) {
-            var d = item.value['default'];
-            for (var option in item.value['options']) {
-              if (option['value'] == d) {
-                current = option['text'] ?? option['value'];
-                break;
-              }
-            }
+    for (final item in settings.entries) {
+      final key = item.key;
+      final setting = item.value;
+      final current = setting['effectiveValue'];
+      final title = (setting['title']?.toString() ?? key).ts(source.key);
+
+      String? save(Object? value, {bool reset = false}) {
+        try {
+          if (reset) {
+            source.resetSourceSetting(key);
           } else {
-            current =
-                item.value['options'].firstWhere(
-                  (e) => e['value'] == current,
-                )['text'] ??
-                current;
+            source.setSourceSetting(key, value);
+          }
+          setState(() {});
+          return null;
+        } catch (_) {
+          return "Invalid input".tl;
+        }
+      }
+
+      Widget actions(Widget control) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            tooltip: "Reset".tl,
+            icon: const Icon(Icons.restart_alt),
+            onPressed: () {
+              final error = save(null, reset: true);
+              if (error != null) context.showMessage(message: error);
+            },
+          ),
+          control,
+        ],
+      );
+
+      switch (setting['type']) {
+        case 'select':
+          final options = (setting['options'] as List? ?? [])
+              .whereType<Map>()
+              .where((option) =>
+                  option['value'] is String ||
+                  option['value'] is num ||
+                  option['value'] is bool)
+              .toList();
+          if (options.isEmpty) continue;
+          String label(Map option) =>
+              (option['text'] ?? option['value']).toString().ts(source.key);
+          final selected = options.indexWhere((option) => option['value'] == current);
+          yield ListTile(
+            title: Text(title),
+            trailing: actions(Select(
+              current: selected < 0 ? '' : label(options[selected]),
+              values: options.map(label).toList(),
+              onTap: (index) {
+                final error = save(options[index]['value']);
+                if (error != null) context.showMessage(message: error);
+              },
+            )),
+          );
+        case 'switch':
+          yield ListTile(
+            title: Text(title),
+            trailing: actions(Switch(
+              value: current == true,
+              onChanged: (value) {
+                final error = save(value);
+                if (error != null) context.showMessage(message: error);
+              },
+            )),
+          );
+        case 'input':
+          final text = current?.toString() ?? '';
+          RegExp? hintValidator;
+          final pattern = setting['validator'];
+          if (pattern is String) {
+            try {
+              hintValidator = RegExp(pattern);
+            } on FormatException {
+              // The backend handles JavaScript patterns Dart cannot preview.
+            }
           }
           yield ListTile(
-            title: Text((item.value['title'] as String).ts(source.key)),
-            trailing: Select(
-              current: (current as String).ts(source.key),
-              values: (item.value['options'] as List)
-                  .map<String>(
-                    (e) => ((e['text'] ?? e['value']) as String).ts(source.key),
-                  )
-                  .toList(),
-              onTap: (i) {
-                source.data['settings'][key] =
-                    item.value['options'][i]['value'];
-                source.saveData();
-                setState(() {});
-              },
-            ),
-          );
-        } else if (type == "switch") {
-          var current = source.data['settings'][key] ?? item.value['default'];
-          yield ListTile(
-            title: Text((item.value['title'] as String).ts(source.key)),
-            trailing: Switch(
-              value: current,
-              onChanged: (v) {
-                source.data['settings'][key] = v;
-                source.saveData();
-                setState(() {});
-              },
-            ),
-          );
-        } else if (type == "input") {
-          var current =
-              source.data['settings'][key] ?? item.value['default'] ?? '';
-          yield ListTile(
-            title: Text((item.value['title'] as String).ts(source.key)),
-            subtitle: Text(
-              current,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: IconButton(
+            title: Text(title),
+            subtitle: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+            trailing: actions(IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                showInputDialog(
-                  context: context,
-                  title: (item.value['title'] as String).ts(source.key),
-                  initialValue: current,
-                  inputValidator: item.value['validator'] == null
-                      ? null
-                      : RegExp(item.value['validator']),
-                  onConfirm: (value) {
-                    source.data['settings'][key] = value;
-                    source.saveData();
-                    setState(() {});
-                    return null;
-                  },
-                );
-              },
-            ),
+              onPressed: () => showInputDialog(
+                context: context,
+                title: title,
+                initialValue: text,
+                inputValidator: hintValidator,
+                onConfirm: (value) => save(value),
+              ),
+            )),
           );
-        } else if (type == "callback") {
+        case 'callback':
           yield _CallbackSetting(setting: item, sourceKey: source.key);
-        }
-      } catch (e, s) {
-        Log.error("ComicSourcePage", "Failed to build a setting\n$e\n$s");
       }
     }
   }
@@ -1021,7 +1044,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
       yield ListTile(
         title: Text("Log out".tl),
         onTap: () {
-          source.data["account"] = null;
+          source.setData("account", null);
           source.account?.logout();
           source.saveData();
           ComicSourceManager().notifyStateChange();
@@ -1187,7 +1210,7 @@ class _LoginPageState extends State<_LoginPage> {
           .toList();
       widget.config.validateCookies!(cookies).then((value) {
         if (value) {
-          widget.source.data['account'] = 'ok';
+          widget.source.setData('account', 'ok');
           widget.source.saveData();
           context.pop();
         } else {
@@ -1235,7 +1258,7 @@ class _LoginPageState extends State<_LoginPage> {
           return;
         }
         success = true;
-        widget.source.data['_localStorage'] = mappedLocalStorage;
+        widget.source.setData('_localStorage', mappedLocalStorage);
         await widget.source.saveData();
         widget.config.onLoginWithWebviewSuccess?.call();
         App.mainNavigatorKey?.currentContext?.pop();
@@ -1258,7 +1281,7 @@ class _LoginPageState extends State<_LoginPage> {
     );
     open = false;
     if (success) {
-      widget.source.data['account'] = 'ok';
+      widget.source.setData('account', 'ok');
       widget.source.saveData();
       context.pop();
     }
@@ -1280,7 +1303,7 @@ class _LoginPageState extends State<_LoginPage> {
     void onClose() {
       open = false;
       if (success) {
-        widget.source.data['account'] = 'ok';
+        widget.source.setData('account', 'ok');
         widget.source.saveData();
         context.pop();
       }
@@ -1317,7 +1340,7 @@ class _LoginPageState extends State<_LoginPage> {
           return;
         }
         success = true;
-        widget.source.data['_localStorage'] = localStorage;
+        widget.source.setData('_localStorage', localStorage);
         await widget.source.saveData();
         widget.config.onLoginWithWebviewSuccess?.call();
         webview.close();

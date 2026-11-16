@@ -58,6 +58,12 @@ abstract class ScriptRuntime implements RustOpaqueInterface {
 
   Future<void> configure({required String optionsJson});
 
+  void editSourceSetting({
+    required String key,
+    required String setting,
+    String? valueJson,
+  });
+
   String evaluate({required String source});
 
   Future<void> initializeSource({required String key});

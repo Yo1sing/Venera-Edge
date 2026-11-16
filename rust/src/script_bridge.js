@@ -53,18 +53,55 @@ globalThis.__venera = (() => {
             default: throw new Error('Unknown bridge value');
         }
     }
-    globalThis.sendMessage = message => {
-        if (message.method === 'load_setting') {
-            const settings = sendMessage({method:'load_data',key:message.key,data_key:'settings'});
-            return settings?.[message.setting_key] ?? ComicSource.sources[message.key]?.settings?.[message.setting_key]?.default;
-        }
+    function sendNative(message) {
         const response = JSON.parse(__nativeHost(JSON.stringify(pack(message))));
         if (response.error) throw new Error(response.error);
         if (response.ticket !== undefined) return new Promise((resolve,reject) => tickets.set(response.ticket, {resolve,reject}));
         return unpack(response.value);
+    }
+
+    // A dynamic getter can consult saved settings while calculating its options.
+    const resolvingSettings = new Set();
+    function definitions(key) {
+        if (resolvingSettings.has(key)) return null;
+        resolvingSettings.add(key);
+        try {
+            return ComicSource.sources[key]?.settings;
+        } finally {
+            resolvingSettings.delete(key);
+        }
+    }
+
+    function descriptor(field) {
+        if (!field || typeof field !== 'object') return null;
+        return {
+            type: field.type,
+            default: field.default,
+            options: Array.isArray(field.options) ? field.options.map(option => option?.value) : [],
+            validator: typeof field.validator === 'string' ? field.validator : null,
+        };
+    }
+
+    function readSetting(key, setting_key, field) {
+        return sendNative({method: 'load_setting', key, setting_key, definition: descriptor(field)});
+    }
+
+    globalThis.sendMessage = message => {
+        if (message.method === 'load_setting') {
+            return readSetting(message.key, message.setting_key, definitions(message.key)?.[message.setting_key]);
+        }
+        if (message.method === 'edit_source_setting') throw new Error('Source settings are read-only to scripts');
+        return sendNative(message);
     };
+
     return {
         pack, unpack,
+        sourceSettings: key => Object.fromEntries(Object.entries(definitions(key) ?? {}).map(([name, field]) =>
+            [name, {...field, effectiveValue: readSetting(key, name, field)}])),
+        editSourceSetting: (key, setting_key, value, reset) => sendNative({
+            method: 'edit_source_setting', key, setting_key, value, reset,
+            definition: descriptor(definitions(key)?.[setting_key]),
+        }),
         evaluate: source => JSON.stringify(pack((0,eval)(source))),
         call: (id,args) => JSON.stringify(pack(unpack(['function',id])(...unpack(args)))),
         retain: id => { const handle=handles.get(id); if (!handle) throw new Error('JavaScript function is released'); handle.refs++; },

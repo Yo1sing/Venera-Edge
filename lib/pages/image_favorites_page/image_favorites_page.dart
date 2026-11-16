@@ -507,7 +507,7 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
       actions: [
         FilledButton(
           onPressed: () {
-            appdata.implicitData["image_favorites_sort"] = sortType.value;
+            appdata.setImplicitData("image_favorites_sort", sortType.value);
             TimeRange timeRange;
             if (timeRangeType == TimeRangeType.custom) {
               timeRange = TimeRange(
@@ -524,9 +524,8 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
                 _ => TimeRange.all,
               };
             }
-            appdata.implicitData["image_favorites_time_filter"] =
-                timeRange.toString();
-            appdata.implicitData["image_favorites_number_filter"] = numFilter;
+            appdata.setImplicitData("image_favorites_time_filter", timeRange.toString());
+            appdata.setImplicitData("image_favorites_number_filter", numFilter);
             appdata.writeImplicitData();
             if (mounted) {
               Navigator.pop(context);

@@ -516,10 +516,12 @@ class _MultiPagesFilter extends StatefulWidget {
 
 class _MultiPagesFilterState extends State<_MultiPagesFilter> {
   late List<String> keys;
+  late Object? original;
 
   @override
   void initState() {
-    keys = List.from(appdata.settings[widget.settingsIndex]);
+    original = appdata.settings[widget.settingsIndex];
+    keys = List<String>.from(original as List? ?? []);
     keys.remove("");
     super.initState();
   }
@@ -688,9 +690,13 @@ class _MultiPagesFilterState extends State<_MultiPagesFilter> {
     );
   }
 
-  void updateSetting() {
-    appdata.settings[widget.settingsIndex] = keys;
-    appdata.saveData();
+  Future<void> updateSetting() async {
+    try {
+      appdata.settings.replaceValue(widget.settingsIndex, previous: original, value: keys);
+      await appdata.saveData();
+    } catch (error) {
+      App.rootContext.showMessage(message: error.toString());
+    }
   }
 }
 

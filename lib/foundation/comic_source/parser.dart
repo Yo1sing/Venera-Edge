@@ -43,7 +43,6 @@ class ComicSourceParser {
       _loadFavoriteData(),
       _loadExploreData(),
       _loadSearchData(),
-      _parseSettings(),
       _parseLoadComicFunc(),
       _parseThumbnailLoader(),
       _parseLoadComicPagesFunc(),
@@ -943,32 +942,6 @@ class ComicSourceParser {
         return Res.error(e.toString());
       }
     };
-  }
-
-  Map<String, Map<String, dynamic>> _parseSettings() {
-    var value = _getValue("settings");
-    if (value is Map) {
-      var newMap = <String, Map<String, dynamic>>{};
-      for (var e in value.entries) {
-        if (e.key is! String) {
-          continue;
-        }
-        var v = <String, dynamic>{};
-        for (var e2 in e.value.entries) {
-          if (e2.key is! String) {
-            continue;
-          }
-          var v2 = e2.value;
-          if (v2 is JSInvokable) {
-            v2 = JSAutoFreeFunction(v2);
-          }
-          v[e2.key] = v2;
-        }
-        newMap[e.key] = v;
-      }
-      return newMap;
-    }
-    return {};
   }
 
   RegExp? _parseIdMatch() {

@@ -56,11 +56,13 @@ class ComicSourceManager with ChangeNotifier, Init {
   @override
   @protected
   Future<void> doInit() async {
+    await appdata.ensureInit();
     await JsEngine().ensureInit();
     _backend = await sources_backend.SourceManager.open(
       runtime: JsEngine().runtime,
     );
     await reload();
+    await appdata.saveData(false);
   }
 
   Future<void> reload() async {
@@ -240,7 +242,9 @@ class ComicSource {
   final Map<String, dynamic> Function(String imageKey)?
   getThumbnailLoadingConfig;
 
-  late final Map<String, dynamic> data = SourceDataMap(key);
+  late final _sourceData = SourceData(key);
+  Map<String, dynamic> get data => _sourceData.snapshot;
+  void setData(String field, Object? value) => _sourceData.set(field, value);
 
   bool get isLogged => data["account"] != null;
 
@@ -266,7 +270,6 @@ class ComicSource {
 
   final LikeCommentFunc? likeCommentFunc;
 
-  final Map<String, Map<String, dynamic>>? settings;
 
   final Map<String, Map<String, String>>? translations;
 
@@ -297,39 +300,28 @@ class ComicSource {
   Future<bool> reLogin() async =>
       await JsEngine().runCode('__sources.reLogin(${jsonEncode(key)})');
 
-  /// Get settings dynamically from JavaScript source.
-  /// This allows sources to use getters for dynamic settings that can change at runtime.
-  Map<String, Map<String, dynamic>>? getSettingsDynamic() {
-    try {
-      var value = JsEngine().runCode(
-        "ComicSource.sources[${jsonEncode(key)}].settings",
-      );
-      if (value is Map) {
-        var newMap = <String, Map<String, dynamic>>{};
-        for (var e in value.entries) {
-          if (e.key is! String) {
-            continue;
-          }
-          var v = <String, dynamic>{};
-          for (var e2 in e.value.entries) {
-            if (e2.key is! String) {
-              continue;
-            }
-            var v2 = e2.value;
-            if (v2 is JSInvokable) {
-              v2 = JSAutoFreeFunction(v2);
-            }
-            v[e2.key] = v2;
-          }
-          newMap[e.key] = v;
-        }
-        return newMap;
+  /// Returns the currently installed script's dynamic setting descriptors and
+  /// the effective values resolved by the Rust source store.
+  Map<String, Map<String, dynamic>> getSettingsDynamic() {
+    final value = JsEngine().runCode('__venera.sourceSettings(${jsonEncode(key)})');
+    return (value as Map).map((key, value) {
+      final field = Map<String, dynamic>.from(value as Map);
+      final callback = field['callback'];
+      if (callback is JSInvokable) {
+        field['callback'] = JSAutoFreeFunction(callback);
       }
-      return null;
-    } catch (e) {
-      Log.error("ComicSource", "Failed to get dynamic settings: $e");
-      return settings;
-    }
+      return MapEntry(key as String, field);
+    });
+  }
+
+  void setSourceSetting(String setting, Object? value) {
+    JsEngine().runtime.editSourceSetting(
+      key: key, setting: setting, valueJson: jsonEncode(value),
+    );
+  }
+
+  void resetSourceSetting(String setting) {
+    JsEngine().runtime.editSourceSetting(key: key, setting: setting);
   }
 
   ComicSource(
@@ -341,7 +333,6 @@ class ComicSource {
     this.favoriteData,
     this.explorePages,
     this.searchPageData,
-    this.settings,
     this.loadComicInfo,
     this.loadComicThumbnail,
     this.loadComicPages,

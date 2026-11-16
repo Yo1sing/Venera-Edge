@@ -1135,8 +1135,7 @@ class _SelectUpdatePageNumState extends State<_SelectUpdatePageNum> {
                   updatePageNum = int.parse(pageNumList[index] == _allPageText
                       ? '9999999'
                       : pageNumList[index]);
-                  appdata.implicitData["local_favorites_update_page_num"] =
-                      updatePageNum;
+                  appdata.setImplicitData("local_favorites_update_page_num", updatePageNum);
                   appdata.writeImplicitData();
                 });
               },
@@ -1209,7 +1208,7 @@ class _LocalFavoritesFilterDialogState
       actions: [
         FilledButton(
           onPressed: () {
-            appdata.implicitData["local_favorites_read_filter"] = readFilter;
+            appdata.setImplicitData("local_favorites_read_filter", readFilter);
             appdata.writeImplicitData();
             if (mounted) {
               Navigator.pop(context);

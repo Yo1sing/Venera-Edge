@@ -102,6 +102,7 @@ class JsEngine with JsUiApi, Init {
 
   @override
   Future<void> doInit() async {
+    await appdata.ensureInit();
     final http = await readHttpOptions();
     _options = _encodeOptions(http);
     final runtime = await backend.ScriptRuntime.open(optionsJson: _options!);

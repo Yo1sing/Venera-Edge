@@ -46,7 +46,12 @@ Future<void> applyScheduledBackup(
         appdata.settings['followUpdatesFolder'] = null;
       }
     }
-    await appdata.saveData(false);
+    try {
+      await appdata.saveData();
+    } on SettingsEditsRejected catch (error, stack) {
+      // The backup is already applied. Conflicting UI edits were rejected.
+      Log.error('Appdata', error, stack);
+    }
   } finally {
     FollowUpdatesBackend.paused = wasPaused;
     FollowUpdatesBackend.restoring = false;

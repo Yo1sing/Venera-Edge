@@ -492,7 +492,7 @@ class ComicTile extends StatelessWidget {
                 onPressed: () {
                   context.pop();
                   for (var word in words) {
-                    appdata.settings['blockedWords'].add(word);
+                    appdata.settings.addBlockedWord('blockedWords', word);
                   }
                   appdata.saveData();
                   context.showMessage(message: 'Blocked'.tl);

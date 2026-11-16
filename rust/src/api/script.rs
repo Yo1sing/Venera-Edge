@@ -32,6 +32,27 @@ impl ScriptRuntime {
         self.inner.evaluate(&source)
     }
     #[flutter_rust_bridge::frb(sync)]
+    pub fn edit_source_setting(
+        &self,
+        key: String,
+        setting: String,
+        value_json: Option<String>,
+    ) -> Result<()> {
+        let reset = value_json.is_none();
+        let value: serde_json::Value = value_json
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?
+            .unwrap_or_default();
+        self.inner.evaluate(&format!(
+            "__venera.editSourceSetting({},{},{value},{reset})",
+            serde_json::to_string(&key)?,
+            serde_json::to_string(&setting)?,
+        ))?;
+        Ok(())
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
     pub fn invoke(&self, id: u64, arguments_json: String) -> Result<String> {
         let arguments: serde_json::Value = serde_json::from_str(&arguments_json)?;
         self.inner.query(format!("__venera.call({id},{arguments})"))

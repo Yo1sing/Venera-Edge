@@ -39,18 +39,33 @@ Future<Map<String, dynamic>> configureWebDav(
   Directory directory,
   HttpServer server,
 ) async {
-  final data = await readSettings(directory);
-  data['settings']['webdav'] = [
-    'http://127.0.0.1:${server.port}',
-    'user',
-    'password',
-  ];
-  await settings.saveAppData(
-    directory: directory.path,
-    dataJson: jsonEncode(data),
-  );
-  return data;
+  await applyEdits(directory, [
+    {
+      'scope': 'webDav',
+      'previous': [],
+      'previousExclusions': '',
+      'config': ['http://127.0.0.1:${server.port}', 'user', 'password'],
+      'exclusions': '',
+    },
+  ]);
+  return readSettings(directory);
 }
+
+Map<String, Object?> globalEdit(String key, Map<String, Object?> change) => {
+  'scope': 'global',
+  'key': key,
+  'change': change,
+};
+
+Future<Map<String, dynamic>> applyEdits(
+  Directory directory,
+  List<Map<String, Object?>> edits,
+) async => jsonDecode(
+  await settings.applyAppDataEdits(
+    directory: directory.path,
+    editsJson: jsonEncode(edits),
+  ),
+);
 
 String davFiles(List<String> names) =>
     '<d:multistatus xmlns:d="DAV:">'
@@ -193,10 +208,10 @@ void main() {
       });
       backup.SyncController? controller;
       try {
-        final saved = await configureWebDav(directory, server);
-        await settings.saveImplicitData(
+        await configureWebDav(directory, server);
+        await settings.applyImplicitDataEdits(
           directory: directory.path,
-          dataJson: '{"webdavAutoSync":true}',
+          changesJson: '{"webdavAutoSync":true}',
         );
         final sync = controller = await backup.SyncController.open(
           directory: directory.path,
@@ -205,14 +220,10 @@ void main() {
         final first = submitSync(sync, 'upload');
         await firstPut.future.timeout(const Duration(seconds: 5));
 
-        final base = jsonEncode(saved);
         for (final theme in ['dark', 'light', 'dark']) {
-          saved['settings']['theme_mode'] = theme;
-          await settings.saveAppDataChanges(
-            directory: directory.path,
-            baseJson: base,
-            dataJson: jsonEncode(saved),
-          );
+          await applyEdits(directory, [
+            globalEdit('theme_mode', {'action': 'set', 'value': theme}),
+          ]);
           await submitSync(sync, 'changed');
         }
         final download = submitSync(sync, 'download');
@@ -269,7 +280,7 @@ void main() {
       });
       backup.SyncController? controller;
       try {
-        final before = await configureWebDav(directory, server);
+        await configureWebDav(directory, server);
         final sync = controller = await backup.SyncController.open(
           directory: directory.path,
           cache: directory.path,
@@ -283,11 +294,13 @@ void main() {
           (state) => state['restore'] != null,
         );
         final id = restoring['restore'] as int;
-        before['searchHistory'] = ['local-during-download'];
-        await settings.saveAppData(
-          directory: directory.path,
-          dataJson: jsonEncode(before),
-        );
+        await applyEdits(directory, [
+          {
+            'scope': 'search',
+            'keyword': 'local-during-download',
+            'remove': false,
+          },
+        ]);
         await expectLater(
           sync.applyRestore(id: id),
           throwsA(containsError('Local data changed')),
@@ -309,6 +322,115 @@ void main() {
       } finally {
         controller?.dispose();
         await server.close(force: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'setting intents apply to the latest data and return accepted values',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_settings_edits_',
+      );
+      try {
+        await applyEdits(directory, [
+          globalEdit('blockedWords', {'action': 'add', 'value': 'first'}),
+          globalEdit('explore_pages', {
+            'action': 'replace',
+            'previous': [],
+            'value': ['new'],
+          }),
+        ]);
+        final result = await applyEdits(directory, [
+          globalEdit('blockedWords', {'action': 'add', 'value': 'second'}),
+          globalEdit('explore_pages', {
+            'action': 'replace',
+            'previous': [],
+            'value': ['stale'],
+          }),
+          globalEdit('downloadThreads', {'action': 'set', 'value': 'invalid'}),
+        ]);
+        expect(result['rejected'], hasLength(2));
+        final saved = result['data']['settings'];
+        expect(saved['blockedWords'], ['first', 'second']);
+        expect(saved['explore_pages'], ['new']);
+        expect(saved['downloadThreads'], 5);
+        expect((await readSettings(directory))['settings'], saved);
+      } finally {
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'source UI and scripts share dynamic defaults, validation and reset',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_source_settings_',
+      );
+      final runtime = await scripts.ScriptRuntime.open(
+        optionsJson: runtimeOptions(directory.path),
+      );
+      final session = ScriptSession(runtime);
+      try {
+        await runtime.parseSource(
+          code: r'''
+        class Fixture extends ComicSource {
+          name='Settings source'; key='fixture'; version='1.0.0';
+          get settings(){
+            const selected = this.loadSetting('mode');
+            return {
+              mode: {type:'select', default:'standard', options:[
+                {text:'Standard',value:'standard'}, {text:'Large',value:'large'}
+              ]},
+              show: {type:'switch', default:selected==='large'},
+              filter: {type:'input', default:'value-1', validator:'^value-(?=[0-9])[0-9]+$'},
+            };
+          }
+        }
+      ''',
+        );
+        dynamic ui(String field) => session.evaluate(
+          "__venera.sourceSettings('fixture').$field.effectiveValue",
+        );
+        dynamic script(String field) => session.evaluate(
+          "ComicSource.sources.fixture.loadSetting('$field')",
+        );
+        void edit(String field, Object value) => runtime.editSourceSetting(
+          key: 'fixture',
+          setting: field,
+          valueJson: jsonEncode(value),
+        );
+        expect(ui('mode'), 'standard');
+        expect(script('mode'), 'standard');
+        expect(ui('show'), false);
+        edit('mode', 'large');
+        expect(ui('mode'), 'large');
+        expect(script('show'), true);
+        expect(ui('show'), true);
+
+        expect(() => edit('mode', 'not-an-option'), throwsA(anything));
+        expect(() => edit('filter', 'wrong'), throwsA(anything));
+        expect(
+          () => scripts.updateSourceData(
+            directory: directory.path,
+            key: 'fixture',
+            path: ['settings', 'mode'],
+            valueJson: '"bypass"',
+          ),
+          throwsA(anything),
+        );
+        expect(ui('filter'), 'value-1');
+        edit('filter', 'value-20');
+        expect(script('filter'), 'value-20');
+        runtime.editSourceSetting(key: 'fixture', setting: 'mode');
+        expect(ui('mode'), 'standard');
+        expect(script('show'), false);
+      } finally {
+        session.close();
+        runtime.close();
+        runtime.dispose();
         await directory.delete(recursive: true);
       }
     },
