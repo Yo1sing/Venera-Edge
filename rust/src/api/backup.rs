@@ -9,6 +9,7 @@ pub fn import_pica_data(
     traditional: bool,
     at_end: bool,
 ) -> Result<()> {
+    let _storage = crate::backup_storage::access();
     crate::legacy_import::import(
         &input,
         &cache,
@@ -20,30 +21,73 @@ pub fn import_pica_data(
     )
 }
 
-pub async fn sync_upload(options_json: String) -> Result<String> {
-    crate::sync::upload(serde_json::from_str(&options_json)?).await
-}
-pub async fn sync_download(options_json: String) -> Result<Option<String>> {
-    crate::sync::download(serde_json::from_str(&options_json)?).await
-}
-
 pub fn export_app_data(directory: String, cache: String, sync: bool) -> Result<String> {
+    let _storage = crate::backup_storage::access();
     crate::backup::export(&directory, &cache, sync)
 }
 
 #[flutter_rust_bridge::frb(opaque)]
-pub struct PreparedBackup {
-    inner: crate::backup::Prepared,
+pub struct SyncController {
+    inner: std::sync::Arc<crate::sync_scheduler::Scheduler>,
+    events: tokio::sync::Mutex<tokio::sync::watch::Receiver<String>>,
 }
-impl PreparedBackup {
-    pub fn open(
-        input: String,
-        cache: String,
-        current_version: Option<i64>,
-    ) -> Result<Option<Self>> {
-        Ok(crate::backup::prepare(&input, &cache, current_version)?.map(|inner| Self { inner }))
+
+impl SyncController {
+    pub fn open(directory: String, cache: String) -> Result<Self> {
+        let inner = crate::sync_scheduler::Scheduler::open(directory, cache)?;
+        Ok(Self {
+            events: tokio::sync::Mutex::new(inner.subscribe()),
+            inner,
+        })
     }
-    pub fn apply(&self, directory: String) -> Result<String> {
-        self.inner.apply(&directory)
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn snapshot(&self) -> String {
+        self.inner.snapshot()
     }
+
+    pub async fn next_snapshot(&self) -> Result<String> {
+        let mut events = self.events.lock().await;
+        events.changed().await?;
+        let snapshot = events.borrow_and_update().clone();
+        Ok(snapshot)
+    }
+
+    pub async fn submit(
+        &self,
+        action: String,
+        http_json: String,
+        path: Option<String>,
+    ) -> Result<()> {
+        use crate::sync_scheduler::Request;
+        let request = match action.as_str() {
+            "refresh" => Request::Refresh,
+            "startup" => Request::Startup,
+            "resume" => Request::Resume,
+            "changed" => Request::Changed,
+            "upload" => Request::Upload,
+            "download" => Request::Download,
+            "import" => {
+                Request::Import(path.ok_or_else(|| anyhow::anyhow!("Missing backup path"))?)
+            }
+            _ => anyhow::bail!("Unknown sync action"),
+        };
+        self.inner
+            .submit(request, serde_json::from_str(&http_json)?)
+            .await
+    }
+
+    pub async fn apply_restore(&self, id: u64) -> Result<String> {
+        self.inner.apply(id).await
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn finish_restore(&self, id: u64, error: Option<String>) -> Result<()> {
+        self.inner.finish(id, error)
+    }
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn cookie_restore_epoch() -> u64 {
+    crate::backup_storage::restore_epoch()
 }

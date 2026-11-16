@@ -34,6 +34,26 @@ Future<void> saveAppData({
   dataJson: dataJson,
 );
 
+Future<void> saveAppDataChanges({
+  required String directory,
+  required String baseJson,
+  required String dataJson,
+}) => RustLib.instance.api.crateApiSettingsSaveAppDataChanges(
+  directory: directory,
+  baseJson: baseJson,
+  dataJson: dataJson,
+);
+
+String rebaseAppData({
+  required String baseJson,
+  required String editedJson,
+  required String currentJson,
+}) => RustLib.instance.api.crateApiSettingsRebaseAppData(
+  baseJson: baseJson,
+  editedJson: editedJson,
+  currentJson: currentJson,
+);
+
 Future<void> saveImplicitData({
   required String directory,
   required String dataJson,

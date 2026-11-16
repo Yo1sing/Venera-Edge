@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
@@ -31,6 +32,50 @@ String runtimeOptions(String directory) => jsonEncode({
   'http': httpOptions,
 });
 
+Future<Map<String, dynamic>> readSettings(Directory directory) async =>
+    jsonDecode(await settings.loadAppData(directory: directory.path));
+
+Future<Map<String, dynamic>> configureWebDav(
+  Directory directory,
+  HttpServer server,
+) async {
+  final data = await readSettings(directory);
+  data['settings']['webdav'] = [
+    'http://127.0.0.1:${server.port}',
+    'user',
+    'password',
+  ];
+  await settings.saveAppData(
+    directory: directory.path,
+    dataJson: jsonEncode(data),
+  );
+  return data;
+}
+
+String davFiles(List<String> names) =>
+    '<d:multistatus xmlns:d="DAV:">'
+    '${names.map((name) => '<d:response><d:href>/$name</d:href></d:response>').join()}'
+    '</d:multistatus>';
+
+Future<void> submitSync(backup.SyncController sync, String action) =>
+    sync.submit(action: action, httpJson: jsonEncode(httpOptions));
+
+Future<Map<String, dynamic>> syncState(
+  backup.SyncController controller,
+  bool Function(Map<String, dynamic>) matches,
+) async {
+  var state = jsonDecode(controller.snapshot()) as Map<String, dynamic>;
+  while (!matches(state)) {
+    state = jsonDecode(
+      await controller.nextSnapshot().timeout(const Duration(seconds: 5)),
+    );
+  }
+  return state;
+}
+
+Matcher containsError(String text) =>
+    predicate<Object>((error) => error.toString().contains(text));
+
 void main() {
   final library = Platform.environment['VENERA_BACKEND_LIBRARY'];
   if (library == null) {
@@ -45,60 +90,224 @@ void main() {
   tearDownAll(RustLib.dispose);
 
   test(
-    'WebDAV keeps backups on failed upload and orders revisions numerically',
+    'WebDAV keeps backups on failed upload and chooses numeric revisions',
     () async {
       final directory = await Directory.systemTemp.createTemp('venera_sync_');
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       var rejectUpload = true;
-      final methods = <String>[];
-      final subscription = server.listen((request) async {
-        methods.add('${request.method} ${request.uri.path}');
+      final requests = <String>[];
+      server.listen((request) async {
+        requests.add('${request.method} ${request.uri.path}');
         await request.drain<void>();
-        if (request.method == 'PROPFIND') {
-          request.response.statusCode = 207;
-          request.response.write(
-            '<d:multistatus xmlns:d="DAV:"><d:response><d:href>/20000-9.venera</d:href></d:response><d:response><d:href>/20000-10.venera</d:href></d:response></d:multistatus>',
-          );
-        } else if (request.method == 'PUT') {
-          request.response.statusCode = rejectUpload ? 500 : 201;
-        } else if (request.method == 'GET') {
-          request.response.add([1, 2, 3]);
-        } else {
-          request.response.statusCode = 204;
+        switch (request.method) {
+          case 'PROPFIND':
+            request.response.statusCode = 207;
+            request.response.write(
+              davFiles(['20000-9.venera', '20000-10.venera']),
+            );
+          case 'PUT':
+            request.response.statusCode = rejectUpload ? 500 : 201;
+          case 'GET':
+            request.response.add([1, 2, 3]);
+          default:
+            request.response.statusCode = 204;
         }
         await request.response.close();
       });
+      backup.SyncController? controller;
       try {
-        final data = jsonDecode(
-          await settings.loadAppData(directory: directory.path),
-        );
-        data['settings']['webdav'] = [
-          'http://127.0.0.1:${server.port}',
-          'user',
-          'password',
-        ];
-        await settings.saveAppData(
+        final data = await configureWebDav(directory, server);
+        final originalRevision = data['settings']['dataVersion'];
+        final sync = controller = await backup.SyncController.open(
           directory: directory.path,
-          dataJson: jsonEncode(data),
+          cache: directory.path,
         );
-        final options = jsonEncode({
-          'directory': directory.path,
-          'cache': directory.path,
-          'http': httpOptions,
-        });
-        await expectLater(
-          backup.syncUpload(optionsJson: options),
+        await expectLater(submitSync(sync, 'upload'), throwsA(anything));
+        expect(requests.where((v) => v.startsWith('DELETE')), isEmpty);
+        expect(
+          (await readSettings(directory))['settings']['dataVersion'],
+          originalRevision,
+        );
+
+        await expectLater(submitSync(sync, 'download'), throwsA(anything));
+        expect(requests.last, 'GET /20000-10.venera');
+        expect(
+          directory.listSync().where((f) => f.path.endsWith('.venera')),
+          isEmpty,
+        );
+
+        rejectUpload = false;
+        await submitSync(sync, 'upload');
+        expect((await readSettings(directory))['settings']['dataVersion'], 11);
+        expect(
+          requests.any((r) => r.startsWith('PUT ') && r.endsWith('-11.venera')),
+          isTrue,
+        );
+      } finally {
+        controller?.dispose();
+        await server.close(force: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'WebDAV queues downloads and coalesces edits behind an active upload',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_sync_queue_',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final firstPut = Completer<void>();
+      final releasePut = Completer<void>();
+      final uploaded = <Map<String, dynamic>>[];
+      final files = <String>[];
+      final requests = <String>[];
+      server.listen((request) async {
+        requests.add(request.method);
+        if (request.method == 'PUT') {
+          final bytes = await request.fold(
+            <int>[],
+            (all, chunk) => all..addAll(chunk),
+          );
+          final archive = ZipDecoder().decodeBytes(bytes);
+          uploaded.add(
+            jsonDecode(utf8.decode(archive.findFile('appdata.json')!.content)),
+          );
+          if (uploaded.length == 1) {
+            firstPut.complete();
+            await releasePut.future;
+          }
+          files.add(request.uri.pathSegments.last);
+          request.response.statusCode = 201;
+        } else if (request.method == 'PROPFIND') {
+          request.response.statusCode = 207;
+          request.response.write(davFiles(files));
+        } else if (request.method == 'DELETE') {
+          files.remove(request.uri.pathSegments.last);
+          request.response.statusCode = 204;
+        } else {
+          request.response.statusCode = 500;
+        }
+        await request.response.close();
+      });
+      backup.SyncController? controller;
+      try {
+        final saved = await configureWebDav(directory, server);
+        await settings.saveImplicitData(
+          directory: directory.path,
+          dataJson: '{"webdavAutoSync":true}',
+        );
+        final sync = controller = await backup.SyncController.open(
+          directory: directory.path,
+          cache: directory.path,
+        );
+        final first = submitSync(sync, 'upload');
+        await firstPut.future.timeout(const Duration(seconds: 5));
+
+        final base = jsonEncode(saved);
+        for (final theme in ['dark', 'light', 'dark']) {
+          saved['settings']['theme_mode'] = theme;
+          await settings.saveAppDataChanges(
+            directory: directory.path,
+            baseJson: base,
+            dataJson: jsonEncode(saved),
+          );
+          await submitSync(sync, 'changed');
+        }
+        final download = submitSync(sync, 'download');
+        final queued = await syncState(sync, (state) => state['pending'] == 2);
+        expect(queued['phase'], 'uploading');
+        expect(requests, ['PROPFIND', 'PUT']);
+
+        releasePut.complete();
+        await first;
+        await download;
+        await syncState(sync, (state) => state['phase'] == 'idle');
+        expect(uploaded, hasLength(2));
+        expect(uploaded.last['settings']['theme_mode'], 'dark');
+        expect(
+          (await readSettings(directory))['settings']['theme_mode'],
+          'dark',
+        );
+        expect(requests.where((method) => method == 'GET'), isEmpty);
+      } finally {
+        if (!releasePut.isCompleted) releasePut.complete();
+        controller?.dispose();
+        await server.close(force: true);
+        await directory.delete(recursive: true);
+      }
+    },
+  );
+
+  test(
+    'WebDAV restore rejects local changes before applying a downloaded backup',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'venera_sync_restore_',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'appdata.json',
+            '{"settings":{"dataVersion":10,"theme_mode":"light"},"searchHistory":["remote"]}',
+          ),
+        );
+      final bytes = ZipEncoder().encode(archive);
+      server.listen((request) async {
+        await request.drain<void>();
+        if (request.method == 'PROPFIND') {
+          request.response.statusCode = 207;
+          request.response.write(davFiles(['20000-10.venera']));
+        } else if (request.method == 'GET') {
+          request.response.add(bytes);
+        } else {
+          request.response.statusCode = 500;
+        }
+        await request.response.close();
+      });
+      backup.SyncController? controller;
+      try {
+        final before = await configureWebDav(directory, server);
+        final sync = controller = await backup.SyncController.open(
+          directory: directory.path,
+          cache: directory.path,
+        );
+        final rejected = expectLater(
+          submitSync(sync, 'download'),
           throwsA(anything),
         );
-        expect(methods.where((v) => v.startsWith('DELETE')), isEmpty);
-        rejectUpload = false;
-        final saved = jsonDecode(await backup.syncUpload(optionsJson: options));
-        expect(saved['settings']['dataVersion'], greaterThan(0));
-        final downloaded = await backup.syncDownload(optionsJson: options);
-        expect(methods.last, 'GET /20000-10.venera');
-        expect(await File(downloaded!).readAsBytes(), [1, 2, 3]);
+        final restoring = await syncState(
+          sync,
+          (state) => state['restore'] != null,
+        );
+        final id = restoring['restore'] as int;
+        before['searchHistory'] = ['local-during-download'];
+        await settings.saveAppData(
+          directory: directory.path,
+          dataJson: jsonEncode(before),
+        );
+        await expectLater(
+          sync.applyRestore(id: id),
+          throwsA(containsError('Local data changed')),
+        );
+        sync.finishRestore(id: id, error: 'Local data changed');
+        await rejected;
+        expect((await readSettings(directory))['searchHistory'], [
+          'local-during-download',
+        ]);
+
+        final retry = submitSync(sync, 'download');
+        final next = await syncState(sync, (state) => state['restore'] != null);
+        final nextId = next['restore'] as int;
+        final restored = jsonDecode(await sync.applyRestore(id: nextId));
+        expect(restored['data']['searchHistory'], ['remote']);
+        sync.finishRestore(id: nextId);
+        await retry;
+        expect((await readSettings(directory))['searchHistory'], ['remote']);
       } finally {
-        await subscription.cancel();
+        controller?.dispose();
         await server.close(force: true);
         await directory.delete(recursive: true);
       }

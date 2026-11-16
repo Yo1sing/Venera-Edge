@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Result};
-use std::sync::Mutex;
+use crate::backup_storage::Database;
+use anyhow::Result;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct StoredCookie {
@@ -15,7 +16,7 @@ pub struct StoredCookie {
 
 #[flutter_rust_bridge::frb(opaque)]
 pub struct CookieStore {
-    inner: Mutex<Option<crate::cookies::Cookies>>,
+    pub(crate) inner: Arc<Database<crate::cookies::Cookies>>,
 }
 
 // Synchronous methods retain the existing JavaScript cookie API contract.
@@ -24,7 +25,7 @@ impl CookieStore {
     #[flutter_rust_bridge::frb(sync)]
     pub fn open(path: String) -> Result<Self> {
         Ok(Self {
-            inner: Mutex::new(Some(crate::cookies::Cookies::open(&path)?)),
+            inner: Database::new(path, crate::cookies::Cookies::open)?,
         })
     }
 
@@ -36,6 +37,21 @@ impl CookieStore {
     #[flutter_rust_bridge::frb(sync)]
     pub fn save_headers(&self, url: String, headers: Vec<String>) -> Result<()> {
         self.with(|jar| jar.save_headers(&url, headers))
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn save_headers_at_epoch(
+        &self,
+        url: String,
+        headers: Vec<String>,
+        epoch: u64,
+    ) -> Result<()> {
+        self.with(|jar| {
+            if crate::backup_storage::restore_epoch() == epoch {
+                jar.save_headers(&url, headers)?;
+            }
+            Ok(())
+        })
     }
 
     #[flutter_rust_bridge::frb(sync)]
@@ -67,21 +83,12 @@ impl CookieStore {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn close(&self) -> Result<()> {
-        self.inner
-            .lock()
-            .map_err(|_| anyhow!("cookie lock poisoned"))?
-            .take();
+        self.inner.close();
         Ok(())
     }
 
     #[flutter_rust_bridge::frb(ignore)]
     fn with<T>(&self, f: impl FnOnce(&mut crate::cookies::Cookies) -> Result<T>) -> Result<T> {
-        let mut guard = self
-            .inner
-            .lock()
-            .map_err(|_| anyhow!("cookie lock poisoned"))?;
-        f(guard
-            .as_mut()
-            .ok_or_else(|| anyhow!("cookie store is closed"))?)
+        self.inner.with(f)
     }
 }

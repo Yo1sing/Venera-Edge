@@ -9,6 +9,7 @@ import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/auth_page.dart';
 import 'package:venera/pages/main_page.dart';
 import 'package:venera/utils/io.dart';
+import 'package:venera/utils/data_sync.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/components.dart';
 import 'components/window_frame.dart';
@@ -28,8 +29,10 @@ void main(List<String> args) {
       WidgetsFlutterBinding.ensureInitialized();
       await init();
       runApp(const MyApp());
+      DataSync().start();
       if (App.isDesktop) {
         await windowManager.ensureInitialized();
+        await windowManager.setPreventClose(true);
         windowManager.waitUntilReadyToShow().then((_) async {
           await windowManager.setTitleBarStyle(
             TitleBarStyle.hidden,

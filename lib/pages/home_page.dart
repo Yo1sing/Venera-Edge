@@ -93,7 +93,6 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
     super.initState();
     DataSync().addListener(update);
     WidgetsBinding.instance.addObserver(this);
-    lastCheck = DateTime.now();
   }
 
   void update() {
@@ -109,16 +108,11 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
     WidgetsBinding.instance.removeObserver(this);
   }
 
-  late DateTime lastCheck;
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      if (DateTime.now().difference(lastCheck) > const Duration(minutes: 10)) {
-        lastCheck = DateTime.now();
-        DataSync().downloadData();
-      }
+      DataSync().resumed();
     }
   }
 

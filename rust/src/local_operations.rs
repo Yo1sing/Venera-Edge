@@ -111,6 +111,10 @@ impl Worker {
             _ = self.cancel.cancelled() => anyhow::bail!("Local operation cancelled"),
             guard = crate::http_policy::serial(&library_key) => guard,
         };
+        let _storage = tokio::select! {
+            _ = self.cancel.cancelled() => anyhow::bail!("Local operation cancelled"),
+            guard = crate::backup_storage::OPERATIONS.read() => guard,
+        };
         let db = Database::open(options)?;
         std::fs::create_dir_all(&options.cache_path)?;
         let journals = journal_directory(options);

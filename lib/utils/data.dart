@@ -6,7 +6,8 @@ import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/favorites.dart';
 import 'package:venera/foundation/follow_updates.dart';
 import 'package:venera/foundation/history.dart';
-import 'package:venera/network/cookie_jar.dart';
+import 'package:venera/foundation/log.dart';
+import 'package:venera/utils/data_sync.dart';
 import 'package:venera/src/rust/api/backup.dart' as backend;
 
 import 'io.dart';
@@ -19,37 +20,41 @@ Future<File> exportAppData([bool sync = true]) async => File(
   ),
 );
 
-Future<void> importAppData(File file, [bool checkVersion = false]) async {
-  final prepared = await backend.PreparedBackup.open(
-    input: file.path,
-    cache: App.cachePath,
-    currentVersion: checkVersion ? appdata.settings['dataVersion'] : null,
-  );
-  if (prepared == null) return;
+Future<void> importAppData(File file) => DataSync().importBackup(file.path);
+
+Future<void> applyScheduledBackup(
+  backend.SyncController controller,
+  int id,
+  void Function() refreshFavorites,
+) async {
   final wasPaused = FollowUpdatesBackend.paused;
   FollowUpdatesBackend.restoring = true;
   FollowUpdatesBackend.paused = true;
   try {
     await FollowUpdatesBackend.close();
-    HistoryManager().close();
-    LocalFavoritesManager().close();
-    SingleInstanceCookieJar.instance?.dispose();
-    try {
-      final result = jsonDecode(await prepared.apply(directory: App.dataPath));
-      appdata.applyBackendData(Map<String, dynamic>.from(result['data']));
-      if (result['sourcesChanged'] == true) await ComicSourceManager().reload();
-    } finally {
-      await HistoryManager().init();
-      await LocalFavoritesManager().init();
-      SingleInstanceCookieJar.instance = SingleInstanceCookieJar(
-        '${App.dataPath}/cookie.db',
-      )..init();
+    final result = await appdata.applyRestoredData(
+      () async => jsonDecode(await controller.applyRestore(id: id)),
+    );
+    HistoryManager().notifyExternalChanges();
+    refreshFavorites();
+    if (result['sourcesChanged'] == true) await ComicSourceManager().reload();
+    final folder = appdata.settings['followUpdatesFolder'];
+    if (folder is String) {
+      if (LocalFavoritesManager().existsFolder(folder)) {
+        LocalFavoritesManager().prepareTableForFollowUpdates(folder, false);
+      } else {
+        appdata.settings['followUpdatesFolder'] = null;
+      }
     }
+    await appdata.saveData(false);
   } finally {
-    prepared.dispose();
     FollowUpdatesBackend.paused = wasPaused;
     FollowUpdatesBackend.restoring = false;
-    await FollowUpdatesBackend.configure();
+    try {
+      await FollowUpdatesBackend.configure();
+    } catch (error, stack) {
+      Log.error('Check Updates', error, stack);
+    }
   }
 }
 

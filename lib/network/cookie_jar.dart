@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/src/rust/api/cookies.dart';
+import 'package:venera/src/rust/api/backup.dart' show cookieRestoreEpoch;
 
 /// Compatibility adapter for platform Cookie values and the source JavaScript API.
 /// Persistence, expiry and request matching are owned by Rust.
@@ -53,8 +54,12 @@ class CookieJarSql {
       )
       .toList();
 
-  void saveFromResponseCookieHeader(Uri uri, List<String> headers) =>
-      _store!.saveHeaders(url: uri.toString(), headers: headers);
+  void saveFromResponseCookieHeader(Uri uri, List<String> headers, int epoch) =>
+      _store!.saveHeadersAtEpoch(
+        url: uri.toString(),
+        headers: headers,
+        epoch: epoch,
+      );
 
   String loadForRequestCookieHeader(Uri uri) =>
       _store!.header(url: uri.toString());
@@ -91,12 +96,14 @@ class SingleInstanceCookieJar extends CookieJarSql {
 }
 
 class CookieManagerSql extends Interceptor {
+  static const _epochKey = 'venera.cookieRestoreEpoch';
   final CookieJarSql cookieJar;
 
   CookieManagerSql(this.cookieJar);
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra[_epochKey] = cookieRestoreEpoch();
     var cookies = cookieJar.loadForRequestCookieHeader(options.uri);
     if (cookies.isNotEmpty) {
       if (options.headers["cookie"] != null) {
@@ -109,10 +116,15 @@ class CookieManagerSql extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    cookieJar.saveFromResponseCookieHeader(
-      response.requestOptions.uri,
-      response.headers["set-cookie"] ?? [],
-    );
+    final epoch = response.requestOptions.extra[_epochKey] as int?;
+    final headers = response.headers["set-cookie"];
+    if (epoch != null && headers != null && headers.isNotEmpty) {
+      cookieJar.saveFromResponseCookieHeader(
+        response.requestOptions.uri,
+        headers,
+        epoch,
+      );
+    }
     handler.next(response);
   }
 

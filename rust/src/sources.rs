@@ -215,6 +215,10 @@ impl Manager {
             .as_str()
             .context("Missing source key")?
             .to_owned();
+        let _storage = tokio::select! {
+            _ = cancel.cancelled() => anyhow::bail!("Source operation cancelled"),
+            guard = crate::backup_storage::OPERATIONS.read() => guard,
+        };
         let _mutation = tokio::select! {_=cancel.cancelled()=>return Err(anyhow!("Source operation cancelled")),guard=self.mutations.lock()=>guard};
         let previous = if let Some(expected) = expected {
             Some(self.find(expected)?)
@@ -350,6 +354,10 @@ impl Manager {
         Ok(())
     }
     pub async fn remove(&self, key: &str, cancel: &HttpCancellation) -> Result<()> {
+        let _storage = tokio::select! {
+            _ = cancel.cancelled() => anyhow::bail!("Source operation cancelled"),
+            guard = crate::backup_storage::OPERATIONS.read() => guard,
+        };
         let _mutation = tokio::select! {_=cancel.cancelled()=>return Err(anyhow!("Source operation cancelled")),guard=self.mutations.lock()=>guard};
         let source = self.find(key)?;
         let lock = self.engine.source_lock(key);

@@ -119,7 +119,8 @@ class ComicSourceManager with ChangeNotifier, Init {
   Future<void> _apply(Future<String> operation, {bool added = false}) async {
     final metadata = jsonDecode(await operation);
     await _refresh(added: added ? metadata['key'] : null);
-    await appdata.saveData();
+    await appdata.saveData(false);
+    DataSync().onDataChanged();
   }
 
   Future<void> installUrl(String url, HttpCancellation cancellation) => _apply(
@@ -156,7 +157,8 @@ class ComicSourceManager with ChangeNotifier, Init {
   Future<void> remove(String key, HttpCancellation cancellation) async {
     await _backend.remove(key: key, cancellation: cancellation);
     await _refresh();
-    await appdata.saveData();
+    await appdata.saveData(false);
+    DataSync().onDataChanged();
   }
 
   Future<List<dynamic>> catalog(
@@ -289,7 +291,7 @@ class ComicSource {
 
   Future<void> saveData() async {
     // Map/list mutations have already been persisted by the Rust source store.
-    DataSync().uploadData();
+    DataSync().onDataChanged();
   }
 
   Future<bool> reLogin() async =>

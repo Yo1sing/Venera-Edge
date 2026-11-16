@@ -563,6 +563,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
                   setState(() {
                     isTesting = true;
                   });
+                  await appdata.saveData(false);
                   var testResult = upload
                       ? await DataSync().uploadData()
                       : await DataSync().downloadData();

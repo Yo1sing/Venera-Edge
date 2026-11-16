@@ -101,22 +101,41 @@ fn backup_name(name: &str) -> Option<(u64, u64)> {
     let (day, version) = name.strip_suffix(".venera")?.split_once('-')?;
     Some((day.parse().ok()?, version.parse().ok()?))
 }
-static TRANSFER: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-pub async fn upload(options: Options) -> Result<String> {
-    let _guard = TRANSFER.lock().await;
-    let mut data = crate::settings::load(&options.directory)?;
+pub async fn upload_revision(options: Options) -> Result<Option<u64>> {
+    let data = {
+        let _storage = crate::backup_storage::access();
+        crate::settings::load(&options.directory)?
+    };
     let Some(dav) = Dav::new(&data["settings"], &options.http)? else {
-        return Ok(data.to_string());
+        return Ok(None);
     };
     let files = dav.list().await?;
-    let version = data["settings"]["dataVersion"]
-        .as_u64()
-        .unwrap_or(0)
-        .checked_add(1)
-        .context("Data version overflow")?;
-    data["settings"]["dataVersion"] = version.into();
-    crate::settings::save(&options.directory, data.clone())?;
-    let output = crate::backup::export(&options.directory, &options.cache, true)?;
+    let remote_version = files.iter().map(|file| file.2).max().unwrap_or(0);
+    let webdav = data["settings"]["webdav"].clone();
+    let directory = options.directory.clone();
+    let cache = options.cache.clone();
+    let (output, version) = tokio::task::spawn_blocking(move || {
+        let _storage = crate::backup_storage::access();
+        let mut snapshot = crate::settings::load(&directory)?;
+        ensure!(
+            snapshot["settings"]["webdav"] == data["settings"]["webdav"],
+            "WebDAV configuration changed during upload"
+        );
+        let version = snapshot["settings"]["dataVersion"]
+            .as_u64()
+            .unwrap_or(0)
+            .max(remote_version)
+            .checked_add(1)
+            .filter(|version| *version <= i64::MAX as u64)
+            .context("Data version overflow")?;
+        snapshot["settings"]["dataVersion"] = version.into();
+        let snapshot = crate::settings::sync_snapshot(snapshot);
+        Ok::<_, anyhow::Error>((
+            crate::backup::export_with_data(&directory, &cache, true, Some(&snapshot))?,
+            version,
+        ))
+    })
+    .await??;
     let day = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs()
@@ -130,6 +149,10 @@ pub async fn upload(options: Options) -> Result<String> {
             .send()
             .await?
             .error_for_status()?;
+        {
+            let _storage = crate::backup_storage::access();
+            crate::settings::advance_revision(&options.directory, &webdav, version)?;
+        }
         let mut remaining = files
             .into_iter()
             .filter(|f| f.0 != name)
@@ -152,15 +175,17 @@ pub async fn upload(options: Options) -> Result<String> {
                 .await?
                 .error_for_status()?;
         }
-        Ok::<_, anyhow::Error>(data.to_string())
+        Ok::<_, anyhow::Error>(Some(version))
     }
     .await;
     let _ = std::fs::remove_file(output);
     result
 }
 pub async fn download(options: Options) -> Result<Option<String>> {
-    let _guard = TRANSFER.lock().await;
-    let data = crate::settings::load(&options.directory)?;
+    let data = {
+        let _storage = crate::backup_storage::access();
+        crate::settings::load(&options.directory)?
+    };
     let Some(dav) = Dav::new(&data["settings"], &options.http)? else {
         return Ok(None);
     };

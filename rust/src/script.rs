@@ -600,6 +600,7 @@ impl Host {
                 Value::Null
             }
             "cookie" => {
+                let _storage = crate::backup_storage::access();
                 let mut cookies = crate::cookies::Cookies::open(
                     &PathBuf::from(&self.options.data_path)
                         .join("cookie.db")
@@ -691,6 +692,14 @@ fn source_path(directory: &str, key: &str) -> Result<PathBuf> {
         .join(format!("{key}.data")))
 }
 pub fn source_data(directory: &str, key: &str) -> Result<Value> {
+    let _storage = crate::backup_storage::access();
+    let _guard = DATA_WRITES
+        .lock()
+        .map_err(|_| anyhow!("Source data lock poisoned"))?;
+    read_source_data(directory, key)
+}
+
+fn read_source_data(directory: &str, key: &str) -> Result<Value> {
     let path = source_path(directory, key)?;
     match std::fs::read(path) {
         Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
@@ -704,10 +713,11 @@ pub fn update_source(
     path: &[String],
     value: Option<Value>,
 ) -> Result<()> {
+    let _storage = crate::backup_storage::access();
     let _guard = DATA_WRITES
         .lock()
         .map_err(|_| anyhow!("Source data lock poisoned"))?;
-    let mut data = source_data(directory, key)?;
+    let mut data = read_source_data(directory, key)?;
     fn apply(current: &mut Value, path: &[String], value: Option<Value>) -> Result<()> {
         if path.is_empty() {
             *current = value.unwrap_or_else(|| json!({}));
@@ -786,7 +796,9 @@ async fn http(options: &Options, data: &Value) -> Result<Value> {
         .join("cookie.db")
         .to_string_lossy()
         .into_owned();
+    let restore_epoch = crate::backup_storage::restore_epoch();
     if !has_cookie {
+        let _storage = crate::backup_storage::access();
         let cookie = crate::cookies::Cookies::open(&cookie_path)?
             .load(url)?
             .iter()
@@ -884,7 +896,12 @@ async fn http(options: &Options, data: &Value) -> Result<Value> {
         response.close().await;
         return Err(anyhow!("CloudflareException: {url}"));
     }
-    crate::cookies::Cookies::open(&cookie_path)?.save_headers(&response.url(), cookies)?;
+    if !cookies.is_empty() {
+        let _storage = crate::backup_storage::access();
+        if crate::backup_storage::restore_epoch() == restore_epoch {
+            crate::cookies::Cookies::open(&cookie_path)?.save_headers(&response.url(), cookies)?;
+        }
+    }
     let mut bytes = Vec::new();
     let total = headers
         .get("content-length")

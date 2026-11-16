@@ -16,16 +16,71 @@ class Appdata with Init {
   var implicitData = <String, dynamic>{};
   Future<void> _pendingSave = Future.value();
 
-  Future<void> saveData([bool sync = true]) async {
-    final snapshot = jsonEncode(toJson());
-    final operation = _pendingSave.then(
-      (_) => backend.saveAppData(directory: App.dataPath, dataJson: snapshot),
+  String? _savedSnapshot;
+
+  Future<T> _serialize<T>(Future<T> Function() action) {
+    final operation = _pendingSave.then((_) => action());
+    _pendingSave = operation.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stack) {
+        Log.error('Appdata', error, stack);
+      },
     );
-    _pendingSave = operation.catchError((Object error, StackTrace stack) {
-      Log.error('Appdata', error, stack);
+    return operation;
+  }
+
+  Future<void> flushSaves() => _pendingSave;
+
+  Future<void> saveData([bool sync = true]) async {
+    final changed = await _serialize(_persist);
+    if (sync && changed) DataSync().onDataChanged();
+  }
+
+  Future<bool> _persist() async {
+    final snapshot = jsonEncode(toJson());
+    final previous = _savedSnapshot;
+    if (previous == null) {
+      await backend.saveAppData(directory: App.dataPath, dataJson: snapshot);
+    } else if (previous != snapshot) {
+      await backend.saveAppDataChanges(
+        directory: App.dataPath,
+        baseJson: previous,
+        dataJson: snapshot,
+      );
+    }
+    _savedSnapshot = snapshot;
+    return previous != snapshot;
+  }
+
+  Future<Map<String, dynamic>> applyRestoredData(
+    Future<Map<String, dynamic>> Function() apply,
+  ) => _serialize(() async {
+    final base = _savedSnapshot ?? jsonEncode(toJson());
+    final result = await apply();
+    final data = Map<String, dynamic>.from(result['data']);
+    final restored = jsonEncode({
+      'settings': data['settings'],
+      'searchHistory': data['searchHistory'],
     });
-    await operation;
-    if (sync) DataSync().uploadData();
+    final rebased = backend.rebaseAppData(
+      baseJson: base,
+      editedJson: jsonEncode(toJson()),
+      currentJson: restored,
+    );
+    _savedSnapshot = restored;
+    _apply(jsonDecode(rebased));
+    if (await _persist()) DataSync().onDataChanged();
+    return result;
+  });
+
+  void applyUploadRevision(int revision) {
+    settings['dataVersion'] = revision;
+    final snapshot = _savedSnapshot;
+    if (snapshot != null) {
+      final data = jsonDecode(snapshot);
+      data['settings']['dataVersion'] = revision;
+      _savedSnapshot = jsonEncode(data);
+    }
   }
 
   void addSearchHistory(String keyword) {
@@ -64,8 +119,6 @@ class Appdata with Init {
     searchHistory = List<String>.from(data['searchHistory']);
   }
 
-  void applyBackendData(Map<String, dynamic> data) => _apply(data);
-
   void syncData(Map<String, dynamic> data) {
     _apply(
       jsonDecode(
@@ -80,16 +133,21 @@ class Appdata with Init {
 
   void writeImplicitData() {
     final snapshot = jsonEncode(implicitData);
-    _pendingSave = _pendingSave
-        .then(
-          (_) => backend.saveImplicitData(
-            directory: App.dataPath,
-            dataJson: snapshot,
-          ),
-        )
-        .catchError((Object error, StackTrace stack) {
-          Log.error('Appdata', error, stack);
-        });
+    unawaited(
+      _serialize(
+        () => backend.saveImplicitData(
+          directory: App.dataPath,
+          dataJson: snapshot,
+        ),
+      ).then(
+        (_) {
+          DataSync().refreshConfiguration();
+        },
+        onError: (Object _, StackTrace _) {
+          // _serialize already logged the save failure.
+        },
+      ),
+    );
   }
 
   @override

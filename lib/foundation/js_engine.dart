@@ -12,6 +12,7 @@ import 'package:venera/foundation/script_bridge.dart';
 import 'package:venera/network/proxy.dart';
 import 'package:venera/src/rust/api/script.dart' as backend;
 import 'package:venera/utils/init.dart';
+import 'package:venera/utils/data_sync.dart';
 import 'package:venera/utils/io.dart' show FileExtension;
 
 export 'script_bridge.dart' show JSInvokable;
@@ -104,6 +105,7 @@ class JsEngine with JsUiApi, Init {
     if (session.closed) return;
     if (event['event'] == 'sourceChanged') {
       ComicSourceManager().notifyStateChange();
+      DataSync().onDataChanged();
       return;
     }
     final data = session.decode(event['data']) as Map<String, dynamic>;

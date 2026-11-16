@@ -1,5 +1,6 @@
-use anyhow::{anyhow, Result};
-use std::sync::Mutex;
+use crate::backup_storage::Database;
+use anyhow::Result;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HistoryEntry {
@@ -23,13 +24,13 @@ pub struct ComicKey {
 
 #[flutter_rust_bridge::frb(opaque)]
 pub struct HistoryStore {
-    inner: Mutex<Option<crate::history::History>>,
+    pub(crate) inner: Arc<Database<crate::history::History>>,
 }
 
 impl HistoryStore {
     pub fn open(path: String) -> Result<Self> {
         Ok(Self {
-            inner: Mutex::new(Some(crate::history::History::open(&path)?)),
+            inner: Database::new(path, crate::history::History::open)?,
         })
     }
 
@@ -116,10 +117,7 @@ impl HistoryStore {
 
     #[flutter_rust_bridge::frb(sync)]
     pub fn close(&self) -> Result<()> {
-        self.inner
-            .lock()
-            .map_err(|_| anyhow!("history lock poisoned"))?
-            .take();
+        self.inner.close();
         Ok(())
     }
 
@@ -128,14 +126,6 @@ impl HistoryStore {
         &self,
         operation: impl FnOnce(&mut crate::history::History) -> Result<T>,
     ) -> Result<T> {
-        let mut guard = self
-            .inner
-            .lock()
-            .map_err(|_| anyhow!("history lock poisoned"))?;
-        operation(
-            guard
-                .as_mut()
-                .ok_or_else(|| anyhow!("history store is closed"))?,
-        )
+        self.inner.with(operation)
     }
 }

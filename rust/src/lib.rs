@@ -18,6 +18,7 @@ mod text;
 
 mod archives;
 mod backup;
+mod backup_storage;
 mod books;
 mod comic_archive;
 mod comic_queue;
@@ -27,3 +28,5 @@ mod image_tasks;
 mod imaging;
 mod legacy_import;
 mod sync;
+
+mod sync_scheduler;

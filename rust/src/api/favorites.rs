@@ -1,18 +1,18 @@
-use anyhow::{anyhow, Result};
-use std::sync::Mutex;
+use crate::backup_storage::Database;
+use anyhow::Result;
+use std::sync::Arc;
 
 #[flutter_rust_bridge::frb(opaque)]
 pub struct FavoriteStore {
-    pub(crate) inner: std::sync::Arc<Mutex<Option<crate::favorites::Favorites>>>,
+    pub(crate) inner: Arc<Database<crate::favorites::Favorites>>,
 }
 
 impl FavoriteStore {
     pub fn open(path: String, traditional: bool) -> Result<Self> {
         Ok(Self {
-            inner: std::sync::Arc::new(Mutex::new(Some(crate::favorites::Favorites::open(
-                &path,
-                traditional,
-            )?))),
+            inner: Database::new(path, move |path| {
+                crate::favorites::Favorites::open(path, traditional)
+            })?,
         })
     }
 
@@ -249,10 +249,7 @@ impl FavoriteStore {
     }
     #[flutter_rust_bridge::frb(sync)]
     pub fn close(&self) -> Result<()> {
-        self.inner
-            .lock()
-            .map_err(|_| anyhow!("favorites lock poisoned"))?
-            .take();
+        self.inner.close();
         Ok(())
     }
     #[flutter_rust_bridge::frb(ignore)]
@@ -260,14 +257,6 @@ impl FavoriteStore {
         &self,
         operation: impl FnOnce(&crate::favorites::Favorites) -> Result<T>,
     ) -> Result<T> {
-        let guard = self
-            .inner
-            .lock()
-            .map_err(|_| anyhow!("favorites lock poisoned"))?;
-        operation(
-            guard
-                .as_ref()
-                .ok_or_else(|| anyhow!("favorites store closed"))?,
-        )
+        self.inner.with(|db| operation(db))
     }
 }

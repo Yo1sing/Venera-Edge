@@ -16,7 +16,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-type Store = Arc<Mutex<Option<Favorites>>>;
+type Store = Arc<crate::backup_storage::Database<Favorites>>;
 const DAY_MS: i64 = 86_400_000;
 
 fn needs_check(last_check: Option<i64>, force: bool, now: i64) -> bool {
@@ -188,11 +188,7 @@ impl Service {
         }
     }
     fn with_store<T>(&self, f: impl FnOnce(&Favorites) -> Result<T>) -> Result<T> {
-        let store = self
-            .store
-            .lock()
-            .map_err(|_| anyhow!("Favorites poisoned"))?;
-        f(store.as_ref().context("Favorites store closed")?)
+        self.store.with(|db| f(db))
     }
     pub async fn configure(
         self: &Arc<Self>,
@@ -581,17 +577,19 @@ class UpdateTest extends ComicSource {
             }))?;
             let engine = Arc::new(Engine::open(options)?);
             engine.evaluate(&format!("__sources.install({})", json!(SOURCE)))?;
-            let db = Favorites::open(":memory:", false)?;
-            db.create("Follow", false)?;
+            let db = crate::backup_storage::Database::new(":memory:".into(), |path| {
+                Favorites::open(path, false)
+            })?;
+            db.with(|db| db.create("Follow", false))?;
             for id in ids {
                 let comic = serde_json::from_value(
                     json!({"id":id,"name":"Old","author":"Old author","type":42,"coverPath":"old-cover","tags":[]}),
                 )?;
-                db.add("Follow", &comic, None, true, false)?;
+                db.with(|db| db.add("Follow", &comic, None, true, false))?;
             }
             let service = Service::open_with_policy(
                 engine,
-                Arc::new(Mutex::new(Some(db))),
+                db,
                 Policy {
                     retry_delay: Duration::from_millis(20),
                     throttle: Duration::from_millis(1),

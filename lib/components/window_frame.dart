@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:venera/utils/data_sync.dart';
 
 const _kTitleBarHeight = 36.0;
 
@@ -53,7 +54,7 @@ class WindowFrame extends StatefulWidget {
 
 typedef WindowCloseListener = bool Function();
 
-class _WindowFrameState extends State<WindowFrame> {
+class _WindowFrameState extends State<WindowFrame> with WindowListener {
   bool isWindowFrameHidden = false;
   bool useDarkTheme = false;
   var closeListeners = <WindowCloseListener>[];
@@ -76,7 +77,23 @@ class _WindowFrameState extends State<WindowFrame> {
     closeListeners.remove(listener);
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (App.isDesktop) windowManager.addListener(this);
+  }
+
+  @override
+  void dispose() {
+    if (App.isDesktop) windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowClose() => _onClose();
+
   void _onClose() {
+    if (!DataSync().allowWindowClose()) return;
     for (var listener in closeListeners) {
       if (!listener()) {
         return;

@@ -24,12 +24,6 @@ Future<void> importPicaData({
   atEnd: atEnd,
 );
 
-Future<String> syncUpload({required String optionsJson}) =>
-    RustLib.instance.api.crateApiBackupSyncUpload(optionsJson: optionsJson);
-
-Future<String?> syncDownload({required String optionsJson}) =>
-    RustLib.instance.api.crateApiBackupSyncDownload(optionsJson: optionsJson);
-
 Future<String> exportAppData({
   required String directory,
   required String cache,
@@ -40,17 +34,30 @@ Future<String> exportAppData({
   sync_: sync_,
 );
 
-// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedBackup>>
-abstract class PreparedBackup implements RustOpaqueInterface {
-  Future<String> apply({required String directory});
+int cookieRestoreEpoch() =>
+    RustLib.instance.api.crateApiBackupCookieRestoreEpoch();
 
-  static Future<PreparedBackup?> open({
-    required String input,
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SyncController>>
+abstract class SyncController implements RustOpaqueInterface {
+  Future<String> applyRestore({required int id});
+
+  void finishRestore({required int id, String? error});
+
+  Future<String> nextSnapshot();
+
+  static Future<SyncController> open({
+    required String directory,
     required String cache,
-    int? currentVersion,
-  }) => RustLib.instance.api.crateApiBackupPreparedBackupOpen(
-    input: input,
+  }) => RustLib.instance.api.crateApiBackupSyncControllerOpen(
+    directory: directory,
     cache: cache,
-    currentVersion: currentVersion,
   );
+
+  String snapshot();
+
+  Future<void> submit({
+    required String action,
+    required String httpJson,
+    String? path,
+  });
 }

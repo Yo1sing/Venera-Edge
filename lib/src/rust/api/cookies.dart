@@ -27,6 +27,12 @@ abstract class CookieStore implements RustOpaqueInterface {
   void save({required String url, required List<StoredCookie> cookies});
 
   void saveHeaders({required String url, required List<String> headers});
+
+  void saveHeadersAtEpoch({
+    required String url,
+    required List<String> headers,
+    required int epoch,
+  });
 }
 
 class StoredCookie {

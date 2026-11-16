@@ -70,14 +70,18 @@ fn excluded(settings: &Value) -> Vec<String> {
         .collect()
 }
 
-pub fn save(directory: &str, mut data: Value) -> Result<()> {
+pub fn save(directory: &str, data: Value) -> Result<()> {
+    let _guard = WRITES
+        .lock()
+        .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
+    save_locked(directory, data)
+}
+
+fn save_locked(directory: &str, mut data: Value) -> Result<()> {
     ensure!(
         data["settings"].is_object() && data["searchHistory"].is_array(),
         "Invalid appdata snapshot"
     );
-    let _guard = WRITES
-        .lock()
-        .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
     // A UI snapshot taken during a WebDAV upload must not rewind its revision.
     if let Some(previous) = read_optional(&Path::new(directory).join("appdata.json"))? {
         if let Some(version) = previous["settings"]["dataVersion"].as_u64() {
@@ -86,14 +90,84 @@ pub fn save(directory: &str, mut data: Value) -> Result<()> {
             }
         }
     }
-    let mut sync = data.clone();
-    for key in excluded(&data["settings"]) {
-        sync["settings"].as_object_mut().unwrap().remove(&key);
-    }
     // syncdata always exists, even with no custom exclusions.
-    atomic_json(&Path::new(directory).join("syncdata.json"), &sync)?;
+    atomic_json(
+        &Path::new(directory).join("syncdata.json"),
+        &sync_snapshot(data.clone()),
+    )?;
     atomic_json(&Path::new(directory).join("appdata.json"), &data)?;
     Ok(())
+}
+
+pub fn sync_snapshot(mut data: Value) -> Value {
+    let exclusions = excluded(&data["settings"]);
+    if let Some(settings) = data["settings"].as_object_mut() {
+        for key in exclusions {
+            settings.remove(&key);
+        }
+    }
+    if let Some(data) = data.as_object_mut() {
+        data.remove("implicitData");
+    }
+    data
+}
+
+pub fn advance_revision(directory: &str, webdav: &Value, version: u64) -> Result<()> {
+    let _guard = WRITES
+        .lock()
+        .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
+    let mut data = load(directory)?;
+    ensure!(
+        &data["settings"]["webdav"] == webdav,
+        "WebDAV configuration changed during upload"
+    );
+    if data["settings"]["dataVersion"].as_u64().unwrap_or(0) < version {
+        data["settings"]["dataVersion"] = version.into();
+        data.as_object_mut().unwrap().remove("implicitData");
+        save_locked(directory, data)?;
+    }
+    Ok(())
+}
+
+// Rebase edits made against a Flutter snapshot onto the current Rust snapshot.
+pub fn overlay_changes(base: &Value, edited: &Value, current: &mut Value) {
+    if base == edited {
+        return;
+    }
+    if let (Some(base), Some(edited), Some(current)) = (
+        base.as_object(),
+        edited.as_object(),
+        current.as_object_mut(),
+    ) {
+        for (key, previous) in base {
+            if !edited.contains_key(key) {
+                current.remove(key);
+            } else if &edited[key] != previous {
+                overlay_changes(
+                    previous,
+                    &edited[key],
+                    current.entry(key.clone()).or_insert(Value::Null),
+                );
+            }
+        }
+        for (key, value) in edited {
+            if !base.contains_key(key) {
+                current.insert(key.clone(), value.clone());
+            }
+        }
+    } else {
+        *current = edited.clone();
+    }
+}
+
+pub fn save_changes(directory: &str, base: Value, edited: Value) -> Result<()> {
+    let _guard = WRITES
+        .lock()
+        .map_err(|_| anyhow::anyhow!("settings lock poisoned"))?;
+    let mut current = load(directory)?;
+    current.as_object_mut().unwrap().remove("implicitData");
+    overlay_changes(&base, &edited, &mut current);
+    save_locked(directory, current)
 }
 
 pub fn save_implicit(directory: &str, data: Value) -> Result<()> {

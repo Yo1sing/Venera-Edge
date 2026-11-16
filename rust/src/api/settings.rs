@@ -64,14 +64,45 @@ pub fn default_settings_json() -> String {
 }
 
 pub fn load_app_data(directory: String) -> Result<String> {
+    let _storage = crate::backup_storage::access();
     Ok(serde_json::to_string(&crate::settings::load(&directory)?)?)
 }
 
 pub fn save_app_data(directory: String, data_json: String) -> Result<()> {
+    let _storage = crate::backup_storage::access();
     crate::settings::save(&directory, serde_json::from_str(&data_json)?)
 }
 
+pub fn save_app_data_changes(
+    directory: String,
+    base_json: String,
+    data_json: String,
+) -> Result<()> {
+    let _storage = crate::backup_storage::access();
+    crate::settings::save_changes(
+        &directory,
+        serde_json::from_str(&base_json)?,
+        serde_json::from_str(&data_json)?,
+    )
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn rebase_app_data(
+    base_json: String,
+    edited_json: String,
+    current_json: String,
+) -> Result<String> {
+    let mut current = serde_json::from_str(&current_json)?;
+    crate::settings::overlay_changes(
+        &serde_json::from_str(&base_json)?,
+        &serde_json::from_str(&edited_json)?,
+        &mut current,
+    );
+    Ok(current.to_string())
+}
+
 pub fn save_implicit_data(directory: String, data_json: String) -> Result<()> {
+    let _storage = crate::backup_storage::access();
     crate::settings::save_implicit(&directory, serde_json::from_str(&data_json)?)
 }
 
