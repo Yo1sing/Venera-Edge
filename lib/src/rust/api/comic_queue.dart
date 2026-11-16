@@ -29,7 +29,11 @@ abstract class ComicDownloadQueue implements RustOpaqueInterface {
     sourceTypesJson: sourceTypesJson,
   );
 
-  Future<void> resolvePlatform({required String id, String? error});
+  Future<void> resolvePlatform({
+    required String id,
+    String? error,
+    String? valueJson,
+  });
 
   String snapshot();
 }

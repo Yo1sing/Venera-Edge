@@ -109,8 +109,39 @@ impl LocalLibrary {
             .db
             .query_row("SELECT COUNT(*) FROM comics", [], |r| r.get(0))?)
     }
-    pub fn save(&self, mut comic: LocalComic) -> Result<()> {
+    pub fn save(&self, comic: LocalComic) -> Result<()> {
         let transaction = self.db.unchecked_transaction()?;
+        self.save_row(comic)?;
+        transaction.commit()?;
+        Ok(())
+    }
+    pub(crate) fn save_download(&self, comic: LocalComic, token: &str) -> Result<()> {
+        self.db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS download_commits (token TEXT PRIMARY KEY)",
+        )?;
+        let transaction = self.db.unchecked_transaction()?;
+        self.save_row(comic)?;
+        self.db
+            .execute("INSERT OR IGNORE INTO download_commits VALUES (?)", [token])?;
+        transaction.commit()?;
+        Ok(())
+    }
+    pub(crate) fn download_committed(&self, token: &str) -> Result<bool> {
+        self.db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS download_commits (token TEXT PRIMARY KEY)",
+        )?;
+        Ok(self.db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM download_commits WHERE token=?)",
+            [token],
+            |row| row.get(0),
+        )?)
+    }
+    pub(crate) fn forget_download(&self, token: &str) -> Result<()> {
+        self.db
+            .execute("DELETE FROM download_commits WHERE token=?", [token])?;
+        Ok(())
+    }
+    fn save_row(&self, mut comic: LocalComic) -> Result<()> {
         if let Some(old) = self.find(&comic.id, comic.comic_type)? {
             comic.downloaded_chapters.extend(old.downloaded_chapters);
         }
@@ -135,7 +166,6 @@ impl LocalLibrary {
                 comic.created_at
             ],
         )?;
-        transaction.commit()?;
         Ok(())
     }
     pub fn list(

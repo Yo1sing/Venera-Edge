@@ -27,6 +27,7 @@ struct State {
     epoch: u64,
     cancel: Option<Arc<HttpCancellation>>,
     options: Options,
+    cleanup: Vec<Value>,
 }
 pub struct Queue {
     engine: Arc<Engine>,
@@ -36,7 +37,7 @@ pub struct Queue {
     pub snapshot_receiver: tokio::sync::Mutex<tokio::sync::watch::Receiver<String>>,
     platform: tokio::sync::mpsc::Sender<String>,
     pub platform_receiver: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>,
-    acknowledgements: Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<()>>>>,
+    acknowledgements: Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<Value>>>>,
 }
 fn key(value: &Value) -> String {
     format!(
@@ -60,6 +61,10 @@ fn normalize(value: &mut Value, types: &Value) {
     value["_error"] = false.into();
     value["_speed"] = 0.into();
     value["message"] = "Paused".into();
+    if crate::download_files::token(value).is_err() {
+        value["_work"] = uuid::Uuid::new_v4().to_string().into();
+        value["_legacyWork"] = true.into();
+    }
 }
 impl Queue {
     pub fn open(engine: Arc<Engine>, options: Options, types: Value) -> Result<Arc<Self>> {
@@ -69,12 +74,35 @@ impl Queue {
         } else {
             vec![]
         };
+        let cleanup_path = Path::new(&options.data_path).join("download_cleanup.json");
+        let cleanup: Vec<Value> = match fs::read(cleanup_path) {
+            Ok(bytes) => serde_json::from_slice(&bytes)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => vec![],
+            Err(error) => return Err(error.into()),
+        };
         for item in &mut items {
+            let needs_owner = crate::download_files::token(item).is_err();
             normalize(item, &types);
+            if needs_owner {
+                if let Some(request) = cleanup
+                    .iter()
+                    .find(|request| key(&request["item"]) == key(item))
+                {
+                    item["_work"] = request["item"]["_work"].clone();
+                    item["_legacyWork"] = request["item"]["_legacyWork"].clone();
+                }
+            }
+            if cleanup
+                .iter()
+                .any(|request| request["item"]["_work"] == item["_work"])
+            {
+                item["_cleanupOnly"] = true.into();
+                item["message"] = "Cleaning up cancelled download...".into();
+            }
         }
         let (snapshots, receiver) = tokio::sync::watch::channel(serde_json::to_string(&items)?);
         let (platform, platform_receiver) = tokio::sync::mpsc::channel(8);
-        Ok(Arc::new(Self {
+        let queue = Arc::new(Self {
             engine,
             execution: tokio::sync::Mutex::new(()),
             state: Mutex::new(State {
@@ -83,23 +111,23 @@ impl Queue {
                 epoch: 0,
                 cancel: None,
                 options,
+                cleanup,
             }),
             snapshots,
             snapshot_receiver: tokio::sync::Mutex::new(receiver),
             platform,
             platform_receiver: tokio::sync::Mutex::new(platform_receiver),
             acknowledgements: Mutex::new(HashMap::new()),
-        }))
+        });
+        queue.schedule();
+        Ok(queue)
     }
     fn publish(&self, state: &State, persist: bool) -> Result<()> {
         let json = serde_json::to_string(&state.items)?;
         if persist {
             let root = Path::new(&state.options.data_path);
             fs::create_dir_all(root)?;
-            let mut file = tempfile::NamedTempFile::new_in(root)?;
-            file.write_all(json.as_bytes())?;
-            file.as_file().sync_all()?;
-            file.persist(root.join("downloading_tasks.json"))?;
+            crate::download_files::atomic_json(&root.join("downloading_tasks.json"), &state.items)?;
         }
         self.snapshots.send_replace(json);
         Ok(())
@@ -115,10 +143,15 @@ impl Queue {
         Ok(())
     }
     pub fn add(self: &Arc<Self>, mut item: Value) -> Result<()> {
+        item["_legacyWork"] = false.into();
+        item["_work"] = uuid::Uuid::new_v4().to_string().into();
         normalize(&mut item, &json!({}));
         ensure!(item["comicType"].is_i64(), "Missing comic type");
         {
             let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+            state
+                .items
+                .retain(|existing| key(existing) != key(&item) || existing["_cleanupOnly"] != true);
             ensure!(
                 !state.items.iter().any(|v| key(v) == key(&item)),
                 "Comic is already queued"
@@ -130,21 +163,35 @@ impl Queue {
         self.schedule();
         Ok(())
     }
-    pub fn command(self: &Arc<Self>, id: &str, action: &str) -> Result<()> {
+    fn persist_cleanup(&self, state: &State) -> Result<()> {
+        crate::download_files::atomic_json(
+            &Path::new(&state.options.data_path).join("download_cleanup.json"),
+            &state.cleanup,
+        )
+    }
+    pub async fn command(self: &Arc<Self>, id: &str, action: &str) -> Result<()> {
         ensure!(
-            matches!(action, "pause" | "resume" | "first" | "cancel"),
+            ["pause", "resume", "first", "cancel"].contains(&action),
             "Unknown queue command"
         );
         {
             let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
-            let index = state
-                .items
-                .iter()
-                .position(|v| key(v) == id)
-                .context("Download task not found")?;
-            // Stop the old generation before changing order; its future cannot update the new generation.
+            let Some(index) = state.items.iter().position(|value| key(value) == id) else {
+                ensure!(action == "cancel", "Download task not found");
+                return Ok(());
+            };
+            if action == "cancel"
+                && !state
+                    .cleanup
+                    .iter()
+                    .any(|request| request["item"]["_work"] == state.items[index]["_work"])
+            {
+                let request = json!({"item":state.items[index],"options":state.options});
+                state.cleanup.push(request);
+                self.persist_cleanup(&state)?;
+            }
             state.epoch += 1;
-            if let Some(cancel) = state.cancel.take() {
+            if let Some(cancel) = &state.cancel {
                 cancel.cancel();
             }
             for item in &mut state.items {
@@ -156,78 +203,190 @@ impl Queue {
                     state.running = false;
                     state.items[index]["message"] = "Paused".into();
                 }
-                "resume" => {
+                "resume" | "first" => {
                     let item = state.items.remove(index);
                     state.items.insert(0, item);
-                    state.running = true;
-                }
-                "first" => {
-                    let item = state.items.remove(index);
-                    state.items.insert(0, item);
+                    if action == "resume" {
+                        state.running = true;
+                    }
                 }
                 "cancel" => {
-                    state.items.remove(index);
+                    state.items[index]["_cleanupOnly"] = true.into();
+                    state.items[index]["message"] = "Cleaning up cancelled download...".into();
                 }
-                _ => return Err(anyhow!("Unknown queue command")),
+                _ => unreachable!(),
             }
             self.publish(&state, true)?;
         }
+        // Keep the barrier through transport shutdown, extraction and every SAF receipt.
+        // All later generations process durable cleanup requests before they can write.
+        let cleanup = {
+            let _execution = self.execution.lock().await;
+            self.process_cleanup().await
+        };
         self.schedule();
-        Ok(())
+        cleanup
+    }
+    async fn process_cleanup(&self) -> Result<()> {
+        loop {
+            let request = {
+                self.state
+                    .lock()
+                    .map_err(|_| anyhow!("Queue poisoned"))?
+                    .cleanup
+                    .first()
+                    .cloned()
+            };
+            let Some(request) = request else {
+                return Ok(());
+            };
+            let item = &request["item"];
+            let token = crate::download_files::token(item)?;
+            let options: Options = serde_json::from_value(request["options"].clone())?;
+            let lock = format!(
+                "local-comic:{}:{}:{}",
+                options.data_path,
+                item["comicType"],
+                item["comicId"].as_str().unwrap_or_default()
+            );
+            let _comic = crate::http_policy::serial(&lock).await;
+            let result = async {
+                let mut work = if let Some(work) = crate::download_files::read(&options, token)? {
+                    work
+                } else {
+                    let destination = item["path"]
+                        .as_str()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| Path::new(&options.local_path).join(token));
+                    crate::download_files::Work::open(
+                        options.clone(),
+                        item,
+                        key(item),
+                        destination,
+                    )?
+                };
+                work.clean(self, true).await
+            }
+            .await;
+            let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+            match result {
+                Ok(()) => {
+                    state.items.retain(|item| item["_work"] != token);
+                    self.publish(&state, true)?;
+                    state
+                        .cleanup
+                        .retain(|request| request["item"]["_work"] != token);
+                    self.persist_cleanup(&state)?;
+                }
+                Err(error) => {
+                    state.running = false;
+                    for pending in &mut state.items {
+                        if pending["_work"] == token
+                            || key(pending) == key(item)
+                            || pending["_running"] == true
+                        {
+                            pending["_running"] = false.into();
+                            pending["_error"] = true.into();
+                            pending["message"] =
+                                format!("Cleanup pending: {error:#}. Resume to retry.").into();
+                        }
+                    }
+                    self.publish(&state, true)?;
+                    return Err(error
+                        .context("Cancelled download cleanup pending; resume or cancel to retry"));
+                }
+            }
+        }
     }
     fn schedule(self: &Arc<Self>) {
         let start = {
-            let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
-            if !state.running || state.items.is_empty() || state.cancel.is_some() {
+            let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            if state.cancel.is_some() {
+                return;
+            }
+            let item = if !state.cleanup.is_empty() {
+                None
+            } else {
+                if !state.running {
+                    return;
+                }
+                state
+                    .items
+                    .iter()
+                    .find(|item| item["_cleanupOnly"] != true)
+                    .cloned()
+            };
+            if item.is_none() && state.cleanup.is_empty() {
                 return;
             }
             let cancel = Arc::new(HttpCancellation::new());
             state.cancel = Some(cancel.clone());
-            state.items[0]["_running"] = true.into();
-            state.items[0]["_error"] = false.into();
-            state.items[0]["message"] = "Downloading...".into();
+            if let Some(item) = &item {
+                if let Some(row) = state
+                    .items
+                    .iter_mut()
+                    .find(|row| row["_work"] == item["_work"])
+                {
+                    row["_running"] = true.into();
+                    row["_error"] = false.into();
+                    row["message"] = "Downloading...".into();
+                }
+            }
             let _ = self.publish(&state, false);
-            (
-                state.items[0].clone(),
-                state.options.clone(),
-                state.epoch,
-                cancel,
-            )
+            (item, state.options.clone(), state.epoch, cancel)
         };
         let queue = self.clone();
         crate::script::executor().spawn(async move {
             let (item, options, epoch, cancel) = start;
-            let id = key(&item);
-            // A cancelled generation must finish dropping its futures before the next
-            // generation can write to the same destination or copy through SAF.
-            let work = async {
+            let result = {
                 let _execution = queue.execution.lock().await;
-                queue.run(item, options, epoch).await
-            };
-            let result = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => return,
-                result = work => result,
+                let work = async {
+                    queue.process_cleanup().await?;
+                    if let Some(item) = &item {
+                        ensure!(!cancel.is_cancelled(), "Download cancelled");
+                        queue.run(item.clone(), options, epoch, &cancel).await?;
+                    }
+                    Ok::<_, anyhow::Error>(())
+                }
+                .await;
+                let cleanup = queue.process_cleanup().await;
+                work.and(cleanup)
             };
             {
-                let mut state = queue.state.lock().unwrap_or_else(|e| e.into_inner());
-                if state.epoch != epoch {
-                    return;
+                let mut state = queue
+                    .state
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                if state
+                    .cancel
+                    .as_ref()
+                    .is_some_and(|active| Arc::ptr_eq(active, &cancel))
+                {
+                    state.cancel = None;
                 }
-                state.cancel = None;
-                if let Some(index) = state.items.iter().position(|v| key(v) == id) {
-                    match result {
-                        Ok(()) => {
-                            state.items.remove(index);
+                if state.epoch == epoch {
+                    if let Some(item) = &item {
+                        if let Some(index) = state
+                            .items
+                            .iter()
+                            .position(|row| row["_work"] == item["_work"])
+                        {
+                            match result {
+                                Ok(()) => {
+                                    state.items.remove(index);
+                                }
+                                Err(error) => {
+                                    state.running = false;
+                                    let row = &mut state.items[index];
+                                    row["_running"] = false.into();
+                                    row["_error"] = true.into();
+                                    row["_speed"] = 0.into();
+                                    row["message"] = format!("Error: {error:#}").into();
+                                }
+                            }
                         }
-                        Err(error) => {
-                            state.running = false;
-                            let item = &mut state.items[index];
-                            item["_running"] = false.into();
-                            item["_error"] = true.into();
-                            item["_speed"] = 0.into();
-                            item["message"] = format!("Error: {error:#}").into();
-                        }
+                    } else if result.is_err() {
+                        state.running = false;
                     }
                 }
                 if let Err(error) = queue.publish(&state, true) {
@@ -235,7 +394,16 @@ impl Queue {
                     eprintln!("Download queue persistence failed: {error}");
                 }
             }
-            queue.schedule();
+            // A failed cleanup is retried by an explicit command or a later open.
+            if queue
+                .state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .cleanup
+                .is_empty()
+            {
+                queue.schedule();
+            }
         });
     }
     fn update(&self, id: &str, epoch: u64, patch: Value, persist: bool) -> Result<()> {
@@ -251,27 +419,44 @@ impl Queue {
         }
         self.publish(&state, persist)
     }
-    pub fn resolve_platform(&self, id: &str, error: Option<String>) -> Result<()> {
+    pub fn resolve_platform(
+        &self,
+        id: &str,
+        error: Option<String>,
+        value: Option<String>,
+    ) -> Result<()> {
         if let Some(sender) = self
             .acknowledgements
             .lock()
             .map_err(|_| anyhow!("Queue poisoned"))?
             .remove(id)
         {
-            let _ = sender.send(error.map_or(Ok(()), |e| Err(anyhow!(e))));
+            let result = match error {
+                Some(error) => Err(anyhow!(error)),
+                None => value
+                    .map(|value| serde_json::from_str(&value).map_err(Into::into))
+                    .unwrap_or(Ok(Value::Null)),
+            };
+            let _ = sender.send(result);
         }
         Ok(())
     }
-    async fn platform_copy(&self, from: &str, to: &str) -> Result<()> {
+    pub(crate) async fn platform_operation(
+        &self,
+        operation: &str,
+        from: &Path,
+        to: Option<&Path>,
+    ) -> Result<Value> {
         let id = uuid::Uuid::new_v4().to_string();
         let (sender, receiver) = tokio::sync::oneshot::channel();
         self.acknowledgements
             .lock()
             .map_err(|_| anyhow!("Queue poisoned"))?
             .insert(id.clone(), sender);
-        self.platform
-            .send(json!({"id":id,"operation":"copyDirectory","from":from,"to":to}).to_string())
-            .await?;
+        if self.platform.send(json!({"id":id,"operation":operation,"from":from.to_string_lossy(),"to":to.map(|path|path.to_string_lossy())}).to_string()).await.is_err() {
+            self.acknowledgements.lock().unwrap_or_else(|error|error.into_inner()).remove(&id);
+            anyhow::bail!("Platform event listener stopped");
+        }
         receiver.await?
     }
     #[allow(clippy::too_many_arguments)]
@@ -285,8 +470,10 @@ impl Queue {
         thumbnail: bool,
         id: &str,
         epoch: u64,
+        cancellation: &HttpCancellation,
     ) -> Result<Vec<u8>> {
         for attempt in 0..3 {
+            ensure!(!cancellation.is_cancelled(), "Download cancelled");
             let task = crate::image_tasks::Task::start(
                 self.engine.clone(),
                 options.data_path.clone(),
@@ -298,23 +485,42 @@ impl Queue {
                 thumbnail,
                 false,
             )?;
-            let result=async {
-                let mut receiver=task.receiver.lock().await;let started=Instant::now();let mut last=Instant::now();
-                while let Some(progress)=receiver.recv().await {
-                    if let Some(error)=progress.error{return Err(anyhow!(error));}
-                    if let Some(bytes)=progress.bytes{return Ok(bytes);}
-                    if last.elapsed().as_millis()>300 {self.update(id,epoch,json!({"_speed":(progress.current as f64/started.elapsed().as_secs_f64().max(0.1)) as u64}),false)?;last=Instant::now();}
-                } Err(anyhow!("Image stream ended without data"))
-            }.await;
+            let work = async {
+                let mut receiver = task.receiver.lock().await;
+                let started = Instant::now();
+                let mut last = Instant::now();
+                while let Some(progress) = receiver.recv().await {
+                    if let Some(error) = progress.error {
+                        return Err(anyhow!(error));
+                    }
+                    if let Some(bytes) = progress.bytes {
+                        return Ok(bytes);
+                    }
+                    if last.elapsed().as_millis() > 300 {
+                        self.update(id,epoch,json!({"_speed":(progress.current as f64/started.elapsed().as_secs_f64().max(0.1)) as u64}),false)?;
+                        last = Instant::now();
+                    }
+                }
+                Err(anyhow!("Image stream ended without data"))
+            };
+            let result = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), result=work=>result };
             match result {
                 Ok(bytes) => return Ok(bytes),
                 Err(error) if attempt == 2 => return Err(error),
-                Err(_) => tokio::time::sleep(std::time::Duration::from_secs(attempt + 1)).await,
+                Err(_) => {
+                    tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), _=tokio::time::sleep(std::time::Duration::from_secs(attempt + 1))=>{} }
+                }
             }
         }
         unreachable!()
     }
-    async fn run(&self, mut item: Value, options: Options, epoch: u64) -> Result<()> {
+    async fn run(
+        &self,
+        mut item: Value,
+        options: Options,
+        epoch: u64,
+        cancellation: &Arc<HttpCancellation>,
+    ) -> Result<()> {
         let id = key(&item);
         let source = item["source"]
             .as_str()
@@ -324,7 +530,7 @@ impl Queue {
         // Child image tasks reuse this protection rather than acquiring a nested
         // read lock while an update is waiting for the download to finish.
         let source_lock = self.engine.source_lock(&source);
-        let _source_guard = source_lock.read_owned().await;
+        let _source_guard = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), guard=source_lock.read_owned()=>guard };
         let comic_id = item["comicId"]
             .as_str()
             .context("Missing comic id")?
@@ -337,6 +543,7 @@ impl Queue {
                     json!(source),
                     json!(comic_id)
                 ),
+                cancellation,
             )
             .await?;
             comic["comicId"] = comic_id.clone().into();
@@ -347,6 +554,8 @@ impl Queue {
         let comic = item["comic"].clone();
         let title = comic["title"].as_str().context("Missing comic title")?;
         let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
+        let comic_lock = format!("local-comic:{}:{comic_type}:{comic_id}", options.data_path);
+        let _comic_guard = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), guard=crate::http_policy::serial(&comic_lock)=>guard };
         let library = crate::local::LocalLibrary::open(&format!("{}/local.db", options.data_path))?;
         let existing = library.find(&comic_id, comic_type)?;
         drop(library);
@@ -361,13 +570,47 @@ impl Queue {
                 &uuid::Uuid::new_v4().to_string()[..8]
             ))
         };
-        let working = if options.saf {
-            Path::new(&options.data_path)
-                .join("download_work")
-                .join(format!("{:x}", md5::compute(&id)))
-        } else {
-            destination.clone()
-        };
+        let mut ownership = crate::download_files::Work::open(
+            options.clone(),
+            &item,
+            id.clone(),
+            destination.clone(),
+        )?;
+        if ownership.committed()? {
+            ownership.clean(self, true).await?;
+            return Ok(());
+        }
+        ownership.clean(self, false).await?;
+        let result = self
+            .transfer(item, options, epoch, cancellation, &mut ownership, existing)
+            .await;
+        let cleanup = ownership.clean(self, false).await;
+        result.and(cleanup)
+    }
+
+    async fn transfer(
+        &self,
+        item: Value,
+        options: Options,
+        epoch: u64,
+        cancellation: &Arc<HttpCancellation>,
+        ownership: &mut crate::download_files::Work,
+        existing: Option<crate::local::LocalComic>,
+    ) -> Result<()> {
+        let id = key(&item);
+        let source = item["source"]
+            .as_str()
+            .context("Missing source")?
+            .to_owned();
+        let comic_id = item["comicId"]
+            .as_str()
+            .context("Missing comic ID")?
+            .to_owned();
+        let comic_type = item["comicType"].as_i64().context("Missing comic type")? as i32;
+        let comic = item["comic"].clone();
+        let title = comic["title"].as_str().context("Missing comic title")?;
+        let destination = ownership.destination.clone();
+        let working = ownership.payload();
         fs::create_dir_all(&working)?;
         self.update(
             &id,
@@ -376,9 +619,7 @@ impl Queue {
             true,
         )?;
         let cover = if item["type"] == "ArchiveDownloadTask" {
-            let archive = Path::new(&options.data_path)
-                .join("download_work")
-                .join(format!("{:x}.zip", md5::compute(&id)));
+            let archive = ownership.archive();
             fs::create_dir_all(archive.parent().unwrap())?;
             let task = crate::api::download::FileDownload::start(
                 item["archiveUrl"]
@@ -390,19 +631,52 @@ impl Queue {
                 options.http.clone(),
             )
             .await?;
-            let mut finished = false;
-            while let Some(progress) = task.next_status().await? {
-                self.update(&id,epoch,json!({"_speed":progress.bytes_per_second,"downloadedCount":progress.downloaded_bytes,"totalCount":progress.total_bytes,"message":"Downloading archive..."}),false)?;
-                finished = progress.finished;
+            let download_result = async {
+                let mut finished = false;
+                loop {
+                    let progress = tokio::select! {
+                        _ = cancellation.cancelled() => return Err(anyhow!("Download cancelled")),
+                        progress = task.next_status() => progress?,
+                    };
+                    let Some(progress) = progress else {
+                        break;
+                    };
+                    self.update(
+                        &id,
+                        epoch,
+                        json!({
+                            "_speed": progress.bytes_per_second,
+                            "downloadedCount": progress.downloaded_bytes,
+                            "totalCount": progress.total_bytes,
+                            "message": "Downloading archive..."
+                        }),
+                        false,
+                    )?;
+                    finished = progress.finished;
+                }
+                ensure!(finished, "Archive download interrupted");
+                Ok::<_, anyhow::Error>(())
             }
-            ensure!(finished, "Archive download interrupted");
+            .await;
+            task.stop().await?;
+            download_result?;
             self.update(
                 &id,
                 epoch,
                 json!({"message":"Extracting archive..."}),
                 false,
             )?;
-            crate::archives::extract(&archive, &working)?;
+            let extract_archive = archive.clone();
+            let extract_working = working.clone();
+            let extract_cancel = cancellation.clone();
+            tokio::task::spawn_blocking(move || {
+                crate::archives::extract_cancellable(
+                    &extract_archive,
+                    &extract_working,
+                    &extract_cancel,
+                )
+            })
+            .await??;
             let _ = fs::remove_file(archive);
             let mut files = fs::read_dir(&working)?
                 .filter_map(|e| e.ok())
@@ -417,10 +691,13 @@ impl Queue {
                 .context("Archive contains no images")?
                 .clone()
         } else {
+            let saved_cover = ownership.existing_cover(self).await?;
             let cover = fs::read_dir(&working)?
                 .filter_map(|v| v.ok())
                 .find(|v| v.file_name().to_string_lossy().starts_with("cover."));
-            let cover = if let Some(cover) = cover {
+            let cover = if let Some(saved) = saved_cover {
+                saved
+            } else if let Some(cover) = cover {
                 cover.file_name().to_string_lossy().into_owned()
             } else {
                 let bytes = self
@@ -433,8 +710,10 @@ impl Queue {
                         true,
                         &id,
                         epoch,
+                        cancellation,
                     )
                     .await?;
+                ensure!(!cancellation.is_cancelled(), "Download cancelled");
                 let name = format!("cover.{}", extension(&bytes));
                 write_image(&working.join(&name), &bytes)?;
                 name
@@ -442,7 +721,7 @@ impl Queue {
             self.update(
                 &id,
                 epoch,
-                json!({"cover":format!("file://{}",working.join(&cover).display())}),
+                json!({"cover":format!("file://{}",if working.join(&cover).is_file(){working.join(&cover)}else{destination.join(&cover)}.display())}),
                 true,
             )?;
             let chapter_ids = if comic["chapters"].is_null() {
@@ -450,12 +729,33 @@ impl Queue {
             } else {
                 crate::local::chapter_ids(&comic["chapters"])
             };
+            for chapter in &chapter_ids {
+                if !chapter.is_empty() {
+                    let directory = crate::api::local::chapter_directory_name(chapter.clone());
+                    ensure!(
+                        crate::archives::safe_relative(&directory)?
+                            .components()
+                            .count()
+                            == 1,
+                        "Invalid chapter directory"
+                    );
+                }
+            }
             let selected = item["chapters"].as_array();
             let mut images = item["images"].as_object().cloned().unwrap_or_default();
-            for chapter in chapter_ids
-                .iter()
-                .filter(|c| selected.is_none_or(|s| s.contains(&json!(c))))
-            {
+            images.retain(|chapter, _| {
+                chapter_ids.contains(chapter)
+                    && selected.is_none_or(|selected| selected.contains(&json!(chapter)))
+                    && !existing
+                        .as_ref()
+                        .is_some_and(|comic| comic.downloaded_chapters.contains(chapter))
+            });
+            for chapter in chapter_ids.iter().filter(|c| {
+                selected.is_none_or(|s| s.contains(&json!(c)))
+                    && !existing
+                        .as_ref()
+                        .is_some_and(|comic| comic.downloaded_chapters.contains(c))
+            }) {
                 if !images.contains_key(chapter) {
                     self.update(
                         &id,
@@ -475,6 +775,7 @@ impl Queue {
                                 json!(chapter)
                             }
                         ),
+                        cancellation,
                     )
                     .await?;
                     ensure!(pages["images"].is_array(), "Invalid image list");
@@ -494,6 +795,7 @@ impl Queue {
                 json!({"totalCount":total,"downloadedCount":0}),
                 true,
             )?;
+            let chapterless = comic["chapters"].is_null();
             for (chapter, pages) in &images {
                 let directory = if comic["chapters"].is_null() {
                     working.clone()
@@ -509,14 +811,28 @@ impl Queue {
                     let source = &source;
                     let comic_id = &comic_id;
                     let options = &options;
+                    let ownership = &ownership;
                     async move {
-                        let exists = fs::read_dir(directory)?.filter_map(|e| e.ok()).any(|e| {
-                            e.path().is_file()
-                                && e.path()
-                                    .file_stem()
-                                    .is_some_and(|v| v == index.to_string().as_str())
-                                && is_image(&e.path())
-                        });
+                        let relative = if chapterless {
+                            PathBuf::new()
+                        } else {
+                            PathBuf::from(crate::api::local::chapter_directory_name(
+                                chapter.clone(),
+                            ))
+                        };
+                        let staged =
+                            fs::read_dir(directory)?
+                                .filter_map(|entry| entry.ok())
+                                .any(|entry| {
+                                    entry.path().is_file()
+                                        && entry
+                                            .path()
+                                            .file_stem()
+                                            .is_some_and(|stem| stem == index.to_string().as_str())
+                                        && is_image(&entry.path())
+                                });
+                        let exists =
+                            staged || ownership.existing_page(self, &relative, index).await?;
                         if !exists {
                             let bytes = self
                                 .image(
@@ -528,8 +844,10 @@ impl Queue {
                                     false,
                                     id,
                                     epoch,
+                                    cancellation,
                                 )
                                 .await?;
+                            ensure!(!cancellation.is_cancelled(), "Download cancelled");
                             write_image(
                                 &directory.join(format!("{index}.{}", extension(&bytes))),
                                 &bytes,
@@ -551,11 +869,8 @@ impl Queue {
             }
             cover
         };
-        if options.saf {
-            self.update(&id, epoch, json!({"message":"Saving files..."}), false)?;
-            self.platform_copy(&working.to_string_lossy(), &destination.to_string_lossy())
-                .await?;
-        }
+        self.update(&id, epoch, json!({"message":"Saving files..."}), false)?;
+        ownership.promote(self, cancellation).await?;
         let tags = comic["tags"]
             .as_object()
             .map(|tags| {
@@ -600,20 +915,24 @@ impl Queue {
         let state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
         ensure!(state.epoch == epoch, "Download cancelled");
         crate::local::LocalLibrary::open(&format!("{}/local.db", options.data_path))?
-            .save(record)?;
+            .save_download(record, &ownership.token)?;
         drop(state);
-        if options.saf {
-            let _ = fs::remove_dir_all(working);
-        }
         Ok(())
     }
 }
-async fn evaluate_with_retry(engine: &Engine, code: &str) -> Result<Value> {
+async fn evaluate_with_retry(
+    engine: &Engine,
+    code: &str,
+    cancellation: &HttpCancellation,
+) -> Result<Value> {
     for attempt in 0..3 {
-        match crate::image_tasks::evaluate(engine, code).await {
+        let result = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), result=crate::image_tasks::evaluate(engine,code)=>result };
+        match result {
             Ok(value) => return Ok(value),
             Err(error) if attempt == 2 => return Err(error),
-            Err(_) => tokio::time::sleep(std::time::Duration::from_secs(attempt + 1)).await,
+            Err(_) => {
+                tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), _=tokio::time::sleep(std::time::Duration::from_secs(attempt+1))=>{} }
+            }
         }
     }
     unreachable!()
@@ -638,6 +957,7 @@ fn write_image(path: &Path, bytes: &[u8]) -> Result<()> {
     let mut file = tempfile::NamedTempFile::new_in(path.parent().context("Missing directory")?)?;
     file.write_all(bytes)?;
     file.as_file().sync_all()?;
-    file.persist(path)?;
+    file.persist(path)
+        .with_context(|| format!("Cannot save image {}", path.display()))?;
     Ok(())
 }

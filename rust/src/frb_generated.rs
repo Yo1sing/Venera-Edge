@@ -529,7 +529,7 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_command_impl(
     rust_vec_len_: i32,
     data_len_: i32,
 ) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
             debug_name: "ComicDownloadQueue_command",
             port: Some(port_),
@@ -551,9 +551,9 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_command_impl(
             let api_key = <String>::sse_decode(&mut deserializer);
             let api_action = <String>::sse_decode(&mut deserializer);
             deserializer.end();
-            move |context| {
+            move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
-                    (move || {
+                    (move || async move {
                         let mut api_that_guard = None;
                         let decode_indices_ =
                             flutter_rust_bridge::for_generated::lockable_compute_decode_order(
@@ -563,7 +563,10 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_command_impl(
                             );
                         for i in decode_indices_ {
                             match i {
-                                0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
                                 _ => unreachable!(),
                             }
                         }
@@ -572,9 +575,11 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_command_impl(
                             &*api_that_guard,
                             api_key,
                             api_action,
-                        )?;
+                        )
+                        .await?;
                         Ok(output_ok)
-                    })(),
+                    })()
+                    .await,
                 )
             }
         },
@@ -843,6 +848,7 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_resolve_platform_impl(
             >>::sse_decode(&mut deserializer);
             let api_id = <String>::sse_decode(&mut deserializer);
             let api_error = <Option<String>>::sse_decode(&mut deserializer);
+            let api_value_json = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -866,6 +872,7 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_resolve_platform_impl(
                                 &*api_that_guard,
                                 api_id,
                                 api_error,
+                                api_value_json,
                             )?;
                         Ok(output_ok)
                     })(),

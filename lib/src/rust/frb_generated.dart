@@ -160,6 +160,7 @@ abstract class RustLibApi extends BaseApi {
     required ComicDownloadQueue that,
     required String id,
     String? error,
+    String? valueJson,
   });
 
   String crateApiComicQueueComicDownloadQueueSnapshot({
@@ -1598,6 +1599,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required ComicDownloadQueue that,
     required String id,
     String? error,
+    String? valueJson,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1609,6 +1611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(id, serializer);
           sse_encode_opt_String(error, serializer);
+          sse_encode_opt_String(valueJson, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1622,7 +1625,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         ),
         constMeta:
             kCrateApiComicQueueComicDownloadQueueResolvePlatformConstMeta,
-        argValues: [that, id, error],
+        argValues: [that, id, error, valueJson],
         apiImpl: this,
       ),
     );
@@ -1632,7 +1635,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiComicQueueComicDownloadQueueResolvePlatformConstMeta =>
       const TaskConstMeta(
         debugName: "ComicDownloadQueue_resolve_platform",
-        argNames: ["that", "id", "error"],
+        argNames: ["that", "id", "error", "valueJson"],
       );
 
   @override
@@ -10640,11 +10643,16 @@ class ComicDownloadQueueImpl extends RustOpaque implements ComicDownloadQueue {
   Future<String?> nextSnapshot() => RustLib.instance.api
       .crateApiComicQueueComicDownloadQueueNextSnapshot(that: this);
 
-  Future<void> resolvePlatform({required String id, String? error}) =>
+  Future<void> resolvePlatform({
+    required String id,
+    String? error,
+    String? valueJson,
+  }) =>
       RustLib.instance.api.crateApiComicQueueComicDownloadQueueResolvePlatform(
         that: this,
         id: id,
         error: error,
+        valueJson: valueJson,
       );
 
   String snapshot() => RustLib.instance.api

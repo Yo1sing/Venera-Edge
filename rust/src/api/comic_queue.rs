@@ -23,8 +23,8 @@ impl ComicDownloadQueue {
     pub fn add(&self, task_json: String) -> Result<()> {
         self.inner.add(serde_json::from_str(&task_json)?)
     }
-    pub fn command(&self, key: String, action: String) -> Result<()> {
-        self.inner.command(&key, &action)
+    pub async fn command(&self, key: String, action: String) -> Result<()> {
+        self.inner.command(&key, &action).await
     }
     #[flutter_rust_bridge::frb(sync)]
     pub fn snapshot(&self) -> String {
@@ -41,7 +41,12 @@ impl ComicDownloadQueue {
     pub async fn next_platform_event(&self) -> Option<String> {
         self.inner.platform_receiver.lock().await.recv().await
     }
-    pub fn resolve_platform(&self, id: String, error: Option<String>) -> Result<()> {
-        self.inner.resolve_platform(&id, error)
+    pub fn resolve_platform(
+        &self,
+        id: String,
+        error: Option<String>,
+        value_json: Option<String>,
+    ) -> Result<()> {
+        self.inner.resolve_platform(&id, error, value_json)
     }
 }

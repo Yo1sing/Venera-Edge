@@ -137,21 +137,75 @@ abstract class DownloadQueueView {
     }
   }
 
+  static Future<dynamic> handlePlatformOperation(
+    Map<String, dynamic> event,
+  ) async {
+    dynamic result;
+    final from = event['from'] as String;
+    final to = event['to'] as String?;
+    switch (event['operation']) {
+      case 'copyDirectory':
+        final target = Directory(to!);
+        await target.create(recursive: true);
+        await copyDirectoryIsolate(Directory(from), target);
+      case 'exists':
+        result = await File(from).exists() || await Directory(from).exists();
+      case 'listFiles':
+        result = await Directory(from)
+            .list()
+            .where((entry) => entry is File)
+            .map((entry) => entry.name)
+            .toList();
+      case 'readFile':
+        result = (await File(from).readAsBytes()).toList();
+      case 'createDirectory':
+        await Directory(from).create();
+      case 'moveFile':
+        if (await File(to!).exists() || await Directory(to).exists()) {
+          throw StateError('Destination already exists');
+        }
+        await File(from).rename(to);
+        if (!await File(to).exists() || await File(from).exists()) {
+          throw StateError('File move was not completed');
+        }
+      case 'removeFile':
+        await File(from).delete();
+        if (await File(from).exists()) {
+          throw StateError('File deletion was not completed');
+        }
+      case 'removeEmptyDirectory':
+        final directory = Directory(from);
+        if (await directory.list().isEmpty) await directory.delete();
+      case 'removeDirectory':
+        await Directory(from).delete(recursive: true);
+        if (await Directory(from).exists()) {
+          throw StateError('Directory deletion was not completed');
+        }
+      default:
+        throw StateError('Unknown download file operation');
+    }
+    return result;
+  }
+
   static Future<void> _platform() async {
     while (true) {
       final encoded = await _queue!.nextPlatformEvent();
       if (encoded == null) return;
       final event = jsonDecode(encoded);
       String? error;
+      dynamic result;
       try {
-        // Android document-provider I/O is a platform capability, not queue logic.
-        final target = Directory(event['to']);
-        await target.create(recursive: true);
-        await copyDirectoryIsolate(Directory(event['from']), target);
+        result = await handlePlatformOperation(
+          Map<String, dynamic>.from(event),
+        );
       } catch (e) {
         error = e.toString();
       }
-      await _queue!.resolvePlatform(id: event['id'], error: error);
+      await _queue!.resolvePlatform(
+        id: event['id'],
+        error: error,
+        valueJson: jsonEncode(result),
+      );
     }
   }
 

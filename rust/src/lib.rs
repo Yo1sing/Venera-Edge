@@ -20,6 +20,7 @@ mod backup;
 mod books;
 mod comic_archive;
 mod comic_queue;
+mod download_files;
 mod http_policy;
 mod image_tasks;
 mod imaging;

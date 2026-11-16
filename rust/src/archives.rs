@@ -33,6 +33,39 @@ fn destination(root: &Path, name: &str) -> Result<PathBuf> {
     Ok(path)
 }
 pub fn extract(input: &Path, output: &Path) -> Result<()> {
+    extract_impl(input, output, None)
+}
+
+pub(crate) fn extract_cancellable(
+    input: &Path,
+    output: &Path,
+    cancellation: &crate::api::http::HttpCancellation,
+) -> Result<()> {
+    extract_impl(input, output, Some(cancellation))
+}
+fn copy_cancellable(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    cancellation: Option<&crate::api::http::HttpCancellation>,
+) -> Result<()> {
+    let mut buffer = vec![0; 256 * 1024];
+    loop {
+        ensure!(
+            !cancellation.is_some_and(|cancel| cancel.is_cancelled()),
+            "Archive extraction cancelled"
+        );
+        let length = reader.read(&mut buffer)?;
+        if length == 0 {
+            return Ok(());
+        }
+        writer.write_all(&buffer[..length])?;
+    }
+}
+fn extract_impl(
+    input: &Path,
+    output: &Path,
+    cancellation: Option<&crate::api::http::HttpCancellation>,
+) -> Result<()> {
     fs::create_dir_all(output)?;
     ensure!(
         !fs::symlink_metadata(output)?.file_type().is_symlink(),
@@ -59,7 +92,7 @@ pub fn extract(input: &Path, output: &Path) -> Result<()> {
             } else {
                 fs::create_dir_all(target.parent().context("Missing parent")?)?;
                 let mut file = File::create(target)?;
-                std::io::copy(&mut entry, &mut file)?;
+                copy_cancellable(&mut entry, &mut file, cancellation)?;
             }
         }
     } else if signature == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c] {
@@ -71,7 +104,8 @@ pub fn extract(input: &Path, output: &Path) -> Result<()> {
             } else {
                 fs::create_dir_all(target.parent().unwrap()).map_err(sevenz_rust::Error::io)?;
                 let mut file = File::create(target).map_err(sevenz_rust::Error::io)?;
-                std::io::copy(reader, &mut file).map_err(sevenz_rust::Error::io)?;
+                copy_cancellable(&mut { reader }, &mut file, cancellation)
+                    .map_err(|error| sevenz_rust::Error::other(error.to_string()))?;
             }
             Ok(true)
         })?;
@@ -172,6 +206,36 @@ mod tests {
         for name in ["../escape", "/absolute", "C:/escape", "a/../../b", "a\\b"] {
             assert!(safe_relative(name).is_err());
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    #[test]
+    fn extraction_stops_between_chunks_and_returns_after_the_last_write() -> Result<()> {
+        struct CancellingReader<'a> {
+            cancellation: &'a crate::api::http::HttpCancellation,
+            reads: usize,
+        }
+        impl Read for CancellingReader<'_> {
+            fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+                self.reads += 1;
+                bytes.fill(7);
+                self.cancellation.cancel();
+                Ok(bytes.len())
+            }
+        }
+        let cancellation = crate::api::http::HttpCancellation::new();
+        let mut reader = CancellingReader {
+            cancellation: &cancellation,
+            reads: 0,
+        };
+        let mut output = Vec::new();
+        assert!(copy_cancellable(&mut reader, &mut output, Some(&cancellation)).is_err());
+        assert_eq!(reader.reads, 1);
+        assert_eq!(output.len(), 256 * 1024);
         Ok(())
     }
 }

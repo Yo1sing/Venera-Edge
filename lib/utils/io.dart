@@ -171,7 +171,7 @@ Future<void> copyDirectory(Directory source, Directory destination) async {
     } else if (content is Directory) {
       Directory newDirectory = Directory(newPath);
       newDirectory.createSync();
-      copyDirectory(content.absolute, newDirectory.absolute);
+      await copyDirectory(content.absolute, newDirectory.absolute);
     }
   }
 }
@@ -365,7 +365,7 @@ Future<void> saveFile(
 final class _IOOverrides extends IOOverrides {
   @override
   Directory createDirectory(String path) {
-    if (App.isAndroid) {
+    if (Platform.isAndroid) {
       var dir = AndroidDirectory.fromPathSync(path);
       if (dir == null) {
         return super.createDirectory(path);
@@ -381,7 +381,7 @@ final class _IOOverrides extends IOOverrides {
     if (path.startsWith("file://")) {
       path = path.substring(7);
     }
-    if (App.isAndroid) {
+    if (Platform.isAndroid) {
       var f = AndroidFile.fromPathSync(path);
       if (f == null) {
         return super.createFile(path);
