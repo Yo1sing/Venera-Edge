@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
+import 'package:venera/src/rust/api/http.dart';
 import 'package:venera/utils/ext.dart';
 
 String? _cachedProxy;
@@ -8,22 +9,47 @@ String? _cachedProxy;
 DateTime? _cachedProxyTime;
 
 Future<String?> getProxy() async {
+  final setting = (appdata.settings['proxy'] as String).removeAllBlank;
+  if (setting == 'direct') return null;
+  if (setting != 'system') return setting;
   if (_cachedProxyTime != null &&
       DateTime.now().difference(_cachedProxyTime!).inSeconds < 1) {
     return _cachedProxy;
   }
-  String? proxy = await _getProxy();
+  final proxy = await _readSystemProxy();
   _cachedProxy = proxy;
   _cachedProxyTime = DateTime.now();
   return proxy;
 }
 
-Future<String?> _getProxy() async {
-  if ((appdata.settings['proxy'] as String).removeAllBlank == "direct") {
-    return null;
+Future<HttpOptions> readHttpOptions({
+  int connectTimeoutMs = 15000,
+  int receiveTimeoutMs = 15000,
+  int maxRedirects = 5,
+}) async {
+  final overrides = <String, String>{};
+  final config = appdata.settings['dnsOverrides'];
+  if (appdata.settings['enableDnsOverrides'] == true && config is Map) {
+    for (final entry in config.entries) {
+      if (entry.key is String && entry.value is String) {
+        overrides[entry.key] = entry.value;
+      }
+    }
   }
-  if (appdata.settings['proxy'] != "system") return appdata.settings['proxy'];
+  final tlsSni = appdata.settings['sni'] != false;
+  final verifyCertificates = appdata.settings['ignoreBadCertificate'] != true;
+  return HttpOptions(
+    proxy: await getProxy(),
+    dnsOverrides: overrides,
+    tlsSni: tlsSni,
+    verifyCertificates: verifyCertificates,
+    connectTimeoutMs: connectTimeoutMs,
+    receiveTimeoutMs: receiveTimeoutMs,
+    maxRedirects: maxRedirects,
+  );
+}
 
+Future<String?> _readSystemProxy() async {
   String res;
   if (!App.isLinux) {
     const channel = MethodChannel("venera/method_channel");

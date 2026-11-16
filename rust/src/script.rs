@@ -1,3 +1,7 @@
+use crate::api::{
+    cookies::{CookieStore, StoredCookie},
+    http::{HttpHeader, SourceHttpOptions},
+};
 use anyhow::{anyhow, ensure, Context as _, Result};
 use rquickjs::{Context, Ctx, FromJs, Function, Runtime};
 use serde::{Deserialize, Serialize};
@@ -29,6 +33,15 @@ pub struct Options {
     #[serde(default)]
     pub cloudflare_user_agent: String,
     pub http: crate::api::http::HttpOptions,
+}
+
+impl Options {
+    fn cookie_path(&self) -> String {
+        PathBuf::from(&self.data_path)
+            .join("cookie.db")
+            .to_string_lossy()
+            .into_owned()
+    }
 }
 
 type Reply = mpsc::SyncSender<Result<String>>;
@@ -599,19 +612,7 @@ impl Host {
                     .try_send(json!({"event":"sourceChanged","key":key}).to_string());
                 Value::Null
             }
-            "cookie" => {
-                let mut cookies = crate::cookies::Cookies::open(
-                    &PathBuf::from(&self.options.data_path)
-                        .join("cookie.db")
-                        .to_string_lossy(),
-                )?;
-                let url = text(data, "url")?;
-                match text(data,"function")? {
-                    "get"=>Value::Array(cookies.load(url)?.into_iter().map(|c|json!({"name":c.name,"value":c.value,"domain":c.domain,"path":c.path,"expires":c.expires_ms,"max-age":c.max_age,"secure":c.secure,"httpOnly":c.http_only,"session":c.expires_ms.is_none()})).collect()),
-                    "set"=>{let values=data["cookies"].as_array().context("Missing cookies")?.iter().map(|c|Ok(crate::api::cookies::StoredCookie{name:text(c,"name")?.into(),value:text(c,"value")?.into(),domain:c["domain"].as_str().map(str::to_owned),path:c["path"].as_str().map(str::to_owned),expires_ms:None,max_age:None,secure:c["secure"]==true,http_only:c["httpOnly"]==true})).collect::<Result<_>>()?;cookies.save(url,values)?;Value::Null},
-                    "delete"=>{cookies.delete(url,None)?;Value::Null},_=>return Err(anyhow!("Unknown cookie operation")),
-                }
-            }
+            "cookie" => cookie(&self.options, data)?,
             "delay" => {
                 let delay = data["time"].as_u64().unwrap_or(0);
                 return Ok(self.asynchronous(async move {
@@ -754,95 +755,75 @@ pub fn update_source(
     Ok(())
 }
 
+fn cookie(options: &Options, data: &Value) -> Result<Value> {
+    let store = CookieStore::open(options.cookie_path())?;
+    let url = text(data, "url")?.to_owned();
+    match text(data, "function")? {
+        "get" => Ok(Value::Array(store.load(url)?.into_iter().map(|cookie| json!({
+            "name": cookie.name, "value": cookie.value, "domain": cookie.domain,
+            "path": cookie.path, "expires": cookie.expires_ms, "max-age": cookie.max_age,
+            "secure": cookie.secure, "httpOnly": cookie.http_only,
+            "session": cookie.expires_ms.is_none()
+        })).collect())),
+        "set" => {
+            let cookies = data["cookies"].as_array().context("Missing cookies")?
+                .iter().map(|cookie| Ok(StoredCookie {
+                    name: text(cookie, "name")?.into(),
+                    value: text(cookie, "value")?.into(),
+                    domain: cookie["domain"].as_str().map(str::to_owned),
+                    path: cookie["path"].as_str().map(str::to_owned),
+                    expires_ms: cookie["expires"].as_i64(),
+                    max_age: cookie["max-age"].as_i64(),
+                    secure: cookie["secure"] == true,
+                    http_only: cookie["httpOnly"] == true,
+                })).collect::<Result<_>>()?;
+            store.save(url, cookies)?;
+            Ok(Value::Null)
+        }
+        "delete" => {
+            store.delete(url, None)?;
+            Ok(Value::Null)
+        }
+        _ => Err(anyhow!("Unknown cookie operation")),
+    }
+}
+
 async fn http(options: &Options, data: &Value) -> Result<Value> {
-    let url = text(data, "url")?;
-    let mut request =
-        crate::api::http::client(&options.http)?.request(text(data, "http_method")?.parse()?, url);
-    let headers = data["headers"].as_object();
-    let mut has_agent = false;
-    let mut has_cookie = false;
-    if let Some(headers) = headers {
-        for (key, value) in headers {
-            if ["cache-time", "prevent-parallel", "http_client"]
-                .contains(&key.to_lowercase().as_str())
-            {
-                continue;
-            }
-            has_agent |= key.eq_ignore_ascii_case("user-agent");
-            has_cookie |= key.eq_ignore_ascii_case("cookie");
-            request = request.header(
-                key,
-                value
-                    .as_str()
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| value.to_string()),
-            );
-        }
-    }
-    if !has_agent {
-        request = request.header("User-Agent", &options.user_agent);
-    }
-    let cookie_path = PathBuf::from(&options.data_path)
-        .join("cookie.db")
-        .to_string_lossy()
-        .into_owned();
-    if !has_cookie {
-        let cookie = crate::cookies::Cookies::open(&cookie_path)?
-            .load(url)?
-            .iter()
-            .map(|c| format!("{}={}", c.name, c.value))
-            .collect::<Vec<_>>()
-            .join("; ");
-        if cookie.contains("cf_clearance=") && !options.cloudflare_user_agent.is_empty() {
-            request = request.header("User-Agent", &options.cloudflare_user_agent);
-        }
-        if !cookie.is_empty() {
-            request = request.header("Cookie", cookie);
-        }
-    }
-    let body = &data["data"];
-    if let Some(text) = body.as_str() {
-        request = request.body(text.to_owned());
-    } else if body.get("$bytes").is_some() || body.is_array() {
-        request = request.body(crate::script_crypto::bytes(body)?);
-    } else if body.is_object() {
-        let form = headers
-            .and_then(|v| {
-                v.iter()
-                    .find(|(k, _)| k.eq_ignore_ascii_case("content-type"))
-            })
-            .and_then(|(_, v)| v.as_str())
-            .is_some_and(|v| v.contains("application/x-www-form-urlencoded"));
-        if form {
-            request = request.form(body.as_object().unwrap());
-        } else {
-            request = request
-                .header("Content-Type", "application/json")
-                .body(body.to_string());
-        }
-    }
-    let request = request.build()?;
-    let mut request_headers: Vec<_> = request
-        .headers()
-        .iter()
-        .map(|(k, v)| crate::api::http::HttpHeader {
-            name: k.to_string(),
-            value: String::from_utf8_lossy(v.as_bytes()).into_owned(),
+    let mut headers: Vec<_> = data["headers"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(name, value)| HttpHeader {
+            name: name.clone(),
+            value: value
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| value.to_string()),
         })
         .collect();
-    if let Some(headers) = data["headers"].as_object() {
-        for (key, value) in headers {
-            if crate::http_policy::is_policy(key) {
-                request_headers.push(crate::api::http::HttpHeader {
-                    name: key.clone(),
-                    value: value
-                        .as_str()
-                        .map(str::to_owned)
-                        .unwrap_or_else(|| value.to_string()),
-                });
+    let body = &data["data"];
+    let body = if let Some(text) = body.as_str() {
+        Some(text.as_bytes().to_vec())
+    } else if body.get("$bytes").is_some() || body.is_array() {
+        Some(crate::script_crypto::bytes(body)?)
+    } else if body.is_object() {
+        match crate::http_policy::header(&headers, "content-type") {
+            Some(value) if value.contains("application/x-www-form-urlencoded") => {
+                Some(serde_urlencoded::to_string(body.as_object().unwrap())?.into_bytes())
+            }
+            content_type => {
+                if content_type.is_none() {
+                    headers.push(HttpHeader {
+                        name: "content-type".into(),
+                        value: "application/json".into(),
+                    });
+                }
+                Some(serde_json::to_vec(body)?)
             }
         }
-    }
+    } else {
+        None
+    };
     let image_request = data["_requestId"]
         .as_str()
         .and_then(crate::image_tasks::request);
@@ -850,24 +831,28 @@ async fn http(options: &Options, data: &Value) -> Result<Value> {
         .as_ref()
         .map(|r| r.cancellation.clone())
         .unwrap_or_else(|| Arc::new(crate::api::http::HttpCancellation::new()));
-    let response = crate::api::http::http_request(
-        request.url().to_string(),
-        request.method().to_string(),
-        request_headers,
-        request.body().and_then(|v| v.as_bytes().map(Vec::from)),
+    let cookie_path = options.cookie_path();
+    let http = crate::http_policy::source_options(&cookie_path, &options.http);
+    let response = crate::api::http::source_http_request(
+        text(data, "url")?.into(),
+        text(data, "http_method")?.into(),
+        headers,
+        body,
         &crate::api::http::HttpUpload::new(),
         false,
-        options.http.clone(),
+        http,
+        SourceHttpOptions {
+            cookie_path,
+            user_agent: options.user_agent.clone(),
+            legacy_clearance_user_agent: (!options.cloudflare_user_agent.is_empty())
+                .then(|| options.cloudflare_user_agent.clone()),
+        },
         &cancellation,
     )
     .await?;
     let status = response.status();
     let mut headers = HashMap::<String, String>::new();
-    let mut cookies = Vec::new();
     for header in response.headers() {
-        if header.name.eq_ignore_ascii_case("set-cookie") {
-            cookies.push(header.value.clone());
-        }
         headers
             .entry(header.name)
             .and_modify(|v| {
@@ -876,15 +861,6 @@ async fn http(options: &Options, data: &Value) -> Result<Value> {
             })
             .or_insert(header.value);
     }
-    if status == 403
-        && headers
-            .get("cf-mitigated")
-            .is_some_and(|v| v == "challenge")
-    {
-        response.close().await;
-        return Err(anyhow!("CloudflareException: {url}"));
-    }
-    crate::cookies::Cookies::open(&cookie_path)?.save_headers(&response.url(), cookies)?;
     let mut bytes = Vec::new();
     let total = headers
         .get("content-length")

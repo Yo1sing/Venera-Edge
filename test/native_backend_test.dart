@@ -6,8 +6,15 @@ import 'package:venera/src/rust/api/favorites.dart' as favorites;
 import 'package:venera/src/rust/api/tags.dart' as tags;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
+import 'package:venera/foundation/consts.dart';
+import 'package:venera/foundation/log.dart';
+import 'package:venera/foundation/script_bridge.dart';
 import 'package:venera/network/app_dio.dart';
+import 'package:venera/network/cloudflare.dart';
+import 'package:venera/network/cookie_jar.dart';
+import 'package:venera/src/rust/api/script.dart';
 import 'package:venera/src/rust/frb_generated.dart';
 
 void main() {
@@ -27,6 +34,100 @@ void main() {
 
   tearDownAll(() {
     RustLib.dispose();
+  });
+
+  test('Dio and source scripts share cookies and challenge errors', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'venera-source-http',
+    );
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final base = 'http://127.0.0.1:${server.port}';
+    final subscription = server.listen((request) async {
+      request.response.headers.set('cache-control', 'no-store');
+      switch (request.uri.path) {
+        case '/challenge':
+          request.response.statusCode = 403;
+          request.response.headers.set('cf-mitigated', 'challenge');
+        case '/login':
+          request.response.headers.add('set-cookie', 'account=one; Path=/');
+        case '/switch':
+          request.response.headers.add('set-cookie', 'account=two; Path=/');
+        default:
+          request.response.write(
+            request.headers.value('cookie') ?? 'anonymous',
+          );
+      }
+      expect(request.headers.value('user-agent'), webUA);
+      await request.response.close();
+    });
+    final runtime = await ScriptRuntime.open(
+      optionsJson: jsonEncode({
+        'data_path': directory.path,
+        'version': '1.0.0',
+        'locale': 'en_US',
+        'platform': 'test',
+        'user_agent': webUA,
+        'http': {
+          'proxy': null,
+          'dns_overrides': {},
+          'tls_sni': true,
+          'verify_certificates': true,
+          'connect_timeout_ms': 15000,
+          'receive_timeout_ms': 15000,
+          'max_redirects': 5,
+        },
+      }),
+    );
+    final session = ScriptSession(runtime);
+    final wasInitialized = App.isInitialized;
+    final wasLogMuted = Log.isMuted;
+    final oldJar = SingleInstanceCookieJar.instance;
+    SingleInstanceCookieJar.instance = null;
+    final jar = SingleInstanceCookieJar('${directory.path}/cookie.db');
+    App.isInitialized = true;
+    Log.isMuted = true;
+    final dio = AppDio();
+    Future<dynamic> scriptGet(String path) async =>
+        session.evaluate('Network.get(${jsonEncode('$base$path')})');
+    try {
+      await expectLater(
+        dio.get<void>('$base/challenge'),
+        throwsA(
+          isA<CloudflareException>().having(
+            (error) => error.url,
+            'url',
+            '$base/challenge',
+          ),
+        ),
+      );
+      await expectLater(
+        scriptGet('/challenge'),
+        throwsA(
+          predicate(
+            (Object? error) =>
+                CloudflareException.fromString(error.toString())?.url ==
+                '$base/challenge',
+          ),
+        ),
+      );
+      await scriptGet('/login');
+      expect((await dio.get<String>('$base/account')).data, 'account=one');
+      await dio.get<void>('$base/switch');
+      expect((await scriptGet('/account'))['body'], 'account=two');
+      jar.deleteAll();
+      expect((await scriptGet('/account'))['body'], 'anonymous');
+    } finally {
+      dio.close(force: true);
+      session.close();
+      runtime.dispose();
+      jar.pause();
+      SingleInstanceCookieJar.instance = oldJar;
+      App.isInitialized = wasInitialized;
+      Log.isMuted = wasLogMuted;
+      await subscription.cancel();
+      await server.close(force: true);
+      await directory.delete(recursive: true);
+    }
   });
 
   test('Dio adapter streams binary response through Rust', () async {

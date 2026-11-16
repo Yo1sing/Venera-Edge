@@ -6,7 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `with`
+// These functions are ignored because they are not marked as `pub`: `lock`, `mutate`, `next_generation`, `request_cookies`, `save_response`, `with`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `State`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CookieStore>>
@@ -15,7 +16,16 @@ abstract class CookieStore implements RustOpaqueInterface {
 
   void close();
 
+  bool completeCloudflare({
+    required String url,
+    required List<StoredCookie> cookies,
+    required String userAgent,
+    required int generation,
+  });
+
   void delete({required String url, String? name});
+
+  int generation();
 
   String header({required String url});
 
@@ -24,9 +34,18 @@ abstract class CookieStore implements RustOpaqueInterface {
   static CookieStore open({required String path}) =>
       RustLib.instance.api.crateApiCookiesCookieStoreOpen(path: path);
 
+  void reopen();
+
   void save({required String url, required List<StoredCookie> cookies});
 
   void saveHeaders({required String url, required List<String> headers});
+
+  bool saveWebview({
+    required String url,
+    required List<StoredCookie> cookies,
+    String? userAgent,
+    required int generation,
+  });
 }
 
 class StoredCookie {

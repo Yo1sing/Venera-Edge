@@ -6,9 +6,23 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `body`, `cancelled`, `client`, `is_cancelled`
+// These functions are ignored because they are not marked as `pub`: `body`, `cancelled`, `client`, `is_cancelled`, `partition`, `request`, `transport_error`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ResponseState`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`
+
+void configureSourceHttp({
+  required String cookiePath,
+  required HttpOptions options,
+}) => RustLib.instance.api.crateApiHttpConfigureSourceHttp(
+  cookiePath: cookiePath,
+  options: options,
+);
+
+bool isCloudflareChallengePage({required String head, required String body}) =>
+    RustLib.instance.api.crateApiHttpIsCloudflareChallengePage(
+      head: head,
+      body: body,
+    );
 
 Future<HttpResponse> httpRequest({
   required String url,
@@ -27,6 +41,28 @@ Future<HttpResponse> httpRequest({
   upload: upload,
   hasUpload: hasUpload,
   options: options,
+  cancellation: cancellation,
+);
+
+Future<HttpResponse> sourceHttpRequest({
+  required String url,
+  required String method,
+  required List<HttpHeader> headers,
+  Uint8List? body,
+  required HttpUpload upload,
+  required bool hasUpload,
+  required HttpOptions options,
+  required SourceHttpOptions source,
+  required HttpCancellation cancellation,
+}) => RustLib.instance.api.crateApiHttpSourceHttpRequest(
+  url: url,
+  method: method,
+  headers: headers,
+  body: body,
+  upload: upload,
+  hasUpload: hasUpload,
+  options: options,
+  source: source,
   cancellation: cancellation,
 );
 
@@ -131,4 +167,31 @@ class HttpOptions {
           connectTimeoutMs == other.connectTimeoutMs &&
           receiveTimeoutMs == other.receiveTimeoutMs &&
           maxRedirects == other.maxRedirects;
+}
+
+class SourceHttpOptions {
+  final String cookiePath;
+  final String userAgent;
+  final String? legacyClearanceUserAgent;
+
+  const SourceHttpOptions({
+    required this.cookiePath,
+    required this.userAgent,
+    this.legacyClearanceUserAgent,
+  });
+
+  @override
+  int get hashCode =>
+      cookiePath.hashCode ^
+      userAgent.hashCode ^
+      legacyClearanceUserAgent.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SourceHttpOptions &&
+          runtimeType == other.runtimeType &&
+          cookiePath == other.cookiePath &&
+          userAgent == other.userAgent &&
+          legacyClearanceUserAgent == other.legacyClearanceUserAgent;
 }

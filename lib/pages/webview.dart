@@ -10,7 +10,6 @@ import 'package:venera/components/components.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/appdata.dart';
 import 'package:venera/network/proxy.dart';
-import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/translations.dart';
 import 'dart:io' as io;
 
@@ -18,13 +17,8 @@ export 'package:flutter_inappwebview/flutter_inappwebview.dart'
     show WebUri, URLRequest;
 
 extension WebviewExtension on InAppWebViewController {
-  Future<List<io.Cookie>?> getCookies(String url) async {
-    if (url.contains("https://")) {
-      url.replaceAll("https://", "");
-    }
-    if (url[url.length - 1] == '/') {
-      url = url.substring(0, url.length - 1);
-    }
+  Future<List<io.Cookie>> getCookies(String url) async {
+    final uri = Uri.parse(url);
     CookieManager cookieManager = CookieManager.instance(
       webViewEnvironment: AppWebview.webViewEnvironment,
     );
@@ -34,16 +28,22 @@ extension WebviewExtension on InAppWebViewController {
     );
     var res = <io.Cookie>[];
     for (var cookie in cookies) {
-      var c = io.Cookie(cookie.name, cookie.value);
-      c.domain = cookie.domain;
-      res.add(c);
+      final expires = cookie.expiresDate;
+      res.add(io.Cookie(cookie.name, cookie.value.toString())
+        ..domain = cookie.domain
+        ..path = cookie.path
+        ..expires = expires == null || cookie.isSessionOnly == true
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(expires)
+        ..secure = cookie.isSecure ?? (uri.scheme == 'https')
+        ..httpOnly = cookie.isHttpOnly ?? false);
     }
     return res;
   }
 
   Future<String?> getUA() async {
     var res = await evaluateJavascript(source: "navigator.userAgent");
-    if (res is String) {
+    if (res is String && res.length >= 2) {
       if (res[0] == "'" || res[0] == "\"") {
         res = res.substring(1, res.length - 1);
       }
@@ -93,21 +93,21 @@ class _AppWebviewState extends State<AppWebview> {
 
   Future<bool> _createWebviewEnvironment() async {
     var proxy = appdata.settings['proxy'].toString();
-    if (proxy != "system" && proxy != "direct") {
-      var proxyAvailable = await WebViewFeature.isFeatureSupported(
+    if (App.isAndroid) {
+      final proxyAvailable = await WebViewFeature.isFeatureSupported(
         WebViewFeature.PROXY_OVERRIDE,
       );
       if (proxyAvailable) {
-        ProxyController proxyController = ProxyController.instance();
+        final proxyController = ProxyController.instance();
         await proxyController.clearProxyOverride();
-        if (!proxy.contains("://")) {
-          proxy = "http://$proxy";
+        if (proxy != "system" && proxy != "direct") {
+          if (!proxy.contains("://")) {
+            proxy = "http://$proxy";
+          }
+          await proxyController.setProxyOverride(
+            settings: ProxySettings(proxyRules: [ProxyRule(url: proxy)]),
+          );
         }
-        await proxyController.setProxyOverride(
-          settings: ProxySettings(
-            proxyRules: [ProxyRule(url: proxy)],
-          ),
-        );
       }
     }
     if (!App.isWindows) {
@@ -302,7 +302,7 @@ class DesktopWebview {
     });
   }
 
-  void open() async {
+  Future<void> open() async {
     _webview = await WebviewWindow.create(
         configuration: CreateConfiguration(
       useWindowPositionAndSize: true,
@@ -332,37 +332,27 @@ class DesktopWebview {
     return _webview!.evaluateJavaScript(source);
   }
 
-  Future<Map<String, String>> getCookies(String url) async {
-    var allCookies = await _webview!.getAllCookies();
-    var res = <String, String>{};
-    for (var c in allCookies) {
-      if (_cookieMatch(url, c.domain)) {
-        res[_removeCode0(c.name)] = _removeCode0(c.value);
-      }
-    }
-    return res;
+  Future<List<io.Cookie>> readCookies() async {
+    final cookies = await _webview!.getAllCookies();
+    return [
+      for (final cookie in cookies)
+        io.Cookie(_removeCode0(cookie.name), _removeCode0(cookie.value))
+          ..domain = _removeCode0(cookie.domain)
+          ..path = _removeCode0(cookie.path)
+          // The Linux plugin reports Unix epoch for unset GDateTime expiry.
+          ..expires = cookie.sessionOnly ||
+                  (App.isLinux && cookie.expires?.millisecondsSinceEpoch == 0)
+              ? null
+              : cookie.expires
+          ..secure = cookie.secure
+          ..httpOnly = cookie.httpOnly,
+    ];
   }
 
   String _removeCode0(String s) {
     var codeUints = List<int>.from(s.codeUnits);
     codeUints.removeWhere((e) => e == 0);
     return String.fromCharCodes(codeUints);
-  }
-
-  bool _cookieMatch(String url, String domain) {
-    domain = _removeCode0(domain);
-    var host = Uri.parse(url).host;
-    var acceptedHost = _getAcceptedDomains(host);
-    return acceptedHost.contains(domain.removeAllBlank);
-  }
-
-  List<String> _getAcceptedDomains(String host) {
-    var acceptedDomains = <String>[host];
-    var hostParts = host.split(".");
-    for (var i = 0; i < hostParts.length - 1; i++) {
-      acceptedDomains.add(".${hostParts.sublist(i).join(".")}");
-    }
-    return acceptedDomains;
   }
 
   void close() {

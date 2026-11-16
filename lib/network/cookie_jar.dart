@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/src/rust/api/cookies.dart';
 
@@ -8,38 +7,56 @@ import 'package:venera/src/rust/api/cookies.dart';
 /// Persistence, expiry and request matching are owned by Rust.
 class CookieJarSql {
   final String path;
-  CookieStore? _store;
+  late final CookieStore _store = CookieStore.open(path: path);
 
   CookieJarSql(this.path) {
     init();
   }
 
-  void init() {
-    _store?.close();
-    _store = CookieStore.open(path: path);
-  }
+  void init() => reopen();
 
-  void saveFromResponse(Uri uri, List<Cookie> cookies) {
-    _store!.save(
-      url: uri.toString(),
-      cookies: cookies
-          .map(
-            (cookie) => StoredCookie(
-              name: cookie.name,
-              value: cookie.value,
-              domain: cookie.domain,
-              path: cookie.path,
-              expiresMs: cookie.expires?.millisecondsSinceEpoch,
-              secure: cookie.secure,
-              httpOnly: cookie.httpOnly,
-              maxAge: cookie.maxAge,
-            ),
-          )
-          .toList(),
-    );
-  }
+  bool saveFromWebview(
+    Uri uri,
+    List<Cookie> cookies, {
+    required int generation,
+    String? userAgent,
+  }) => _store.saveWebview(
+    url: uri.toString(),
+    cookies: _toStoredCookies(cookies),
+    userAgent: userAgent,
+    generation: generation,
+  );
 
-  List<Cookie> loadForRequest(Uri uri) => _store!
+  int get generation => _store.generation();
+
+  bool completeCloudflare(
+    String url,
+    List<Cookie> cookies,
+    String userAgent,
+    int generation,
+  ) => _store.completeCloudflare(
+    url: url,
+    cookies: _toStoredCookies(cookies),
+    userAgent: userAgent,
+    generation: generation,
+  );
+
+  List<StoredCookie> _toStoredCookies(List<Cookie> cookies) => cookies
+      .map(
+        (cookie) => StoredCookie(
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.domain,
+          path: cookie.path,
+          expiresMs: cookie.expires?.millisecondsSinceEpoch,
+          secure: cookie.secure,
+          httpOnly: cookie.httpOnly,
+          maxAge: cookie.maxAge,
+        ),
+      )
+      .toList();
+
+  List<Cookie> loadForRequest(Uri uri) => _store
       .load(url: uri.toString())
       .map(
         (cookie) => Cookie(cookie.name, cookie.value)
@@ -54,22 +71,23 @@ class CookieJarSql {
       .toList();
 
   void saveFromResponseCookieHeader(Uri uri, List<String> headers) =>
-      _store!.saveHeaders(url: uri.toString(), headers: headers);
+      _store.saveHeaders(url: uri.toString(), headers: headers);
 
   String loadForRequestCookieHeader(Uri uri) =>
-      _store!.header(url: uri.toString());
+      _store.header(url: uri.toString());
 
   void delete(Uri uri, String name) =>
-      _store!.delete(url: uri.toString(), name: name);
+      _store.delete(url: uri.toString(), name: name);
 
-  void deleteUri(Uri uri) => _store!.delete(url: uri.toString());
+  void deleteUri(Uri uri) => _store.delete(url: uri.toString());
 
-  void deleteAll() => _store!.clear();
+  void deleteAll() => _store.clear();
 
-  void dispose() {
-    _store?.close();
-    _store = null;
-  }
+  void pause() => _store.close();
+
+  void reopen() => _store.reopen();
+
+  void dispose() => pause();
 }
 
 class SingleInstanceCookieJar extends CookieJarSql {
@@ -87,37 +105,5 @@ class SingleInstanceCookieJar extends CookieJarSql {
     var dataPath = (await getApplicationSupportDirectory()).path;
     instance = SingleInstanceCookieJar("$dataPath/cookie.db");
     return instance!;
-  }
-}
-
-class CookieManagerSql extends Interceptor {
-  final CookieJarSql cookieJar;
-
-  CookieManagerSql(this.cookieJar);
-
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    var cookies = cookieJar.loadForRequestCookieHeader(options.uri);
-    if (cookies.isNotEmpty) {
-      if (options.headers["cookie"] != null) {
-        cookies = "${options.headers["cookie"]}; $cookies";
-      }
-      options.headers["cookie"] = cookies;
-    }
-    handler.next(options);
-  }
-
-  @override
-  void onResponse(Response response, ResponseInterceptorHandler handler) {
-    cookieJar.saveFromResponseCookieHeader(
-      response.requestOptions.uri,
-      response.headers["set-cookie"] ?? [],
-    );
-    handler.next(response);
-  }
-
-  @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    handler.next(err);
   }
 }
