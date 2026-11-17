@@ -8,12 +8,8 @@ import 'package:venera/foundation/log.dart';
 import 'package:venera/pages/comic_details_page/comic_page.dart';
 import 'package:venera/pages/downloading_page.dart';
 import 'package:venera/pages/favorites/favorites_page.dart';
-import 'package:venera/utils/cbz.dart';
-import 'package:venera/utils/epub.dart';
 import 'package:venera/utils/io.dart';
-import 'package:venera/utils/pdf.dart';
 import 'package:venera/utils/translations.dart';
-import 'package:venera/src/rust/api/archive.dart' as archive;
 import 'package:url_launcher/url_launcher_string.dart';
 
 class LocalComicsPage extends StatefulWidget {
@@ -450,102 +446,41 @@ class _LocalComicsPageState extends State<LocalComicsPage> {
         icon: Icons.outbox_outlined,
         text: "Export as cbz".tl,
         onClick: () {
-          exportComics(comics, CBZ.export, ".cbz");
+          exportComics(comics, "cbz");
         },
       ),
       MenuEntry(
         icon: Icons.picture_as_pdf_outlined,
         text: "Export as pdf".tl,
         onClick: () async {
-          exportComics(comics, createPdfFromComicIsolate, ".pdf");
+          exportComics(comics, "pdf");
         },
       ),
       MenuEntry(
         icon: Icons.import_contacts_outlined,
         text: "Export as epub".tl,
         onClick: () async {
-          exportComics(comics, createEpubWithLocalComic, ".epub");
+          exportComics(comics, "epub");
         },
       )
     ];
   }
 
-  /// Export given comics to a file
-  void exportComics(
-      List<LocalComic> comics, ExportComicFunc export, String ext) async {
-    var current = 0;
-    var cacheDir = FilePath.join(App.cachePath, 'comics_export');
-    var outFile = FilePath.join(App.cachePath, 'comics_export.zip');
-    bool canceled = false;
-    if (Directory(cacheDir).existsSync()) {
-      Directory(cacheDir).deleteSync(recursive: true);
-    }
-    Directory(cacheDir).createSync();
-    var loadingController = showLoadingDialog(
-      context,
-      allowCancel: true,
-      message: "${"Exporting".tl} $current/${comics.length}",
-      withProgress: comics.length > 1,
-      onCancel: () {
-        canceled = true;
-      },
-    );
+  Future<void> exportComics(List<LocalComic> comics, String format) async {
     try {
-      var fileName = "";
-      // For each comic, export it to a file
-      for (var comic in comics) {
-        fileName = FilePath.join(
-          cacheDir,
-          sanitizeFileName(comic.title, maxLength: 100) + ext,
-        );
-        await export(comic, fileName);
-        current++;
-        if (comics.length > 1) {
-          loadingController
-              .setMessage("${"Exporting".tl} $current/${comics.length}");
-          loadingController.setProgress(current / comics.length);
-        }
-        if (canceled) {
-          return;
-        }
-      }
-      // For single comic, just save the file
-      if (comics.length == 1) {
-        await saveFile(
-          file: File(fileName),
-          filename: File(fileName).name,
-        );
-        Directory(cacheDir).deleteSync(recursive: true);
-        loadingController.close();
-        return;
-      }
-      // For multiple comics, compress the folder
-      loadingController.setProgress(null);
-      loadingController.setMessage("Compressing".tl);
-      await archive.compressFolder(input: cacheDir, output: outFile);
-      if (canceled) {
-        File(outFile).deleteIgnoreError();
-        return;
-      }
-    } catch (e, s) {
-      Log.error("Export Comics", e, s);
-      context.showMessage(message: e.toString());
-      loadingController.close();
-      return;
-    } finally {
-      Directory(cacheDir).deleteIgnoreError(recursive: true);
+      await LocalManager().runOperation({
+        'mode': 'export',
+        'format': format,
+        'keys': [
+          for (final comic in comics) {'id': comic.id, 'type': comic.comicType.value},
+        ],
+      });
+    } catch (error, stack) {
+      Log.error('Export Comics', error, stack);
+      if (mounted) context.showMessage(message: error.toString());
     }
-    await saveFile(
-      file: File(outFile),
-      filename: "comics_export.zip",
-    );
-    loadingController.close();
-    File(outFile).deleteIgnoreError();
   }
 }
-
-typedef ExportComicFunc = Future<File> Function(
-    LocalComic comic, String outFilePath);
 
 /// Opens the folder containing the comic in the system file explorer
 Future<void> openComicFolder(LocalComic comic) async {

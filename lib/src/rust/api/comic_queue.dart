@@ -15,6 +15,11 @@ abstract class ComicDownloadQueue implements RustOpaqueInterface {
 
   Future<void> configure({required String optionsJson});
 
+  Future<String> moveStorage({
+    required String destination,
+    required bool android,
+  });
+
   Future<String?> nextPlatformEvent();
 
   Future<String?> nextSnapshot();

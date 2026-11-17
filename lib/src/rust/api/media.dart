@@ -7,6 +7,26 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'script.dart';
 
+// These functions are ignored because they are not marked as `pub`: `write_book`
+
+Future<void> invalidateViewImage({
+  required String dataPath,
+  required String cachePath,
+  required String requestJson,
+}) => RustLib.instance.api.crateApiMediaInvalidateViewImage(
+  dataPath: dataPath,
+  cachePath: cachePath,
+  requestJson: requestJson,
+);
+
+Future<void> deleteLegacyFavoriteCovers({
+  required String dataPath,
+  required List<int> hashes,
+}) => RustLib.instance.api.crateApiMediaDeleteLegacyFavoriteCovers(
+  dataPath: dataPath,
+  hashes: hashes,
+);
+
 Future<void> deleteFavoriteImageCache({
   required String cachePath,
   required String favoriteJson,
@@ -70,6 +90,20 @@ abstract class ImageTransfer implements RustOpaqueInterface {
     localPath: localPath,
     comicType: comicType,
     favoriteJson: favoriteJson,
+  );
+
+  static Future<ImageTransfer> startView({
+    required ScriptRuntime runtime,
+    required String dataPath,
+    required String cachePath,
+    required String localPath,
+    required String requestJson,
+  }) => RustLib.instance.api.crateApiMediaImageTransferStartView(
+    runtime: runtime,
+    dataPath: dataPath,
+    cachePath: cachePath,
+    localPath: localPath,
+    requestJson: requestJson,
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/comic_source/comic_source.dart';
 import 'package:venera/foundation/comic_type.dart';
 import 'package:venera/foundation/history.dart';
+import 'package:venera/foundation/log.dart';
 import 'package:venera/utils/translations.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -85,61 +86,72 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _refreshHistory(History comic) async {
-    var result = await HistoryManager().refreshHistoryInfo(comic);
-    if (result) {
+    try {
+      final result = await HistoryManager().refreshHistoryInfo(comic);
       if (mounted) {
-        App.rootContext.showMessage(message: "Refresh Success".tl);
+        App.rootContext.showMessage(
+          message: result ? "Refresh Success".tl : "Refresh Failed".tl,
+        );
       }
-    } else {
-      if (mounted) {
-        App.rootContext.showMessage(message: "Refresh Failed".tl);
-      }
+    } catch (error, stack) {
+      Log.error('History', error, stack);
+      if (mounted) App.rootContext.showMessage(message: error.toString());
     }
   }
 
   void _refreshAllHistories() async {
-    bool isCanceled = false;
-    void onCancel() {
-      isCanceled = true;
-    }
-
-    var loadingController = showLoadingDialog(
-      App.rootContext,
-      withProgress: true,
-      cancelButtonText: "Cancel".tl,
-      onCancel: onCancel,
-      message: "Refreshing Histories".tl,
-    );
-
-    int success = 0;
-    int failed = 0;
-    int skipped = 0;
-
-    await for (var progress
-        in HistoryManager().refreshAllHistoriesStream()) {
-      if (isCanceled) {
+    final manager = HistoryManager();
+    try {
+      final task = await manager.startMetadataRefresh();
+      if (!mounted) {
+        task.dispose();
         return;
       }
-      if (progress.total > 0) {
-        loadingController.setProgress(progress.current / progress.total);
-      }
-      success = progress.success;
-      failed = progress.failed;
-      skipped = progress.skipped;
-    }
-
-    loadingController.close();
-
-    if (mounted) {
-      App.rootContext.showMessage(
-        message:
-            "Refresh Completed: Success @success, Failed @failed, Skipped @skipped"
-                .tlParams({
-          'success': success,
-          'failed': failed,
-          'skipped': skipped,
-        }),
+      var cancelled = false;
+      final loading = showLoadingDialog(
+        App.rootContext,
+        withProgress: true,
+        cancelButtonText: "Cancel".tl,
+        onCancel: () {
+          cancelled = true;
+          task.cancel();
+        },
+        message: "Refreshing Histories".tl,
       );
+
+      var success = 0;
+      var failed = 0;
+      var skipped = 0;
+      try {
+        while (true) {
+          final progress = await task.next();
+          if (progress == null) break;
+          if (!cancelled && progress.total > 0) {
+            loading.setProgress(progress.current / progress.total);
+          }
+          success = progress.success;
+          failed = progress.failed;
+          skipped = progress.skipped;
+        }
+      } finally {
+        task.dispose();
+        loading.close();
+        manager.notifyExternalChanges();
+      }
+      if (mounted && !cancelled) {
+        App.rootContext.showMessage(
+          message:
+              "Refresh Completed: Success @success, Failed @failed, Skipped @skipped"
+                  .tlParams({
+                    'success': success,
+                    'failed': failed,
+                    'skipped': skipped,
+                  }),
+        );
+      }
+    } catch (error, stack) {
+      Log.error('History', error, stack);
+      if (mounted) App.rootContext.showMessage(message: error.toString());
     }
   }
 

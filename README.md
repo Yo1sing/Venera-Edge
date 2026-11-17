@@ -26,6 +26,9 @@ The AltStore source is initialized without upstream releases. After publishing t
 3. Install rust, see [rustup.rs](https://rustup.rs/)
 4. Build for your platform: e.g. `flutter build apk`
 
+See the [backend architecture and build guide](doc/backend_architecture.md)
+for the Rust toolchain, FRB generation, native tests, and platform verification.
+
 ## Create a new comic source
 See [Comic Source](doc/comic_source.md)
 

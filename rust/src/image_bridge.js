@@ -2,6 +2,23 @@ globalThis.__images = {
     cancelled: new Set(),
     active: new Set(),
     cancel(id) {if(this.active.has(id)) this.cancelled.add(id);},
+    processorCancel: null,
+    async process(script, base64, comic, chapter, page, source) {
+        const bytes = Convert.decodeBase64(base64);
+        const process = new Function(script + '\nreturn typeof processImage === "function" ? processImage : null;')();
+        if (!process) return null;
+        try {
+            const result = await process(bytes, comic, chapter, page, source);
+            if (typeof result?.onCancel === 'function') {
+                this.processorCancel = () => result.onCancel();
+            }
+            const image = await (result?.image ?? result);
+            return image instanceof ArrayBuffer || ArrayBuffer.isView(image) ? image : null;
+        } finally {
+            this.processorCancel = null;
+        }
+    },
+    cancelProcessor() { return this.processorCancel?.(); },
     async fetch(imageKey,sourceKey,cid,eid,thumbnail,requestId) {
         this.active.add(requestId);
         try {return await this._fetch(imageKey,sourceKey,cid,eid,thumbnail,requestId);}

@@ -131,8 +131,7 @@ pub fn write_zip(
         zip.finish()?;
     }
     temporary.as_file().sync_all()?;
-    temporary.persist(output)?;
-    Ok(())
+    crate::atomic_file::persist(temporary, output)
 }
 pub fn add_bytes(
     zip: &mut ZipWriter<&mut File>,

@@ -898,15 +898,13 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (i == null) {
       return null;
     }
-    var imageKey = context.reader.images![i];
-    Uint8List data;
-    if (imageKey.startsWith("file://")) {
-      data = await File(imageKey.substring(7)).readAsBytes();
-    } else {
-      data = await (await CacheManager().findCache(
-        "$imageKey@${context.reader.type.sourceKey}@${context.reader.cid}@${context.reader.eid}",
-      ))!.readAsBytes();
-    }
+    final reader = context.reader;
+    final data = await ImageDownloader.loadOriginal(
+      reader.images![i],
+      reader.type.comicSource?.key,
+      reader.cid,
+      reader.eid,
+    );
     return (i, data);
   }
 

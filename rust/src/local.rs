@@ -17,6 +17,35 @@ pub struct LocalComic {
     pub created_at: i64,
 }
 
+impl LocalComic {
+    pub(crate) fn reading_start(&self) -> Option<crate::api::local::ReadingStart> {
+        use crate::api::local::ReadingStart;
+        let chapters = self.chapters.as_object()?;
+        let first = |chapters: &serde_json::Map<String, Value>| {
+            chapters
+                .keys()
+                .position(|id| self.downloaded_chapters.contains(id))
+                .and_then(|index| u32::try_from(index + 1).ok())
+        };
+        if chapters.values().all(Value::is_object) {
+            for (index, group) in chapters.values().enumerate() {
+                if let Some(chapter) = first(group.as_object()?) {
+                    return Some(ReadingStart {
+                        chapter,
+                        group: u32::try_from(index + 1).ok(),
+                    });
+                }
+            }
+            None
+        } else {
+            first(chapters).map(|chapter| ReadingStart {
+                chapter,
+                group: None,
+            })
+        }
+    }
+}
+
 pub struct LocalLibrary {
     db: Connection,
 }
@@ -69,6 +98,19 @@ pub(crate) fn chapter_ids(chapters: &Value) -> Vec<String> {
 }
 
 impl LocalLibrary {
+    pub(crate) fn relativize_storage(&self, root: &str) -> Result<()> {
+        let transaction = self.db.unchecked_transaction()?;
+        for comic in self.list("time_desc", None, None)? {
+            if let Some(relative) = crate::local_storage::member(root, &comic.directory) {
+                self.db.execute(
+                    "UPDATE comics SET directory=? WHERE id=? AND comic_type=?",
+                    params![relative, comic.id, comic.comic_type],
+                )?;
+            }
+        }
+        transaction.commit()?;
+        Ok(())
+    }
     pub fn open(path: &str) -> Result<Self> {
         let db = Connection::open(path)?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;

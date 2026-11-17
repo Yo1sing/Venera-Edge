@@ -22,6 +22,7 @@ pub struct Options {
     pub http: crate::api::http::HttpOptions,
 }
 struct State {
+    moving_storage: bool,
     items: Vec<Value>,
     running: bool,
     epoch: u64,
@@ -106,6 +107,7 @@ impl Queue {
             engine,
             execution: tokio::sync::Mutex::new(()),
             state: Mutex::new(State {
+                moving_storage: false,
                 items,
                 running: false,
                 epoch: 0,
@@ -127,7 +129,7 @@ impl Queue {
         if persist {
             let root = Path::new(&state.options.data_path);
             fs::create_dir_all(root)?;
-            crate::download_files::atomic_json(&root.join("downloading_tasks.json"), &state.items)?;
+            crate::atomic_file::write_json(&root.join("downloading_tasks.json"), &state.items)?;
         }
         self.snapshots.send_replace(json);
         Ok(())
@@ -135,12 +137,43 @@ impl Queue {
     pub fn snapshot(&self) -> String {
         self.snapshots.borrow().clone()
     }
-    pub fn configure(&self, options: Options) -> Result<()> {
-        self.state
-            .lock()
-            .map_err(|_| anyhow!("Queue poisoned"))?
-            .options = options;
+    pub fn configure(&self, mut options: Options) -> Result<()> {
+        let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+        options.local_path.clone_from(&state.options.local_path);
+        options.saf = crate::local_operations::saf(&options.local_path);
+        state.options = options;
         Ok(())
+    }
+    pub async fn move_storage(&self, destination: &str, android: bool) -> Result<String> {
+        struct Moving<'a>(&'a Mutex<State>);
+        impl Drop for Moving<'_> {
+            fn drop(&mut self) {
+                self.0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .moving_storage = false;
+            }
+        }
+        let options = {
+            let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+            ensure!(
+                !state.moving_storage
+                    && state.items.is_empty()
+                    && state.cleanup.is_empty()
+                    && state.cancel.is_none(),
+                "Finish or cancel queued downloads before moving the storage directory"
+            );
+            state.moving_storage = true;
+            state.options.clone()
+        };
+        let _moving = Moving(&self.state);
+        let warnings =
+            crate::local_storage::relocate(self.engine.clone(), &options, destination, android)
+                .await?;
+        let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+        state.options.local_path = crate::local_storage::active(&self.engine, destination);
+        state.options.saf = crate::local_operations::saf(&state.options.local_path);
+        Ok(json!({"path":state.options.local_path,"warnings":warnings}).to_string())
     }
     pub fn add(self: &Arc<Self>, mut item: Value) -> Result<()> {
         item["_legacyWork"] = false.into();
@@ -149,6 +182,7 @@ impl Queue {
         ensure!(item["comicType"].is_i64(), "Missing comic type");
         {
             let mut state = self.state.lock().map_err(|_| anyhow!("Queue poisoned"))?;
+            ensure!(!state.moving_storage, "Storage directory is being moved");
             state
                 .items
                 .retain(|existing| key(existing) != key(&item) || existing["_cleanupOnly"] != true);
@@ -164,7 +198,7 @@ impl Queue {
         Ok(())
     }
     fn persist_cleanup(&self, state: &State) -> Result<()> {
-        crate::download_files::atomic_json(
+        crate::atomic_file::write_json(
             &Path::new(&state.options.data_path).join("download_cleanup.json"),
             &state.cleanup,
         )

@@ -1,11 +1,9 @@
 import 'dart:async' show Future, StreamController, scheduleMicrotask;
-import 'dart:convert';
 import 'dart:math';
 import 'dart:ui' as ui show Codec;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:venera/foundation/cache_manager.dart';
 import 'package:venera/foundation/log.dart';
 
 abstract class BaseImageProvider<T extends BaseImageProvider<T>>
@@ -27,7 +25,10 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
     // resize if too large
     if (width * height > maxImagePixel) {
       final ratio = sqrt(maxImagePixel / (width * height));
-      return TargetImageSize(width: (width * ratio).round(), height: (height * ratio).round());
+      return TargetImageSize(
+        width: (width * ratio).round(),
+        height: (height * ratio).round(),
+      );
     }
     return TargetImageSize(width: width, height: height);
   }
@@ -55,53 +56,15 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
     ImageDecoderCallback decode,
   ) async {
     try {
-      int retryTime = 1;
-
-      bool stop = false;
-
-      chunkEvents.onCancel = () {
-        stop = true;
-      };
-
-      Uint8List? data;
-
-      while (data == null && !stop) {
-        try {
-          data = await load(chunkEvents, () {
-            if (stop) {
-              throw const _ImageLoadingStopException();
-            }
-          });
-        } on _ImageLoadingStopException {
-          rethrow;
-        } catch (e) {
-          if (!retryOnError) rethrow;
-          if (e.toString().contains("Invalid Status Code: 404")) {
-            rethrow;
-          }
-          if (e.toString().contains("Invalid Status Code: 403")) {
-            rethrow;
-          }
-          if (e.toString().contains("handshake")) {
-            if (retryTime < 5) {
-              retryTime = 5;
-            }
-          }
-          retryTime <<= 1;
-          if (retryTime > (1 << 3) || stop) {
-            rethrow;
-          }
-          await Future.delayed(Duration(seconds: retryTime));
-        }
+      var stopped = false;
+      chunkEvents.onCancel = () => stopped = true;
+      void checkStop() {
+        if (stopped) throw const _ImageLoadingStopException();
       }
 
-      if (stop) {
-        throw const _ImageLoadingStopException();
-      }
-
-      if (data!.isEmpty) {
-        throw Exception("Empty image data");
-      }
+      final data = await load(chunkEvents, checkStop);
+      checkStop();
+      if (data.isEmpty) throw Exception("Empty image data");
 
       try {
         final buffer = await ImmutableBuffer.fromUint8List(data);
@@ -111,16 +74,6 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
         );
       } catch (e) {
         await invalidateCache();
-        if (data.length < 2 * 1024) {
-          // data is too short, it's likely that the data is text, not image
-          try {
-            var text =
-                const Utf8Codec(allowMalformed: false).decoder.convert(data);
-            throw Exception("Expected image data, but got text: $text");
-          } catch (e) {
-            // ignore
-          }
-        }
         rethrow;
       }
     } on _ImageLoadingStopException {
@@ -143,9 +96,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
 
   String get key;
 
-  bool get retryOnError => true;
-
-  Future<void> invalidateCache() => CacheManager().delete(key);
+  Future<void> invalidateCache() async {}
 
   @override
   bool operator ==(Object other) {
@@ -162,8 +113,6 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
 
   bool get enableResize => false;
 }
-
-typedef FileDecoderCallback = Future<ui.Codec> Function(Uint8List);
 
 class _ImageLoadingStopException implements Exception {
   const _ImageLoadingStopException();

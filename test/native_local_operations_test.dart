@@ -108,6 +108,15 @@ class Fixture {
             ).stat()).modified.millisecondsSinceEpoch;
           case 'mkdir':
             await Directory(mapped).create();
+          case 'touch':
+            await File(mapped).create();
+          case 'read':
+            result = await File(mapped).readAsBytes();
+          case 'removeFile':
+            await File(mapped).delete();
+          case 'removeEmpty':
+            final directory = Directory(mapped);
+            if (await directory.list().isEmpty) await directory.delete();
           case 'copy':
             if (path.contains('/B/') &&
                 copying != null &&
@@ -156,16 +165,20 @@ class Fixture {
 
   Future<Map<String, dynamic>> finish(LocalOperation operation) async {
     try {
-      while (true) {
-        final event = jsonDecode(
-          (await operation.next().timeout(const Duration(seconds: 10)))!,
-        );
-        if (event['kind'] == 'result') {
-          return Map<String, dynamic>.from(event['result']);
-        }
-      }
+      return await result(operation);
     } finally {
       operation.dispose();
+    }
+  }
+
+  Future<Map<String, dynamic>> result(LocalOperation operation) async {
+    while (true) {
+      final event = jsonDecode(
+        (await operation.next().timeout(const Duration(seconds: 10)))!,
+      );
+      if (event['kind'] == 'result') {
+        return Map<String, dynamic>.from(event['result']);
+      }
     }
   }
 
@@ -196,6 +209,69 @@ void main() {
   }
   setUpAll(() => RustLib.init(externalLibrary: ExternalLibrary.open(library)));
   tearDownAll(RustLib.dispose);
+
+  test(
+    'exports same-named comics from SAF without overwriting either output',
+    () async {
+      final f = await Fixture.open(saf: true);
+      try {
+        await f.book('One');
+        await f.book('Two');
+        final imported = await f.run({
+          'mode': 'directories',
+          'path': 'android://source',
+          'copy': true,
+        });
+        expect(imported['errors'], isEmpty);
+        final keys = [
+          for (final item in imported['imported'] as List)
+            {'id': item['id'], 'type': 0},
+        ];
+        final store = await LocalStore.open(
+          path: '${f.directory.path}/data/local.db',
+        );
+        try {
+          for (final item in imported['imported'] as List) {
+            store.save(
+              comicJson: jsonEncode({
+                ...Map<String, dynamic>.from(item),
+                'title': 'Book',
+              }),
+            );
+          }
+        } finally {
+          store.close();
+          store.dispose();
+        }
+        final operation = await f.start({
+          'mode': 'export',
+          'format': 'cbz',
+          'keys': keys,
+        });
+        try {
+          final result = await f.result(operation);
+          expect(result['errors'], isEmpty);
+          final output = File(result['export_path']);
+          final archive = ZipDecoder().decodeBytes(await output.readAsBytes());
+          expect(
+            archive.files.map((entry) => entry.name),
+            unorderedEquals(['Book.cbz', 'Book (2).cbz']),
+          );
+          for (final entry in archive.files) {
+            final cbz = ZipDecoder().decodeBytes(entry.content as List<int>);
+            expect(
+              cbz.files.map((entry) => entry.name),
+              containsAll(['1.jpg', '2.jpg', 'cover.jpg']),
+            );
+          }
+        } finally {
+          operation.dispose();
+        }
+      } finally {
+        await f.close();
+      }
+    },
+  );
 
   test(
     'changing a deleted chapter cover changes the Flutter image cache identity',

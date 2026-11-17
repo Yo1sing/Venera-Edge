@@ -47,10 +47,12 @@ impl FollowUpdateService {
                 keys_json.map(|v| serde_json::from_str(&v)).transpose()?,
             )
             .await?;
-        Ok(FollowUpdateTask {
-            receiver: tokio::sync::Mutex::new(job.subscribe()),
-            job,
-        })
+        Ok(FollowUpdateTask::new(job))
+    }
+    pub async fn refresh_metadata(&self, folder: String) -> Result<FollowUpdateTask> {
+        Ok(FollowUpdateTask::new(
+            self.inner.refresh_metadata(folder).await?,
+        ))
     }
     pub async fn next_event(&self) -> Option<String> {
         self.inner.next_event().await
@@ -71,6 +73,12 @@ impl Drop for FollowUpdateTask {
     }
 }
 impl FollowUpdateTask {
+    fn new(job: Arc<crate::follow_updates::Job>) -> Self {
+        Self {
+            receiver: tokio::sync::Mutex::new(job.subscribe()),
+            job,
+        }
+    }
     #[flutter_rust_bridge::frb(sync)]
     pub fn cancel(&self) {
         self.job.cancel();

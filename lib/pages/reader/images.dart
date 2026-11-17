@@ -608,13 +608,13 @@ class _GalleryModeState extends State<_GalleryMode>
   Future<Uint8List?> getImageByOffset(Offset offset) async {
     var imageKey = getImageKeyByOffset(offset);
     if (imageKey == null) return null;
-    if (imageKey.startsWith("file://")) {
-      return await File(imageKey.substring(7)).readAsBytes();
-    } else {
-      return (await CacheManager().findCache(
-        "$imageKey@${context.reader.type.sourceKey}@${context.reader.cid}@${context.reader.eid}",
-      ))!.readAsBytes();
-    }
+    final reader = context.reader;
+    return ImageDownloader.loadOriginal(
+      imageKey,
+      reader.type.comicSource?.key,
+      reader.cid,
+      reader.eid,
+    );
   }
 
   @override
@@ -1192,13 +1192,13 @@ class _ContinuousModeState extends State<_ContinuousMode>
   Future<Uint8List?> getImageByOffset(Offset offset) async {
     var imageKey = getImageKeyByOffset(offset);
     if (imageKey == null) return null;
-    if (imageKey.startsWith("file://")) {
-      return await File(imageKey.substring(7)).readAsBytes();
-    } else {
-      return (await CacheManager().findCache(
-        "$imageKey@${context.reader.type.sourceKey}@${context.reader.cid}@${context.reader.eid}",
-      ))!.readAsBytes();
-    }
+    final reader = context.reader;
+    return ImageDownloader.loadOriginal(
+      imageKey,
+      reader.type.comicSource?.key,
+      reader.cid,
+      reader.eid,
+    );
   }
 
   @override
@@ -1224,7 +1224,7 @@ ImageProvider _createImageProviderFromKey(
     reader.type.comicSource?.key,
     reader.cid,
     reader.eid,
-    reader.page,
+    page,
     enableResize: reader.mode.isContinuous, // For continuous mode, we need to resize the image to improve performance
   );
 }
@@ -1246,7 +1246,7 @@ void _precacheImage(int page, BuildContext context) {
 }
 
 /// [_preDownloadImage] is used to download the image for the given page.
-/// The image is downloaded using the [CacheManager] and saved to the local storage.
+/// Prefetch the original image into the backend cache.
 void _preDownloadImage(int page, BuildContext context) {
   if (page <= 0 || page > context.reader.images!.length) {
     return;
@@ -1259,7 +1259,7 @@ void _preDownloadImage(int page, BuildContext context) {
   var cid = reader.cid;
   var eid = reader.eid;
   var sourceKey = reader.type.comicSource?.key;
-  ImageDownloader.loadComicImage(imageKey, sourceKey, cid, eid);
+  ImageDownloader.loadComicImage(imageKey, sourceKey, cid, eid).drain<void>().ignore();
 }
 
 class _SwipeChangeChapterProgress extends StatefulWidget {

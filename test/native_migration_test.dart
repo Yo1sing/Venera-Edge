@@ -11,6 +11,7 @@ import 'package:venera/src/rust/api/media.dart' as media;
 import 'package:venera/src/rust/api/archive.dart' as archives;
 import 'package:venera/src/rust/api/comic_queue.dart' as downloads;
 import 'package:venera/src/rust/api/local.dart' as local;
+import 'package:venera/src/rust/api/history.dart' as history;
 import 'package:venera/src/rust/api/backup.dart' as backup;
 import 'package:venera/src/rust/api/settings.dart' as settings;
 
@@ -103,6 +104,105 @@ void main() {
   }
   setUpAll(() => RustLib.init(externalLibrary: ExternalLibrary.open(library)));
   tearDownAll(RustLib.dispose);
+
+  test('history refresh preserves concurrent reading progress', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'venera_history_refresh_',
+    );
+    final runtime = await scripts.ScriptRuntime.open(
+      optionsJson: runtimeOptions(directory.path),
+    );
+    final store = await history.HistoryStore.open(
+      path: '${directory.path}/history.db',
+    );
+    final taskData = history.HistoryEntry(
+      id: 'book',
+      title: 'Old title',
+      subtitle: 'Old author',
+      cover: 'old-cover',
+      timeMs: 100,
+      comicType: 42,
+      episode: 1,
+      page: 2,
+      readEpisodes: ['1'],
+    );
+    try {
+      await runtime.parseSource(
+        code: r'''
+        class Fixture extends ComicSource {
+          name='History source'; key='fixture'; version='1.0.0';
+          comic={loadInfo:async() => {
+            const title = await getClipboard();
+            return {title, subtitle:'New author', cover:'new-cover'};
+          }};
+        }
+      ''',
+      );
+      await store.save(entry: taskData);
+      final task = await store.refreshMetadata(
+        runtime: runtime,
+        sourcesJson: '{"42":"fixture"}',
+      );
+      try {
+        final event = jsonDecode(
+          (await runtime.nextEvent().timeout(const Duration(seconds: 5)))!,
+        );
+        expect(event['event'], 'platform');
+        await store.save(
+          entry: history.HistoryEntry(
+            id: 'book',
+            title: 'Old title',
+            subtitle: 'Old author',
+            cover: 'old-cover',
+            timeMs: 200,
+            comicType: 42,
+            episode: 3,
+            page: 8,
+            readEpisodes: ['1', '2-3'],
+            chapterGroup: 2,
+            maxPage: 10,
+          ),
+        );
+        runtime.resolveEvent(
+          id: event['ticket'],
+          valueJson: jsonEncode(encodeScriptValue('New title')),
+        );
+        history.HistoryRefreshProgress? last;
+        while (true) {
+          final progress = await task.next().timeout(
+            const Duration(seconds: 5),
+          );
+          if (progress == null) break;
+          last = progress;
+        }
+        expect(last?.success, 1);
+        final item = store.find(id: 'book', comicType: 42)!;
+        expect(
+          [item.title, item.subtitle, item.cover],
+          ['New title', 'New author', 'new-cover'],
+        );
+        expect(
+          [
+            item.timeMs,
+            item.episode,
+            item.page,
+            item.chapterGroup,
+            item.maxPage,
+          ],
+          [200, 3, 8, 2, 10],
+        );
+        expect(item.readEpisodes, ['1', '2-3']);
+      } finally {
+        task.dispose();
+      }
+    } finally {
+      store.close();
+      store.dispose();
+      runtime.close();
+      runtime.dispose();
+      await directory.delete(recursive: true);
+    }
+  });
 
   test(
     'WebDAV keeps backups on failed upload and chooses numeric revisions',

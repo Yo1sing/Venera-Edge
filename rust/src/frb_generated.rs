@@ -50,7 +50,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 578687429;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1483117383;
 
 // Section: executor
 
@@ -635,6 +635,68 @@ fn wire__crate__api__comic_queue__ComicDownloadQueue_configure_impl(
                         )?;
                         Ok(output_ok)
                     })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__comic_queue__ComicDownloadQueue_move_storage_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ComicDownloadQueue_move_storage",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComicDownloadQueue>,
+            >>::sse_decode(&mut deserializer);
+            let api_destination = <String>::sse_decode(&mut deserializer);
+            let api_android = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = crate::api::comic_queue::ComicDownloadQueue::move_storage(
+                            &*api_that_guard,
+                            api_destination,
+                            api_android,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
                 )
             }
         },
@@ -1534,6 +1596,114 @@ fn wire__crate__api__cookies__CookieStore_save_webview_impl(
         },
     )
 }
+fn wire__crate__api__favorites__FavoriteImportTask_cancel_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FavoriteImportTask_cancel",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::favorites::FavoriteImportTask::cancel(&*api_that_guard);
+                })?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__favorites__FavoriteImportTask_next_snapshot_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FavoriteImportTask_next_snapshot",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::favorites::FavoriteImportTask::next_snapshot(
+                                &*api_that_guard,
+                            )
+                            .await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__favorites__FavoriteStore_add_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -2334,6 +2504,77 @@ fn wire__crate__api__favorites__FavoriteStore_import_impl(
                     Ok(output_ok)
                 })(),
             )
+        },
+    )
+}
+fn wire__crate__api__favorites__FavoriteStore_import_network_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FavoriteStore_import_network",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_runtime = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ScriptRuntime>,
+            >>::sse_decode(&mut deserializer);
+            let api_request_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let mut api_that_guard = None;
+                        let mut api_runtime_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![
+                                    flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                        &api_that, 0, false,
+                                    ),
+                                    flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                        &api_runtime,
+                                        1,
+                                        false,
+                                    ),
+                                ],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                                1 => {
+                                    api_runtime_guard = Some(api_runtime.lockable_decode_sync_ref())
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let api_runtime_guard = api_runtime_guard.unwrap();
+                        let output_ok = crate::api::favorites::FavoriteStore::import_network(
+                            &*api_that_guard,
+                            &*api_runtime_guard,
+                            api_request_json,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
         },
     )
 }
@@ -3501,6 +3742,67 @@ fn wire__crate__api__follow_updates__FollowUpdateService_open_impl(
         },
     )
 }
+fn wire__crate__api__follow_updates__FollowUpdateService_refresh_metadata_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "FollowUpdateService_refresh_metadata",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateService>,
+            >>::sse_decode(&mut deserializer);
+            let api_folder = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok =
+                            crate::api::follow_updates::FollowUpdateService::refresh_metadata(
+                                &*api_that_guard,
+                                api_folder,
+                            )
+                            .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__follow_updates__FollowUpdateService_start_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3723,6 +4025,111 @@ fn wire__crate__api__follow_updates__FollowUpdateTask_wait_impl(
                             crate::api::follow_updates::FollowUpdateTask::wait(&*api_that_guard)
                                 .await;
                         })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__history__HistoryRefreshTask_cancel_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "HistoryRefreshTask_cancel",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_that_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_that, 0, false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_that_guard = api_that_guard.unwrap();
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::history::HistoryRefreshTask::cancel(&*api_that_guard);
+                })?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__history__HistoryRefreshTask_next_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "HistoryRefreshTask_next",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let mut api_that_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_that, 0, false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_that_guard =
+                                        Some(api_that.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::history::HistoryRefreshTask::next(&*api_that_guard).await,
+                        )?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -4428,6 +4835,79 @@ fn wire__crate__api__history__HistoryStore_open_impl(
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
                         let output_ok = crate::api::history::HistoryStore::open(api_path)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__history__HistoryStore_refresh_metadata_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "HistoryStore_refresh_metadata",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_runtime = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ScriptRuntime>,
+            >>::sse_decode(&mut deserializer);
+            let api_sources_json = <String>::sse_decode(&mut deserializer);
+            let api_key = <Option<crate::api::history::ComicKey>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let mut api_that_guard = None;
+                        let mut api_runtime_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![
+                                    flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                        &api_that, 0, false,
+                                    ),
+                                    flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                        &api_runtime,
+                                        1,
+                                        false,
+                                    ),
+                                ],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                                1 => {
+                                    api_runtime_guard = Some(api_runtime.lockable_decode_sync_ref())
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_that_guard = api_that_guard.unwrap();
+                        let api_runtime_guard = api_runtime_guard.unwrap();
+                        let output_ok = crate::api::history::HistoryStore::refresh_metadata(
+                            &*api_that_guard,
+                            &*api_runtime_guard,
+                            api_sources_json,
+                            api_key,
+                        )?;
                         Ok(output_ok)
                     })(),
                 )
@@ -5437,6 +5917,71 @@ fn wire__crate__api__media__ImageTransfer_start_favorite_impl(
         },
     )
 }
+fn wire__crate__api__media__ImageTransfer_start_view_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "ImageTransfer_start_view",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_runtime = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ScriptRuntime>,
+            >>::sse_decode(&mut deserializer);
+            let api_data_path = <String>::sse_decode(&mut deserializer);
+            let api_cache_path = <String>::sse_decode(&mut deserializer);
+            let api_local_path = <String>::sse_decode(&mut deserializer);
+            let api_request_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let mut api_runtime_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_runtime,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_runtime_guard = Some(api_runtime.lockable_decode_sync_ref())
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_runtime_guard = api_runtime_guard.unwrap();
+                        let output_ok = crate::api::media::ImageTransfer::start_view(
+                            &*api_runtime_guard,
+                            api_data_path,
+                            api_cache_path,
+                            api_local_path,
+                            api_request_json,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__local__LocalOperation_cancel_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -6105,6 +6650,60 @@ fn wire__crate__api__local__LocalStore_open_impl(
                     })(),
                 )
             }
+        },
+    )
+}
+fn wire__crate__api__local__LocalStore_reading_start_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "LocalStore_reading_start",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_that = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<LocalStore>,
+            >>::sse_decode(&mut deserializer);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            let api_comic_type = <i32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                (move || {
+                    let mut api_that_guard = None;
+                    let decode_indices_ =
+                        flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                            flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                &api_that, 0, false,
+                            ),
+                        ]);
+                    for i in decode_indices_ {
+                        match i {
+                            0 => api_that_guard = Some(api_that.lockable_decode_sync_ref()),
+                            _ => unreachable!(),
+                        }
+                    }
+                    let api_that_guard = api_that_guard.unwrap();
+                    let output_ok = crate::api::local::LocalStore::reading_start(
+                        &*api_that_guard,
+                        api_id,
+                        api_comic_type,
+                    )?;
+                    Ok(output_ok)
+                })(),
+            )
         },
     )
 }
@@ -8541,6 +9140,45 @@ fn wire__crate__api__media__delete_favorite_image_cache_impl(
         },
     )
 }
+fn wire__crate__api__media__delete_legacy_favorite_covers_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "delete_legacy_favorite_covers",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_path = <String>::sse_decode(&mut deserializer);
+            let api_hashes = <Vec<i32>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::media::delete_legacy_favorite_covers(
+                            api_data_path,
+                            api_hashes,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__backup__export_app_data_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -8962,6 +9600,115 @@ fn wire__crate__api__init_app_impl(
                     })?;
                     Ok(output_ok)
                 })())
+            }
+        },
+    )
+}
+fn wire__crate__api__local__initialize_storage_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "initialize_storage",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_runtime = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ScriptRuntime>,
+            >>::sse_decode(&mut deserializer);
+            let api_data_path = <String>::sse_decode(&mut deserializer);
+            let api_default_path = <String>::sse_decode(&mut deserializer);
+            let api_prefer_existing_in_data = <bool>::sse_decode(&mut deserializer);
+            let api_android = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let mut api_runtime_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_runtime,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_runtime_guard =
+                                        Some(api_runtime.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_runtime_guard = api_runtime_guard.unwrap();
+                        let output_ok = crate::api::local::initialize_storage(
+                            &*api_runtime_guard,
+                            api_data_path,
+                            api_default_path,
+                            api_prefer_existing_in_data,
+                            api_android,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__media__invalidate_view_image_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "invalidate_view_image",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_data_path = <String>::sse_decode(&mut deserializer);
+            let api_cache_path = <String>::sse_decode(&mut deserializer);
+            let api_request_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::media::invalidate_view_image(
+                            api_data_path,
+                            api_cache_path,
+                            api_request_json,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )
@@ -9630,6 +10377,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<CookieStore>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
@@ -9640,6 +10390,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>
+);
+flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
+    flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>
 );
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryStore>
@@ -9712,6 +10465,16 @@ impl SseDecode for CookieStore {
     }
 }
 
+impl SseDecode for FavoriteImportTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
 impl SseDecode for FavoriteStore {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -9747,6 +10510,16 @@ impl SseDecode for FollowUpdateTask {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <RustOpaqueMoi<
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>,
+        >>::sse_decode(deserializer);
+        return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
+    }
+}
+
+impl SseDecode for HistoryRefreshTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <RustOpaqueMoi<
+            flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
     }
@@ -9899,6 +10672,16 @@ impl SseDecode
 }
 
 impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -9930,6 +10713,16 @@ impl SseDecode
 
 impl SseDecode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <usize>::sse_decode(deserializer);
+        return decode_rust_opaque_moi(inner);
+    }
+}
+
+impl SseDecode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -10111,6 +10904,24 @@ impl SseDecode for crate::api::history::HistoryEntry {
     }
 }
 
+impl SseDecode for crate::api::history::HistoryRefreshProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_total = <u32>::sse_decode(deserializer);
+        let mut var_current = <u32>::sse_decode(deserializer);
+        let mut var_success = <u32>::sse_decode(deserializer);
+        let mut var_failed = <u32>::sse_decode(deserializer);
+        let mut var_skipped = <u32>::sse_decode(deserializer);
+        return crate::api::history::HistoryRefreshProgress {
+            total: var_total,
+            current: var_current,
+            success: var_success,
+            failed: var_failed,
+            skipped: var_skipped,
+        };
+    }
+}
+
 impl SseDecode for crate::api::http::HttpHeader {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -10226,6 +11037,18 @@ impl SseDecode for Vec<crate::api::http::HttpHeader> {
     }
 }
 
+impl SseDecode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<i32>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -10321,6 +11144,17 @@ impl SseDecode for Option<String> {
     }
 }
 
+impl SseDecode for Option<crate::api::history::ComicKey> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::history::ComicKey>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::download::DownloadProgress> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -10339,6 +11173,19 @@ impl SseDecode for Option<crate::api::history::HistoryEntry> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::history::HistoryEntry>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::history::HistoryRefreshProgress> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::history::HistoryRefreshProgress>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -10369,6 +11216,17 @@ impl SseDecode for Option<crate::api::media::ImageProgress> {
     }
 }
 
+impl SseDecode for Option<crate::api::local::ReadingStart> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::local::ReadingStart>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<u32> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -10388,6 +11246,18 @@ impl SseDecode for Option<Vec<u8>> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for crate::api::local::ReadingStart {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_chapter = <u32>::sse_decode(deserializer);
+        let mut var_group = <Option<u32>>::sse_decode(deserializer);
+        return crate::api::local::ReadingStart {
+            chapter: var_chapter,
+            group: var_group,
+        };
     }
 }
 
@@ -10534,267 +11404,319 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__comic_queue__ComicDownloadQueue_next_platform_event_impl(
+        12 => wire__crate__api__comic_queue__ComicDownloadQueue_move_storage_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        13 => wire__crate__api__comic_queue__ComicDownloadQueue_next_snapshot_impl(
+        13 => wire__crate__api__comic_queue__ComicDownloadQueue_next_platform_event_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        14 => wire__crate__api__comic_queue__ComicDownloadQueue_open_impl(
+        14 => wire__crate__api__comic_queue__ComicDownloadQueue_next_snapshot_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__comic_queue__ComicDownloadQueue_resolve_platform_impl(
+        15 => wire__crate__api__comic_queue__ComicDownloadQueue_open_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__favorites__FavoriteStore_all_unique_async_impl(
+        16 => wire__crate__api__comic_queue__ComicDownloadQueue_resolve_platform_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        47 => wire__crate__api__favorites__FavoriteStore_list_async_impl(
+        31 => wire__crate__api__favorites__FavoriteImportTask_next_snapshot_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        49 => {
+        34 => wire__crate__api__favorites__FavoriteStore_all_unique_async_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        47 => wire__crate__api__favorites__FavoriteStore_import_network_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        51 => wire__crate__api__favorites__FavoriteStore_list_async_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        53 => {
             wire__crate__api__favorites__FavoriteStore_open_impl(port, ptr, rust_vec_len, data_len)
         }
-        58 => wire__crate__api__download__FileDownload_next_status_impl(
+        62 => wire__crate__api__download__FileDownload_next_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        59 => {
+        63 => {
             wire__crate__api__download__FileDownload_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        60 => wire__crate__api__download__FileDownload_stop_impl(port, ptr, rust_vec_len, data_len),
-        61 => wire__crate__api__follow_updates__FollowUpdateService_close_impl(
+        64 => wire__crate__api__download__FileDownload_stop_impl(port, ptr, rust_vec_len, data_len),
+        65 => wire__crate__api__follow_updates__FollowUpdateService_close_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        62 => wire__crate__api__follow_updates__FollowUpdateService_configure_impl(
+        66 => wire__crate__api__follow_updates__FollowUpdateService_configure_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        63 => wire__crate__api__follow_updates__FollowUpdateService_next_event_impl(
+        67 => wire__crate__api__follow_updates__FollowUpdateService_next_event_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        64 => wire__crate__api__follow_updates__FollowUpdateService_open_impl(
+        68 => wire__crate__api__follow_updates__FollowUpdateService_open_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        65 => wire__crate__api__follow_updates__FollowUpdateService_start_impl(
+        69 => wire__crate__api__follow_updates__FollowUpdateService_refresh_metadata_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        67 => wire__crate__api__follow_updates__FollowUpdateTask_next_snapshot_impl(
+        70 => wire__crate__api__follow_updates__FollowUpdateService_start_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        68 => wire__crate__api__follow_updates__FollowUpdateTask_wait_impl(
+        72 => wire__crate__api__follow_updates__FollowUpdateTask_next_snapshot_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        80 => wire__crate__api__history__HistoryStore_image_statistics_impl(
+        73 => wire__crate__api__follow_updates__FollowUpdateTask_wait_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        82 => wire__crate__api__history__HistoryStore_open_impl(port, ptr, rust_vec_len, data_len),
-        83 => wire__crate__api__history__HistoryStore_save_impl(port, ptr, rust_vec_len, data_len),
-        86 => {
+        75 => wire__crate__api__history__HistoryRefreshTask_next_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        87 => wire__crate__api__history__HistoryStore_image_statistics_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        89 => wire__crate__api__history__HistoryStore_open_impl(port, ptr, rust_vec_len, data_len),
+        90 => wire__crate__api__history__HistoryStore_refresh_metadata_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        91 => wire__crate__api__history__HistoryStore_save_impl(port, ptr, rust_vec_len, data_len),
+        94 => {
             wire__crate__api__http__HttpCancellation_default_impl(port, ptr, rust_vec_len, data_len)
         }
-        88 => wire__crate__api__http__HttpResponse_close_impl(port, ptr, rust_vec_len, data_len),
-        90 => {
+        96 => wire__crate__api__http__HttpResponse_close_impl(port, ptr, rust_vec_len, data_len),
+        98 => {
             wire__crate__api__http__HttpResponse_next_chunk_impl(port, ptr, rust_vec_len, data_len)
         }
-        94 => wire__crate__api__http__HttpUpload_default_impl(port, ptr, rust_vec_len, data_len),
-        95 => wire__crate__api__http__HttpUpload_fail_impl(port, ptr, rust_vec_len, data_len),
-        98 => wire__crate__api__http__HttpUpload_write_impl(port, ptr, rust_vec_len, data_len),
-        100 => wire__crate__api__media__ImageTransfer_next_impl(port, ptr, rust_vec_len, data_len),
-        101 => wire__crate__api__media__ImageTransfer_start_impl(port, ptr, rust_vec_len, data_len),
-        102 => wire__crate__api__media__ImageTransfer_start_favorite_impl(
+        102 => wire__crate__api__http__HttpUpload_default_impl(port, ptr, rust_vec_len, data_len),
+        103 => wire__crate__api__http__HttpUpload_fail_impl(port, ptr, rust_vec_len, data_len),
+        106 => wire__crate__api__http__HttpUpload_write_impl(port, ptr, rust_vec_len, data_len),
+        108 => wire__crate__api__media__ImageTransfer_next_impl(port, ptr, rust_vec_len, data_len),
+        109 => wire__crate__api__media__ImageTransfer_start_impl(port, ptr, rust_vec_len, data_len),
+        110 => wire__crate__api__media__ImageTransfer_start_favorite_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        104 => wire__crate__api__local__LocalOperation_next_impl(port, ptr, rust_vec_len, data_len),
-        105 => {
+        111 => wire__crate__api__media__ImageTransfer_start_view_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        113 => wire__crate__api__local__LocalOperation_next_impl(port, ptr, rust_vec_len, data_len),
+        114 => {
             wire__crate__api__local__LocalOperation_start_impl(port, ptr, rust_vec_len, data_len)
         }
-        115 => wire__crate__api__local__LocalStore_open_impl(port, ptr, rust_vec_len, data_len),
-        117 => wire__crate__api__script__ScriptRuntime_await_promise_impl(
+        124 => wire__crate__api__local__LocalStore_open_impl(port, ptr, rust_vec_len, data_len),
+        127 => wire__crate__api__script__ScriptRuntime_await_promise_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        119 => wire__crate__api__script__ScriptRuntime_configure_impl(
+        129 => wire__crate__api__script__ScriptRuntime_configure_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        122 => wire__crate__api__script__ScriptRuntime_initialize_source_impl(
+        132 => wire__crate__api__script__ScriptRuntime_initialize_source_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        124 => wire__crate__api__script__ScriptRuntime_next_event_impl(
+        134 => wire__crate__api__script__ScriptRuntime_next_event_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        125 => wire__crate__api__script__ScriptRuntime_open_impl(port, ptr, rust_vec_len, data_len),
-        126 => wire__crate__api__script__ScriptRuntime_parse_source_impl(
+        135 => wire__crate__api__script__ScriptRuntime_open_impl(port, ptr, rust_vec_len, data_len),
+        136 => wire__crate__api__script__ScriptRuntime_parse_source_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        130 => wire__crate__api__sources__SourceManager_begin_edit_impl(
+        140 => wire__crate__api__sources__SourceManager_begin_edit_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        131 => {
+        141 => {
             wire__crate__api__sources__SourceManager_catalog_impl(port, ptr, rust_vec_len, data_len)
         }
-        132 => wire__crate__api__sources__SourceManager_check_updates_impl(
+        142 => wire__crate__api__sources__SourceManager_check_updates_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        133 => wire__crate__api__sources__SourceManager_discard_edit_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        134 => {
-            wire__crate__api__sources__SourceManager_install_impl(port, ptr, rust_vec_len, data_len)
-        }
-        135 => wire__crate__api__sources__SourceManager_install_url_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        136 => {
-            wire__crate__api__sources__SourceManager_load_impl(port, ptr, rust_vec_len, data_len)
-        }
-        137 => {
-            wire__crate__api__sources__SourceManager_open_impl(port, ptr, rust_vec_len, data_len)
-        }
-        138 => {
-            wire__crate__api__sources__SourceManager_read_impl(port, ptr, rust_vec_len, data_len)
-        }
-        140 => {
-            wire__crate__api__sources__SourceManager_remove_impl(port, ptr, rust_vec_len, data_len)
-        }
-        141 => {
-            wire__crate__api__sources__SourceManager_save_impl(port, ptr, rust_vec_len, data_len)
-        }
-        142 => wire__crate__api__sources__SourceManager_save_edit_impl(
+        143 => wire__crate__api__sources__SourceManager_discard_edit_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
         144 => {
-            wire__crate__api__sources__SourceManager_update_impl(port, ptr, rust_vec_len, data_len)
+            wire__crate__api__sources__SourceManager_install_impl(port, ptr, rust_vec_len, data_len)
         }
-        145 => wire__crate__api__backup__SyncController_apply_restore_impl(
+        145 => wire__crate__api__sources__SourceManager_install_url_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        147 => wire__crate__api__backup__SyncController_next_snapshot_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
+        146 => {
+            wire__crate__api__sources__SourceManager_load_impl(port, ptr, rust_vec_len, data_len)
+        }
+        147 => {
+            wire__crate__api__sources__SourceManager_open_impl(port, ptr, rust_vec_len, data_len)
+        }
         148 => {
-            wire__crate__api__backup__SyncController_open_impl(port, ptr, rust_vec_len, data_len)
+            wire__crate__api__sources__SourceManager_read_impl(port, ptr, rust_vec_len, data_len)
         }
         150 => {
-            wire__crate__api__backup__SyncController_submit_impl(port, ptr, rust_vec_len, data_len)
+            wire__crate__api__sources__SourceManager_remove_impl(port, ptr, rust_vec_len, data_len)
         }
         151 => {
+            wire__crate__api__sources__SourceManager_save_impl(port, ptr, rust_vec_len, data_len)
+        }
+        152 => wire__crate__api__sources__SourceManager_save_edit_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        154 => {
+            wire__crate__api__sources__SourceManager_update_impl(port, ptr, rust_vec_len, data_len)
+        }
+        155 => wire__crate__api__backup__SyncController_apply_restore_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        157 => wire__crate__api__backup__SyncController_next_snapshot_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        158 => {
+            wire__crate__api__backup__SyncController_open_impl(port, ptr, rust_vec_len, data_len)
+        }
+        160 => {
+            wire__crate__api__backup__SyncController_submit_impl(port, ptr, rust_vec_len, data_len)
+        }
+        161 => {
             wire__crate__api__settings__apply_app_data_edits_impl(port, ptr, rust_vec_len, data_len)
         }
-        152 => wire__crate__api__settings__apply_implicit_data_edits_impl(
+        162 => wire__crate__api__settings__apply_implicit_data_edits_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        155 => wire__crate__api__archive__compress_folder_impl(port, ptr, rust_vec_len, data_len),
-        156 => wire__crate__api__script__compute_script_impl(port, ptr, rust_vec_len, data_len),
-        158 => wire__crate__api__script__create_source_file_impl(port, ptr, rust_vec_len, data_len),
-        160 => wire__crate__api__media__delete_favorite_image_cache_impl(
+        165 => wire__crate__api__archive__compress_folder_impl(port, ptr, rust_vec_len, data_len),
+        166 => wire__crate__api__script__compute_script_impl(port, ptr, rust_vec_len, data_len),
+        168 => wire__crate__api__script__create_source_file_impl(port, ptr, rust_vec_len, data_len),
+        170 => wire__crate__api__media__delete_favorite_image_cache_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        161 => wire__crate__api__backup__export_app_data_impl(port, ptr, rust_vec_len, data_len),
-        162 => wire__crate__api__media__export_book_impl(port, ptr, rust_vec_len, data_len),
-        163 => wire__crate__api__archive__extract_archive_impl(port, ptr, rust_vec_len, data_len),
-        167 => wire__crate__api__http__http_request_impl(port, ptr, rust_vec_len, data_len),
-        168 => {
+        171 => wire__crate__api__media__delete_legacy_favorite_covers_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        172 => wire__crate__api__backup__export_app_data_impl(port, ptr, rust_vec_len, data_len),
+        173 => wire__crate__api__media__export_book_impl(port, ptr, rust_vec_len, data_len),
+        174 => wire__crate__api__archive__extract_archive_impl(port, ptr, rust_vec_len, data_len),
+        178 => wire__crate__api__http__http_request_impl(port, ptr, rust_vec_len, data_len),
+        179 => {
             wire__crate__api__archive__import_comic_archive_impl(port, ptr, rust_vec_len, data_len)
         }
-        169 => wire__crate__api__backup__import_pica_data_impl(port, ptr, rust_vec_len, data_len),
-        170 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
-        172 => wire__crate__api__local__list_comic_images_impl(port, ptr, rust_vec_len, data_len),
-        173 => wire__crate__api__settings__load_app_data_impl(port, ptr, rust_vec_len, data_len),
-        175 => wire__crate__api__media__modify_image_impl(port, ptr, rust_vec_len, data_len),
-        177 => {
+        180 => wire__crate__api__backup__import_pica_data_impl(port, ptr, rust_vec_len, data_len),
+        181 => wire__crate__api__init_app_impl(port, ptr, rust_vec_len, data_len),
+        182 => wire__crate__api__local__initialize_storage_impl(port, ptr, rust_vec_len, data_len),
+        183 => {
+            wire__crate__api__media__invalidate_view_image_impl(port, ptr, rust_vec_len, data_len)
+        }
+        185 => wire__crate__api__local__list_comic_images_impl(port, ptr, rust_vec_len, data_len),
+        186 => wire__crate__api__settings__load_app_data_impl(port, ptr, rust_vec_len, data_len),
+        188 => wire__crate__api__media__modify_image_impl(port, ptr, rust_vec_len, data_len),
+        190 => {
             wire__crate__api__archive__read_ehviewer_library_impl(port, ptr, rust_vec_len, data_len)
         }
-        178 => wire__crate__api__script__read_source_file_impl(port, ptr, rust_vec_len, data_len),
-        182 => wire__crate__api__script__source_files_impl(port, ptr, rust_vec_len, data_len),
-        183 => wire__crate__api__http__source_http_request_impl(port, ptr, rust_vec_len, data_len),
+        191 => wire__crate__api__script__read_source_file_impl(port, ptr, rust_vec_len, data_len),
+        195 => wire__crate__api__script__source_files_impl(port, ptr, rust_vec_len, data_len),
+        196 => wire__crate__api__http__source_http_request_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -10807,161 +11729,168 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        16 => wire__crate__api__comic_queue__ComicDownloadQueue_snapshot_impl(
+        17 => wire__crate__api__comic_queue__ComicDownloadQueue_snapshot_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        17 => wire__crate__api__cookies__CookieStore_clear_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__cookies__CookieStore_close_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__cookies__CookieStore_complete_cloudflare_impl(
+        18 => wire__crate__api__cookies__CookieStore_clear_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__cookies__CookieStore_close_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__cookies__CookieStore_complete_cloudflare_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        20 => wire__crate__api__cookies__CookieStore_delete_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__cookies__CookieStore_generation_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__cookies__CookieStore_header_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__cookies__CookieStore_load_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__cookies__CookieStore_open_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__cookies__CookieStore_reopen_impl(ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__cookies__CookieStore_save_impl(ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__cookies__CookieStore_save_headers_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__cookies__CookieStore_save_webview_impl(ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__favorites__FavoriteStore_add_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__cookies__CookieStore_delete_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__cookies__CookieStore_generation_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__cookies__CookieStore_header_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__cookies__CookieStore_load_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__cookies__CookieStore_open_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__cookies__CookieStore_reopen_impl(ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__cookies__CookieStore_save_impl(ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__cookies__CookieStore_save_headers_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__cookies__CookieStore_save_webview_impl(ptr, rust_vec_len, data_len),
         30 => {
+            wire__crate__api__favorites__FavoriteImportTask_cancel_impl(ptr, rust_vec_len, data_len)
+        }
+        32 => wire__crate__api__favorites__FavoriteStore_add_impl(ptr, rust_vec_len, data_len),
+        33 => {
             wire__crate__api__favorites__FavoriteStore_all_unique_impl(ptr, rust_vec_len, data_len)
         }
-        32 => wire__crate__api__favorites__FavoriteStore_bound_impl(ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__favorites__FavoriteStore_clear_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__favorites__FavoriteStore_close_impl(ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__favorites__FavoriteStore_create_impl(ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__favorites__FavoriteStore_delete_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__favorites__FavoriteStore_delete_folder_impl(
+        35 => wire__crate__api__favorites__FavoriteStore_bound_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__favorites__FavoriteStore_clear_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__favorites__FavoriteStore_close_impl(ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__favorites__FavoriteStore_create_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__favorites__FavoriteStore_delete_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__favorites__FavoriteStore_delete_folder_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        38 => {
+        41 => {
             wire__crate__api__favorites__FavoriteStore_edit_tags_impl(ptr, rust_vec_len, data_len)
         }
-        39 => wire__crate__api__favorites__FavoriteStore_export_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__favorites__FavoriteStore_find_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__favorites__FavoriteStore_folders_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__favorites__FavoriteStore_get_impl(ptr, rust_vec_len, data_len),
-        43 => wire__crate__api__favorites__FavoriteStore_import_impl(ptr, rust_vec_len, data_len),
-        44 => wire__crate__api__favorites__FavoriteStore_link_impl(ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__favorites__FavoriteStore_linked_impl(ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__favorites__FavoriteStore_list_impl(ptr, rust_vec_len, data_len),
-        48 => wire__crate__api__favorites__FavoriteStore_on_read_impl(ptr, rust_vec_len, data_len),
-        50 => wire__crate__api__favorites__FavoriteStore_order_folders_impl(
+        42 => wire__crate__api__favorites__FavoriteStore_export_impl(ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__favorites__FavoriteStore_find_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__favorites__FavoriteStore_folders_impl(ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__favorites__FavoriteStore_get_impl(ptr, rust_vec_len, data_len),
+        46 => wire__crate__api__favorites__FavoriteStore_import_impl(ptr, rust_vec_len, data_len),
+        48 => wire__crate__api__favorites__FavoriteStore_link_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__favorites__FavoriteStore_linked_impl(ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__favorites__FavoriteStore_list_impl(ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__favorites__FavoriteStore_on_read_impl(ptr, rust_vec_len, data_len),
+        54 => wire__crate__api__favorites__FavoriteStore_order_folders_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        51 => wire__crate__api__favorites__FavoriteStore_prepare_follow_impl(
+        55 => wire__crate__api__favorites__FavoriteStore_prepare_follow_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        52 => wire__crate__api__favorites__FavoriteStore_rename_impl(ptr, rust_vec_len, data_len),
-        53 => wire__crate__api__favorites__FavoriteStore_reorder_impl(ptr, rust_vec_len, data_len),
-        54 => wire__crate__api__favorites__FavoriteStore_summary_impl(ptr, rust_vec_len, data_len),
-        55 => wire__crate__api__favorites__FavoriteStore_transfer_impl(ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__favorites__FavoriteStore_update_check_impl(
+        56 => wire__crate__api__favorites__FavoriteStore_rename_impl(ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__favorites__FavoriteStore_reorder_impl(ptr, rust_vec_len, data_len),
+        58 => wire__crate__api__favorites__FavoriteStore_summary_impl(ptr, rust_vec_len, data_len),
+        59 => wire__crate__api__favorites__FavoriteStore_transfer_impl(ptr, rust_vec_len, data_len),
+        60 => wire__crate__api__favorites__FavoriteStore_update_check_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        57 => {
+        61 => {
             wire__crate__api__favorites__FavoriteStore_update_info_impl(ptr, rust_vec_len, data_len)
         }
-        66 => wire__crate__api__follow_updates__FollowUpdateTask_cancel_impl(
+        71 => wire__crate__api__follow_updates__FollowUpdateTask_cancel_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        69 => wire__crate__api__history__HistoryStore_clear_impl(ptr, rust_vec_len, data_len),
-        70 => wire__crate__api__history__HistoryStore_close_impl(ptr, rust_vec_len, data_len),
-        71 => wire__crate__api__history__HistoryStore_count_impl(ptr, rust_vec_len, data_len),
-        72 => wire__crate__api__history__HistoryStore_delete_impl(ptr, rust_vec_len, data_len),
-        73 => wire__crate__api__history__HistoryStore_find_impl(ptr, rust_vec_len, data_len),
-        74 => wire__crate__api__history__HistoryStore_image_count_impl(ptr, rust_vec_len, data_len),
-        75 => {
+        74 => {
+            wire__crate__api__history__HistoryRefreshTask_cancel_impl(ptr, rust_vec_len, data_len)
+        }
+        76 => wire__crate__api__history__HistoryStore_clear_impl(ptr, rust_vec_len, data_len),
+        77 => wire__crate__api__history__HistoryStore_close_impl(ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__history__HistoryStore_count_impl(ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__history__HistoryStore_delete_impl(ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__history__HistoryStore_find_impl(ptr, rust_vec_len, data_len),
+        81 => wire__crate__api__history__HistoryStore_image_count_impl(ptr, rust_vec_len, data_len),
+        82 => {
             wire__crate__api__history__HistoryStore_image_delete_impl(ptr, rust_vec_len, data_len)
         }
-        76 => wire__crate__api__history__HistoryStore_image_find_impl(ptr, rust_vec_len, data_len),
-        77 => wire__crate__api__history__HistoryStore_image_has_impl(ptr, rust_vec_len, data_len),
-        78 => wire__crate__api__history__HistoryStore_image_list_impl(ptr, rust_vec_len, data_len),
-        79 => wire__crate__api__history__HistoryStore_image_save_impl(ptr, rust_vec_len, data_len),
-        81 => wire__crate__api__history__HistoryStore_list_impl(ptr, rust_vec_len, data_len),
-        84 => wire__crate__api__history__HistoryStore_save_sync_impl(ptr, rust_vec_len, data_len),
-        85 => wire__crate__api__http__HttpCancellation_cancel_impl(ptr, rust_vec_len, data_len),
-        87 => wire__crate__api__http__HttpCancellation_new_impl(ptr, rust_vec_len, data_len),
-        89 => wire__crate__api__http__HttpResponse_headers_impl(ptr, rust_vec_len, data_len),
-        91 => wire__crate__api__http__HttpResponse_status_impl(ptr, rust_vec_len, data_len),
-        92 => wire__crate__api__http__HttpResponse_url_impl(ptr, rust_vec_len, data_len),
-        93 => wire__crate__api__http__HttpUpload_abort_impl(ptr, rust_vec_len, data_len),
-        96 => wire__crate__api__http__HttpUpload_finish_impl(ptr, rust_vec_len, data_len),
-        97 => wire__crate__api__http__HttpUpload_new_impl(ptr, rust_vec_len, data_len),
-        99 => wire__crate__api__media__ImageTransfer_cancel_impl(ptr, rust_vec_len, data_len),
-        103 => wire__crate__api__local__LocalOperation_cancel_impl(ptr, rust_vec_len, data_len),
-        106 => wire__crate__api__local__LocalStore_close_impl(ptr, rust_vec_len, data_len),
-        107 => wire__crate__api__local__LocalStore_count_impl(ptr, rust_vec_len, data_len),
-        108 => wire__crate__api__local__LocalStore_delete_impl(ptr, rust_vec_len, data_len),
-        109 => {
+        83 => wire__crate__api__history__HistoryStore_image_find_impl(ptr, rust_vec_len, data_len),
+        84 => wire__crate__api__history__HistoryStore_image_has_impl(ptr, rust_vec_len, data_len),
+        85 => wire__crate__api__history__HistoryStore_image_list_impl(ptr, rust_vec_len, data_len),
+        86 => wire__crate__api__history__HistoryStore_image_save_impl(ptr, rust_vec_len, data_len),
+        88 => wire__crate__api__history__HistoryStore_list_impl(ptr, rust_vec_len, data_len),
+        92 => wire__crate__api__history__HistoryStore_save_sync_impl(ptr, rust_vec_len, data_len),
+        93 => wire__crate__api__http__HttpCancellation_cancel_impl(ptr, rust_vec_len, data_len),
+        95 => wire__crate__api__http__HttpCancellation_new_impl(ptr, rust_vec_len, data_len),
+        97 => wire__crate__api__http__HttpResponse_headers_impl(ptr, rust_vec_len, data_len),
+        99 => wire__crate__api__http__HttpResponse_status_impl(ptr, rust_vec_len, data_len),
+        100 => wire__crate__api__http__HttpResponse_url_impl(ptr, rust_vec_len, data_len),
+        101 => wire__crate__api__http__HttpUpload_abort_impl(ptr, rust_vec_len, data_len),
+        104 => wire__crate__api__http__HttpUpload_finish_impl(ptr, rust_vec_len, data_len),
+        105 => wire__crate__api__http__HttpUpload_new_impl(ptr, rust_vec_len, data_len),
+        107 => wire__crate__api__media__ImageTransfer_cancel_impl(ptr, rust_vec_len, data_len),
+        112 => wire__crate__api__local__LocalOperation_cancel_impl(ptr, rust_vec_len, data_len),
+        115 => wire__crate__api__local__LocalStore_close_impl(ptr, rust_vec_len, data_len),
+        116 => wire__crate__api__local__LocalStore_count_impl(ptr, rust_vec_len, data_len),
+        117 => wire__crate__api__local__LocalStore_delete_impl(ptr, rust_vec_len, data_len),
+        118 => {
             wire__crate__api__local__LocalStore_delete_chapters_impl(ptr, rust_vec_len, data_len)
         }
-        110 => wire__crate__api__local__LocalStore_downloaded_impl(ptr, rust_vec_len, data_len),
-        111 => wire__crate__api__local__LocalStore_find_impl(ptr, rust_vec_len, data_len),
-        112 => wire__crate__api__local__LocalStore_find_name_impl(ptr, rust_vec_len, data_len),
-        113 => wire__crate__api__local__LocalStore_list_impl(ptr, rust_vec_len, data_len),
-        114 => wire__crate__api__local__LocalStore_next_id_impl(ptr, rust_vec_len, data_len),
-        116 => wire__crate__api__local__LocalStore_save_impl(ptr, rust_vec_len, data_len),
-        118 => wire__crate__api__script__ScriptRuntime_close_impl(ptr, rust_vec_len, data_len),
-        120 => wire__crate__api__script__ScriptRuntime_edit_source_setting_impl(
+        119 => wire__crate__api__local__LocalStore_downloaded_impl(ptr, rust_vec_len, data_len),
+        120 => wire__crate__api__local__LocalStore_find_impl(ptr, rust_vec_len, data_len),
+        121 => wire__crate__api__local__LocalStore_find_name_impl(ptr, rust_vec_len, data_len),
+        122 => wire__crate__api__local__LocalStore_list_impl(ptr, rust_vec_len, data_len),
+        123 => wire__crate__api__local__LocalStore_next_id_impl(ptr, rust_vec_len, data_len),
+        125 => wire__crate__api__local__LocalStore_reading_start_impl(ptr, rust_vec_len, data_len),
+        126 => wire__crate__api__local__LocalStore_save_impl(ptr, rust_vec_len, data_len),
+        128 => wire__crate__api__script__ScriptRuntime_close_impl(ptr, rust_vec_len, data_len),
+        130 => wire__crate__api__script__ScriptRuntime_edit_source_setting_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        121 => wire__crate__api__script__ScriptRuntime_evaluate_impl(ptr, rust_vec_len, data_len),
-        123 => wire__crate__api__script__ScriptRuntime_invoke_impl(ptr, rust_vec_len, data_len),
-        127 => wire__crate__api__script__ScriptRuntime_release_impl(ptr, rust_vec_len, data_len),
-        128 => {
+        131 => wire__crate__api__script__ScriptRuntime_evaluate_impl(ptr, rust_vec_len, data_len),
+        133 => wire__crate__api__script__ScriptRuntime_invoke_impl(ptr, rust_vec_len, data_len),
+        137 => wire__crate__api__script__ScriptRuntime_release_impl(ptr, rust_vec_len, data_len),
+        138 => {
             wire__crate__api__script__ScriptRuntime_resolve_event_impl(ptr, rust_vec_len, data_len)
         }
-        129 => wire__crate__api__script__ScriptRuntime_retain_impl(ptr, rust_vec_len, data_len),
-        139 => wire__crate__api__sources__SourceManager_reconcile_pages_impl(
+        139 => wire__crate__api__script__ScriptRuntime_retain_impl(ptr, rust_vec_len, data_len),
+        149 => wire__crate__api__sources__SourceManager_reconcile_pages_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        143 => wire__crate__api__sources__SourceManager_snapshot_impl(ptr, rust_vec_len, data_len),
-        146 => wire__crate__api__backup__SyncController_finish_restore_impl(
+        153 => wire__crate__api__sources__SourceManager_snapshot_impl(ptr, rust_vec_len, data_len),
+        156 => wire__crate__api__backup__SyncController_finish_restore_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        149 => wire__crate__api__backup__SyncController_snapshot_impl(ptr, rust_vec_len, data_len),
-        153 => wire__crate__api__local__chapter_directory_name_impl(ptr, rust_vec_len, data_len),
-        154 => wire__crate__api__http__clear_http_cache_impl(ptr, rust_vec_len, data_len),
-        157 => wire__crate__api__http__configure_source_http_impl(ptr, rust_vec_len, data_len),
-        159 => wire__crate__api__settings__default_settings_json_impl(ptr, rust_vec_len, data_len),
-        164 => wire__crate__api__follow_updates__find_update_time_impl(ptr, rust_vec_len, data_len),
-        165 => wire__crate__api__text__has_chinese_simplified_impl(ptr, rust_vec_len, data_len),
-        166 => wire__crate__api__text__has_chinese_traditional_impl(ptr, rust_vec_len, data_len),
-        171 => {
+        159 => wire__crate__api__backup__SyncController_snapshot_impl(ptr, rust_vec_len, data_len),
+        163 => wire__crate__api__local__chapter_directory_name_impl(ptr, rust_vec_len, data_len),
+        164 => wire__crate__api__http__clear_http_cache_impl(ptr, rust_vec_len, data_len),
+        167 => wire__crate__api__http__configure_source_http_impl(ptr, rust_vec_len, data_len),
+        169 => wire__crate__api__settings__default_settings_json_impl(ptr, rust_vec_len, data_len),
+        175 => wire__crate__api__follow_updates__find_update_time_impl(ptr, rust_vec_len, data_len),
+        176 => wire__crate__api__text__has_chinese_simplified_impl(ptr, rust_vec_len, data_len),
+        177 => wire__crate__api__text__has_chinese_traditional_impl(ptr, rust_vec_len, data_len),
+        184 => {
             wire__crate__api__http__is_cloudflare_challenge_page_impl(ptr, rust_vec_len, data_len)
         }
-        174 => wire__crate__api__script__load_source_data_impl(ptr, rust_vec_len, data_len),
-        176 => wire__crate__api__settings__preview_app_data_edits_impl(ptr, rust_vec_len, data_len),
-        179 => wire__crate__api__settings__reader_setting_impl(ptr, rust_vec_len, data_len),
-        180 => wire__crate__api__text__simplified_to_traditional_impl(ptr, rust_vec_len, data_len),
-        181 => wire__crate__api__local__sort_comic_images_impl(ptr, rust_vec_len, data_len),
-        184 => wire__crate__api__tags__tag_suggestions_impl(ptr, rust_vec_len, data_len),
-        185 => wire__crate__api__text__traditional_to_simplified_impl(ptr, rust_vec_len, data_len),
-        186 => wire__crate__api__tags__translate_tag_impl(ptr, rust_vec_len, data_len),
-        187 => wire__crate__api__script__update_source_data_impl(ptr, rust_vec_len, data_len),
+        187 => wire__crate__api__script__load_source_data_impl(ptr, rust_vec_len, data_len),
+        189 => wire__crate__api__settings__preview_app_data_edits_impl(ptr, rust_vec_len, data_len),
+        192 => wire__crate__api__settings__reader_setting_impl(ptr, rust_vec_len, data_len),
+        193 => wire__crate__api__text__simplified_to_traditional_impl(ptr, rust_vec_len, data_len),
+        194 => wire__crate__api__local__sort_comic_images_impl(ptr, rust_vec_len, data_len),
+        197 => wire__crate__api__tags__tag_suggestions_impl(ptr, rust_vec_len, data_len),
+        198 => wire__crate__api__text__traditional_to_simplified_impl(ptr, rust_vec_len, data_len),
+        199 => wire__crate__api__tags__translate_tag_impl(ptr, rust_vec_len, data_len),
+        200 => wire__crate__api__script__update_source_data_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -11012,6 +11941,24 @@ impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<
 
 impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<CookieStore>> for CookieStore {
     fn into_into_dart(self) -> FrbWrapper<CookieStore> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<FavoriteImportTask> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<FavoriteImportTask>
+{
+}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FavoriteImportTask>> for FavoriteImportTask {
+    fn into_into_dart(self) -> FrbWrapper<FavoriteImportTask> {
         self.into()
     }
 }
@@ -11075,6 +12022,24 @@ impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for FrbWrapper<
 
 impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<FollowUpdateTask>> for FollowUpdateTask {
     fn into_into_dart(self) -> FrbWrapper<FollowUpdateTask> {
+        self.into()
+    }
+}
+
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<HistoryRefreshTask> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self.0)
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<HistoryRefreshTask>
+{
+}
+
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<HistoryRefreshTask>> for HistoryRefreshTask {
+    fn into_into_dart(self) -> FrbWrapper<HistoryRefreshTask> {
         self.into()
     }
 }
@@ -11301,6 +12266,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::history::HistoryEntry>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::history::HistoryRefreshProgress {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.total.into_into_dart().into_dart(),
+            self.current.into_into_dart().into_dart(),
+            self.success.into_into_dart().into_dart(),
+            self.failed.into_into_dart().into_dart(),
+            self.skipped.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::history::HistoryRefreshProgress
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::history::HistoryRefreshProgress>
+    for crate::api::history::HistoryRefreshProgress
+{
+    fn into_into_dart(self) -> crate::api::history::HistoryRefreshProgress {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::http::HttpHeader {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -11361,6 +12350,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::media::ImageProgress>
     for crate::api::media::ImageProgress
 {
     fn into_into_dart(self) -> crate::api::media::ImageProgress {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::local::ReadingStart {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.chapter.into_into_dart().into_dart(),
+            self.group.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::local::ReadingStart
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::local::ReadingStart>
+    for crate::api::local::ReadingStart
+{
+    fn into_into_dart(self) -> crate::api::local::ReadingStart {
         self
     }
 }
@@ -11465,6 +12475,13 @@ impl SseEncode for CookieStore {
     }
 }
 
+impl SseEncode for FavoriteImportTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
 impl SseEncode for FavoriteStore {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11490,6 +12507,13 @@ impl SseEncode for FollowUpdateTask {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
+    }
+}
+
+impl SseEncode for HistoryRefreshTask {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
     }
 }
 
@@ -11611,6 +12635,17 @@ impl SseEncode
 }
 
 impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -11645,6 +12680,17 @@ impl SseEncode
 
 impl SseEncode
     for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        let (ptr, size) = self.sse_encode_raw();
+        <usize>::sse_encode(ptr, serializer);
+        <i32>::sse_encode(size, serializer);
+    }
+}
+
+impl SseEncode
+    for RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>
 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11813,6 +12859,17 @@ impl SseEncode for crate::api::history::HistoryEntry {
     }
 }
 
+impl SseEncode for crate::api::history::HistoryRefreshProgress {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.total, serializer);
+        <u32>::sse_encode(self.current, serializer);
+        <u32>::sse_encode(self.success, serializer);
+        <u32>::sse_encode(self.failed, serializer);
+        <u32>::sse_encode(self.skipped, serializer);
+    }
+}
+
 impl SseEncode for crate::api::http::HttpHeader {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11898,6 +12955,16 @@ impl SseEncode for Vec<crate::api::http::HttpHeader> {
     }
 }
 
+impl SseEncode for Vec<i32> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <i32>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11978,6 +13045,16 @@ impl SseEncode for Option<String> {
     }
 }
 
+impl SseEncode for Option<crate::api::history::ComicKey> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::history::ComicKey>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::download::DownloadProgress> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11994,6 +13071,16 @@ impl SseEncode for Option<crate::api::history::HistoryEntry> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::history::HistoryEntry>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::history::HistoryRefreshProgress> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::history::HistoryRefreshProgress>::sse_encode(value, serializer);
         }
     }
 }
@@ -12018,6 +13105,16 @@ impl SseEncode for Option<crate::api::media::ImageProgress> {
     }
 }
 
+impl SseEncode for Option<crate::api::local::ReadingStart> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::local::ReadingStart>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<u32> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -12035,6 +13132,14 @@ impl SseEncode for Option<Vec<u8>> {
         if let Some(value) = self {
             <Vec<u8>>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for crate::api::local::ReadingStart {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.chapter, serializer);
+        <Option<u32>>::sse_encode(self.group, serializer);
     }
 }
 
@@ -12202,6 +13307,20 @@ mod io {
     }
 
     #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
         ptr: *const std::ffi::c_void,
     ) {
@@ -12255,6 +13374,20 @@ mod io {
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FollowUpdateTask>>::decrement_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>::increment_strong_count(ptr as _);
+    }
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+        ptr: *const std::ffi::c_void,
+    ) {
+        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>::decrement_strong_count(ptr as _);
     }
 
     #[unsafe(no_mangle)]

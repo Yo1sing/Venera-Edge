@@ -1,5 +1,6 @@
 use crate::{
     api::http::HttpCancellation,
+    atomic_file::write_json as atomic_json,
     comic_queue::{Options, Queue},
 };
 use anyhow::{ensure, Context, Result};
@@ -59,30 +60,6 @@ pub(crate) fn read(options: &Options, token: &str) -> Result<Option<Work>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error.into()),
     }
-}
-
-pub(crate) fn atomic_json(path: &Path, value: &impl Serialize) -> Result<()> {
-    fs::create_dir_all(path.parent().context("Missing state directory")?)?;
-    let mut temporary = tempfile::NamedTempFile::new_in(path.parent().unwrap())?;
-    temporary.write_all(&serde_json::to_vec(value)?)?;
-    temporary.as_file().sync_all()?;
-    for attempt in 0..5 {
-        match temporary.persist(path) {
-            Ok(_) => return Ok(()),
-            Err(error)
-                if cfg!(windows)
-                    && matches!(error.error.raw_os_error(), Some(5 | 32 | 33))
-                    && attempt < 4 =>
-            {
-                temporary = error.file;
-                std::thread::sleep(std::time::Duration::from_millis(10 * (attempt + 1)));
-            }
-            Err(error) => {
-                return Err(error).with_context(|| format!("Cannot replace {}", path.display()))
-            }
-        }
-    }
-    unreachable!()
 }
 
 impl Work {

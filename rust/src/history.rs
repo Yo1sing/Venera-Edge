@@ -28,6 +28,19 @@ fn entry(row: &Row) -> rusqlite::Result<HistoryEntry> {
 }
 
 impl History {
+    pub(crate) fn update_cover(
+        &self,
+        id: &str,
+        kind: i32,
+        previous: &str,
+        cover: &str,
+    ) -> Result<()> {
+        self.db.execute(
+            "UPDATE history SET cover=? WHERE id=? AND type=? AND cover=?",
+            params![cover, id, kind, previous],
+        )?;
+        Ok(())
+    }
     pub fn open(path: &str) -> Result<Self> {
         let mut db = Connection::open(path)?;
         db.busy_timeout(std::time::Duration::from_secs(5))?;
@@ -62,6 +75,19 @@ impl History {
                 entry,
             )
             .optional()?)
+    }
+
+    pub fn update_metadata(
+        &self,
+        item: &HistoryEntry,
+        title: &str,
+        subtitle: &str,
+        cover: &str,
+    ) -> Result<bool> {
+        Ok(self.db.execute(
+            "UPDATE history SET title=?, subtitle=?, cover=? WHERE id=? AND type=?",
+            params![title, subtitle, cover, item.id, item.comic_type],
+        )? != 0)
     }
 
     pub fn list(&self, limit: Option<u32>) -> Result<Vec<HistoryEntry>> {

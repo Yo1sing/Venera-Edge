@@ -4,6 +4,9 @@ pub struct ComicDownloadQueue {
     inner: std::sync::Arc<crate::comic_queue::Queue>,
 }
 impl ComicDownloadQueue {
+    pub async fn move_storage(&self, destination: String, android: bool) -> Result<String> {
+        self.inner.move_storage(&destination, android).await
+    }
     pub fn open(
         runtime: &crate::api::script::ScriptRuntime,
         options_json: String,

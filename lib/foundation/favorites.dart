@@ -3,7 +3,8 @@ import 'package:venera/src/rust/api/favorites.dart' as backend;
 
 import 'package:flutter/foundation.dart';
 import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/image_provider/local_favorite_image.dart';
+import 'package:venera/foundation/log.dart';
+import 'package:venera/src/rust/api/media.dart' as media;
 import 'package:venera/foundation/local.dart';
 import 'package:venera/pages/follow_updates_page.dart';
 
@@ -290,22 +291,11 @@ class LocalFavoritesManager with ChangeNotifier {
     return result;
   }
 
-  void linkFolderToNetwork(
-    String folder,
-    String source,
-    String networkFolder,
-  ) =>
-      _store.link(folder: folder, source: source, networkFolder: networkFolder);
   (String?, String?) findLinked(String folder) {
     final result = _store.linked(folder: folder);
     return result.isEmpty ? (null, null) : (result[0], result[1]);
   }
 
-  bool isLinkedToNetworkFolder(
-    String folder,
-    String source,
-    String networkFolder,
-  ) => findLinked(folder) == (source, networkFolder);
   bool comicExists(String folder, String id, ComicType type) =>
       _store.get_(folder: folder, id: id, comicType: type.value) != null;
   FavoriteItem getComic(String folder, String id, ComicType type) {
@@ -387,15 +377,16 @@ class LocalFavoritesManager with ChangeNotifier {
 
   void deleteComicWithId(String folder, String id, ComicType type) {
     _store.delete(folder: folder, keysJson: _key(id, type));
-    LocalFavoriteImageProvider.delete(id, type.value);
+    _deleteLegacyCovers([(id + type.value.toString()).hashCode]);
     initCounts();
   }
 
   void batchDeleteComics(String folder, List<FavoriteItem> comics) {
     _store.delete(folder: folder, keysJson: _keys(comics));
-    for (final comic in comics) {
-      LocalFavoriteImageProvider.delete(comic.id, comic.type.value);
-    }
+    _deleteLegacyCovers([
+      for (final comic in comics)
+        (comic.id + comic.type.value.toString()).hashCode,
+    ]);
     initCounts();
   }
 
@@ -405,10 +396,19 @@ class LocalFavoritesManager with ChangeNotifier {
         comics.map((c) => {'id': c.id, 'type': c.type.value}).toList(),
       ),
     );
-    for (final comic in comics) {
-      LocalFavoriteImageProvider.delete(comic.id, comic.type.value);
-    }
+    _deleteLegacyCovers([
+      for (final comic in comics)
+        (comic.id + comic.type.value.toString()).hashCode,
+    ]);
     initCounts();
+  }
+
+  void _deleteLegacyCovers(List<int> hashes) {
+    media
+        .deleteLegacyFavoriteCovers(dataPath: App.dataPath, hashes: hashes)
+        .catchError((Object error, StackTrace stack) {
+          Log.error('Favorite cover cleanup', error, stack);
+        });
   }
 
   Future<int> removeInvalid() async {

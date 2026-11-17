@@ -1,6 +1,7 @@
+use crate::atomic_file::write_json as atomic_json;
 use anyhow::{ensure, Context, Result};
 use serde_json::{json, Value};
-use std::{fs, io::Write, path::Path, sync::Mutex};
+use std::{fs, path::Path, sync::Mutex};
 
 // Serializes writes within this process, including callers on FRB's worker pool.
 static WRITES: Mutex<()> = Mutex::new(());
@@ -12,17 +13,6 @@ const DEVICE_ONLY: &[&str] = &[
     "disableSyncFields",
     "deviceId",
 ];
-
-fn atomic_json(path: &Path, data: &Value) -> Result<()> {
-    let parent = path.parent().context("settings path has no parent")?;
-    fs::create_dir_all(parent)?;
-    let mut file = tempfile::NamedTempFile::new_in(parent)?;
-    serde_json::to_writer(file.as_file_mut(), data)?;
-    file.as_file_mut().flush()?;
-    file.as_file_mut().sync_all()?;
-    file.persist(path)?;
-    Ok(())
-}
 
 fn read_optional(path: &Path) -> Result<Option<Value>> {
     match fs::read(path) {

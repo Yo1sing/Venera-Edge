@@ -54,6 +54,7 @@ enum Command {
 }
 
 pub struct Engine {
+    pub(crate) local_root: std::sync::RwLock<Option<String>>,
     commands: mpsc::Sender<Command>,
     closed: Arc<AtomicBool>,
     pub events: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>,
@@ -240,6 +241,7 @@ impl Engine {
             .recv()
             .context("Script worker exited during initialization")??;
         Ok(Self {
+            local_root: std::sync::RwLock::new(None),
             commands,
             closed,
             events: tokio::sync::Mutex::new(event_receiver),

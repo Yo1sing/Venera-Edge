@@ -49,12 +49,13 @@ class _AppSettingsState extends State<AppSettings> {
             );
             var res = await LocalManager().setNewPath(result);
             loadingDialog.close();
+            if (!mounted) return;
             if (res != null) {
               context.showMessage(message: res);
             } else {
               context.showMessage(message: "Path set successfully".tl);
-              setState(() {});
             }
+            setState(() {});
           },
         ).toSliver(),
         ListTile(

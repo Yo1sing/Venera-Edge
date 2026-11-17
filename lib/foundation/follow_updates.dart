@@ -130,11 +130,17 @@ abstract class FollowUpdatesBackend {
 class UpdateSession {
   final String folder;
   final bool force;
+  final bool metadataOnly;
   final List<Map<String, dynamic>>? keys;
   backend.FollowUpdateTask? _task;
   bool _cancelled = false;
 
-  UpdateSession(this.folder, this.force, {this.keys});
+  UpdateSession(
+    this.folder,
+    this.force, {
+    this.keys,
+    this.metadataOnly = false,
+  });
 
   void cancel() {
     _cancelled = true;
@@ -144,11 +150,13 @@ class UpdateSession {
   Stream<UpdateProgress> get progress async* {
     final service = await FollowUpdatesBackend._service();
     if (_cancelled) return;
-    final task = await service.start(
-      folder: folder,
-      force: force,
-      keysJson: keys == null ? null : jsonEncode(keys),
-    );
+    final task = metadataOnly
+        ? await service.refreshMetadata(folder: folder)
+        : await service.start(
+            folder: folder,
+            force: force,
+            keysJson: keys == null ? null : jsonEncode(keys),
+          );
     _task = task;
     try {
       if (_cancelled) task.cancel();

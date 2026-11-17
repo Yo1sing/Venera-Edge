@@ -16,9 +16,6 @@ class ImageFavoritesProvider extends BaseImageProvider<ImageFavoritesProvider> {
   final ImageFavorite imageFavorite;
 
   @override
-  bool get retryOnError => false;
-
-  @override
   Future<Uint8List> load(
     StreamController<ImageChunkEvent>? chunkEvents,
     void Function()? checkStop,

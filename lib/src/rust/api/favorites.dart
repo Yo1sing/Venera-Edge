@@ -5,8 +5,16 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'script.dart';
 
 // These functions are ignored because they are not marked as `pub`: `unique`, `with`
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteImportTask>>
+abstract class FavoriteImportTask implements RustOpaqueInterface {
+  void cancel();
+
+  Future<String?> nextSnapshot();
+}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FavoriteStore>>
 abstract class FavoriteStore implements RustOpaqueInterface {
@@ -59,6 +67,11 @@ abstract class FavoriteStore implements RustOpaqueInterface {
     required Map<int, int> legacyTypes,
     required bool atEnd,
     required bool traditional,
+  });
+
+  Future<FavoriteImportTask> importNetwork({
+    required ScriptRuntime runtime,
+    required String requestJson,
   });
 
   void link({

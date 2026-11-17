@@ -10,6 +10,20 @@ import 'script.dart';
 // These functions are ignored because they are not marked as `pub`: `with`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `drop`
 
+Future<String> initializeStorage({
+  required ScriptRuntime runtime,
+  required String dataPath,
+  required String defaultPath,
+  required bool preferExistingInData,
+  required bool android,
+}) => RustLib.instance.api.crateApiLocalInitializeStorage(
+  runtime: runtime,
+  dataPath: dataPath,
+  defaultPath: defaultPath,
+  preferExistingInData: preferExistingInData,
+  android: android,
+);
+
 String chapterDirectoryName({required String name}) =>
     RustLib.instance.api.crateApiLocalChapterDirectoryName(name: name);
 
@@ -70,5 +84,25 @@ abstract class LocalStore implements RustOpaqueInterface {
   static Future<LocalStore> open({required String path}) =>
       RustLib.instance.api.crateApiLocalLocalStoreOpen(path: path);
 
+  ReadingStart? readingStart({required String id, required int comicType});
+
   void save({required String comicJson});
+}
+
+class ReadingStart {
+  final int chapter;
+  final int? group;
+
+  const ReadingStart({required this.chapter, this.group});
+
+  @override
+  int get hashCode => chapter.hashCode ^ group.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReadingStart &&
+          runtimeType == other.runtimeType &&
+          chapter == other.chapter &&
+          group == other.group;
 }

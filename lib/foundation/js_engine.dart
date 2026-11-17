@@ -64,7 +64,7 @@ class JsEngine with JsUiApi, Init {
     },
   });
 
-  void resetDio() {
+  void _refreshTransportOptions() {
     if (appdata.settings['proxy'] == 'system' && !App.isLinux) {
       _systemProxyRefresh ??= Timer.periodic(
         const Duration(seconds: 5),
@@ -109,8 +109,8 @@ class JsEngine with JsUiApi, Init {
     final session = ScriptSession(runtime);
     _session = session;
     _publishHttpOptions(http);
-    appdata.settings.addListener(resetDio);
-    resetDio();
+    appdata.settings.addListener(_refreshTransportOptions);
+    _refreshTransportOptions();
     unawaited(_listen(session));
   }
 
@@ -187,6 +187,18 @@ class JsEngine with JsUiApi, Init {
               await Directory(path).create();
             case 'copy':
               await File(path).copyMem(to!);
+            case 'touch':
+              await File(path).create();
+            case 'read':
+              result = await File(path).readAsBytes();
+            case 'removeFile':
+              await File(path).delete();
+              if (await File(path).exists()) {
+                throw StateError('File deletion was not completed');
+              }
+            case 'removeEmpty':
+              final directory = Directory(path);
+              if (await directory.list().isEmpty) await directory.delete();
             case 'rename':
               await Directory(path).rename(to!);
               if (!await Directory(to).exists() ||
@@ -264,7 +276,7 @@ class JsEngine with JsUiApi, Init {
   }
 
   void dispose() {
-    appdata.settings.removeListener(resetDio);
+    appdata.settings.removeListener(_refreshTransportOptions);
     _systemProxyRefresh?.cancel();
     _systemProxyRefresh = null;
     _session?.close();

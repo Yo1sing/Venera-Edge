@@ -38,6 +38,22 @@ impl HistoryStore {
         self.with(|db| db.save(&entry))
     }
 
+    pub fn refresh_metadata(
+        &self,
+        runtime: &crate::api::script::ScriptRuntime,
+        sources_json: String,
+        key: Option<ComicKey>,
+    ) -> Result<HistoryRefreshTask> {
+        Ok(HistoryRefreshTask {
+            inner: crate::history_refresh::Task::start(
+                self.inner.clone(),
+                runtime.inner.clone(),
+                serde_json::from_str(&sources_json)?,
+                key,
+            )?,
+        })
+    }
+
     // Existing widgets perform synchronous history lookups during build.
     // Keep these compatibility calls small; async APIs are used for writes on reader scroll.
     #[flutter_rust_bridge::frb(sync)]
@@ -127,5 +143,30 @@ impl HistoryStore {
         operation: impl FnOnce(&mut crate::history::History) -> Result<T>,
     ) -> Result<T> {
         self.inner.with(operation)
+    }
+}
+
+#[derive(Clone)]
+pub struct HistoryRefreshProgress {
+    pub total: u32,
+    pub current: u32,
+    pub success: u32,
+    pub failed: u32,
+    pub skipped: u32,
+}
+
+#[flutter_rust_bridge::frb(opaque)]
+pub struct HistoryRefreshTask {
+    inner: crate::history_refresh::Task,
+}
+
+impl HistoryRefreshTask {
+    pub async fn next(&self) -> Option<HistoryRefreshProgress> {
+        self.inner.next().await
+    }
+
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn cancel(&self) {
+        self.inner.cancel();
     }
 }

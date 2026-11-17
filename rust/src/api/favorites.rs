@@ -8,6 +8,20 @@ pub struct FavoriteStore {
 }
 
 impl FavoriteStore {
+    pub fn import_network(
+        &self,
+        runtime: &crate::api::script::ScriptRuntime,
+        request_json: String,
+    ) -> Result<FavoriteImportTask> {
+        Ok(FavoriteImportTask {
+            inner: crate::favorite_import::Task::start(
+                self.inner.clone(),
+                runtime.inner.clone(),
+                serde_json::from_str(&request_json)?,
+            ),
+        })
+    }
+
     pub fn open(path: String, traditional: bool) -> Result<Self> {
         Ok(Self {
             inner: Database::new(path, move |path| {
@@ -258,5 +272,21 @@ impl FavoriteStore {
         operation: impl FnOnce(&crate::favorites::Favorites) -> Result<T>,
     ) -> Result<T> {
         self.inner.with(|db| operation(db))
+    }
+}
+
+#[flutter_rust_bridge::frb(opaque)]
+pub struct FavoriteImportTask {
+    inner: crate::favorite_import::Task,
+}
+
+impl FavoriteImportTask {
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn cancel(&self) {
+        self.inner.cancel();
+    }
+
+    pub async fn next_snapshot(&self) -> Option<String> {
+        self.inner.next().await
     }
 }

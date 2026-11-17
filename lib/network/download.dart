@@ -214,6 +214,13 @@ abstract class DownloadQueueView {
     await _queue!.configure(optionsJson: await _options());
     await _queue!.add(taskJson: jsonEncode(task.toJson()));
   });
+
+  static Future<Map<String, dynamic>> moveStorage(String destination) async {
+    await initialize();
+    return jsonDecode(
+      await _queue!.moveStorage(destination: destination, android: App.isAndroid),
+    ) as Map<String, dynamic>;
+  }
   static void command(String key, String action) => _run(() async {
     await initialize();
     await _queue!.configure(optionsJson: await _options());

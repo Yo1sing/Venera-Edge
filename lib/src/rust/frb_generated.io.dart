@@ -47,6 +47,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerCookieStorePtr;
 
   CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_FavoriteImportTaskPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTaskPtr;
+
+  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_FavoriteStorePtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStorePtr;
 
@@ -61,6 +65,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_FollowUpdateTaskPtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTaskPtr;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_HistoryRefreshTaskPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTaskPtr;
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_HistoryStorePtr => wire
@@ -124,6 +132,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    dynamic raw,
+  );
+
+  @protected
   FavoriteStore
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     dynamic raw,
@@ -144,6 +158,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    dynamic raw,
+  );
+
+  @protected
+  HistoryRefreshTask
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     dynamic raw,
   );
 
@@ -226,6 +246,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    dynamic raw,
+  );
+
+  @protected
   FavoriteStore
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     dynamic raw,
@@ -246,6 +272,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    dynamic raw,
+  );
+
+  @protected
+  HistoryRefreshTask
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     dynamic raw,
   );
 
@@ -340,6 +372,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    dynamic raw,
+  );
+
+  @protected
   FavoriteStore
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     dynamic raw,
@@ -360,6 +398,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    dynamic raw,
+  );
+
+  @protected
+  HistoryRefreshTask
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     dynamic raw,
   );
 
@@ -430,10 +474,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  ComicKey dco_decode_box_autoadd_comic_key(dynamic raw);
+
+  @protected
   DownloadProgress dco_decode_box_autoadd_download_progress(dynamic raw);
 
   @protected
   HistoryEntry dco_decode_box_autoadd_history_entry(dynamic raw);
+
+  @protected
+  HistoryRefreshProgress dco_decode_box_autoadd_history_refresh_progress(
+    dynamic raw,
+  );
 
   @protected
   HttpOptions dco_decode_box_autoadd_http_options(dynamic raw);
@@ -443,6 +495,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImageProgress dco_decode_box_autoadd_image_progress(dynamic raw);
+
+  @protected
+  ReadingStart dco_decode_box_autoadd_reading_start(dynamic raw);
 
   @protected
   SourceHttpOptions dco_decode_box_autoadd_source_http_options(dynamic raw);
@@ -458,6 +513,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HistoryEntry dco_decode_history_entry(dynamic raw);
+
+  @protected
+  HistoryRefreshProgress dco_decode_history_refresh_progress(dynamic raw);
 
   @protected
   HttpHeader dco_decode_http_header(dynamic raw);
@@ -487,6 +545,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<HttpHeader> dco_decode_list_http_header(dynamic raw);
 
   @protected
+  List<int> dco_decode_list_prim_i_32_loose(dynamic raw);
+
+  @protected
+  Int32List dco_decode_list_prim_i_32_strict(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
@@ -514,10 +578,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  ComicKey? dco_decode_opt_box_autoadd_comic_key(dynamic raw);
+
+  @protected
   DownloadProgress? dco_decode_opt_box_autoadd_download_progress(dynamic raw);
 
   @protected
   HistoryEntry? dco_decode_opt_box_autoadd_history_entry(dynamic raw);
+
+  @protected
+  HistoryRefreshProgress? dco_decode_opt_box_autoadd_history_refresh_progress(
+    dynamic raw,
+  );
 
   @protected
   int? dco_decode_opt_box_autoadd_i_32(dynamic raw);
@@ -526,10 +598,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ImageProgress? dco_decode_opt_box_autoadd_image_progress(dynamic raw);
 
   @protected
+  ReadingStart? dco_decode_opt_box_autoadd_reading_start(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  ReadingStart dco_decode_reading_start(dynamic raw);
 
   @protected
   (int, int) dco_decode_record_i_32_i_32(dynamic raw);
@@ -586,6 +664,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   FavoriteStore
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     SseDeserializer deserializer,
@@ -606,6 +690,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HistoryRefreshTask
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     SseDeserializer deserializer,
   );
 
@@ -688,6 +778,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   FavoriteStore
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     SseDeserializer deserializer,
@@ -708,6 +804,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HistoryRefreshTask
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     SseDeserializer deserializer,
   );
 
@@ -804,6 +906,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FavoriteImportTask
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   FavoriteStore
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     SseDeserializer deserializer,
@@ -824,6 +932,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   FollowUpdateTask
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HistoryRefreshTask
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
     SseDeserializer deserializer,
   );
 
@@ -894,12 +1008,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  ComicKey sse_decode_box_autoadd_comic_key(SseDeserializer deserializer);
+
+  @protected
   DownloadProgress sse_decode_box_autoadd_download_progress(
     SseDeserializer deserializer,
   );
 
   @protected
   HistoryEntry sse_decode_box_autoadd_history_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HistoryRefreshProgress sse_decode_box_autoadd_history_refresh_progress(
     SseDeserializer deserializer,
   );
 
@@ -911,6 +1033,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ImageProgress sse_decode_box_autoadd_image_progress(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReadingStart sse_decode_box_autoadd_reading_start(
     SseDeserializer deserializer,
   );
 
@@ -930,6 +1057,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HistoryEntry sse_decode_history_entry(SseDeserializer deserializer);
+
+  @protected
+  HistoryRefreshProgress sse_decode_history_refresh_progress(
+    SseDeserializer deserializer,
+  );
 
   @protected
   HttpHeader sse_decode_http_header(SseDeserializer deserializer);
@@ -959,6 +1091,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<HttpHeader> sse_decode_list_http_header(SseDeserializer deserializer);
+
+  @protected
+  List<int> sse_decode_list_prim_i_32_loose(SseDeserializer deserializer);
+
+  @protected
+  Int32List sse_decode_list_prim_i_32_strict(SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -996,12 +1134,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  ComicKey? sse_decode_opt_box_autoadd_comic_key(SseDeserializer deserializer);
+
+  @protected
   DownloadProgress? sse_decode_opt_box_autoadd_download_progress(
     SseDeserializer deserializer,
   );
 
   @protected
   HistoryEntry? sse_decode_opt_box_autoadd_history_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HistoryRefreshProgress? sse_decode_opt_box_autoadd_history_refresh_progress(
     SseDeserializer deserializer,
   );
 
@@ -1014,10 +1160,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ReadingStart? sse_decode_opt_box_autoadd_reading_start(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  ReadingStart sse_decode_reading_start(SseDeserializer deserializer);
 
   @protected
   (int, int) sse_decode_record_i_32_i_32(SseDeserializer deserializer);
@@ -1085,6 +1239,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    FavoriteImportTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     FavoriteStore self,
     SseSerializer serializer,
@@ -1108,6 +1269,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
     FollowUpdateTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+    HistoryRefreshTask self,
     SseSerializer serializer,
   );
 
@@ -1204,6 +1372,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    FavoriteImportTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     FavoriteStore self,
     SseSerializer serializer,
@@ -1227,6 +1402,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
     FollowUpdateTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+    HistoryRefreshTask self,
     SseSerializer serializer,
   );
 
@@ -1341,6 +1523,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    FavoriteImportTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     FavoriteStore self,
     SseSerializer serializer,
@@ -1364,6 +1553,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask(
     FollowUpdateTask self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+    HistoryRefreshTask self,
     SseSerializer serializer,
   );
 
@@ -1444,6 +1640,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_comic_key(
+    ComicKey self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_download_progress(
     DownloadProgress self,
     SseSerializer serializer,
@@ -1452,6 +1654,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_history_entry(
     HistoryEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_history_refresh_progress(
+    HistoryRefreshProgress self,
     SseSerializer serializer,
   );
 
@@ -1467,6 +1675,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_image_progress(
     ImageProgress self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_reading_start(
+    ReadingStart self,
     SseSerializer serializer,
   );
 
@@ -1490,6 +1704,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_history_entry(HistoryEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_history_refresh_progress(
+    HistoryRefreshProgress self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_http_header(HttpHeader self, SseSerializer serializer);
@@ -1521,6 +1741,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_http_header(
     List<HttpHeader> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_i_32_loose(
+    List<int> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_i_32_strict(
+    Int32List self,
     SseSerializer serializer,
   );
 
@@ -1567,6 +1799,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_comic_key(
+    ComicKey? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_download_progress(
     DownloadProgress? self,
     SseSerializer serializer,
@@ -1575,6 +1813,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_history_entry(
     HistoryEntry? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_history_refresh_progress(
+    HistoryRefreshProgress? self,
     SseSerializer serializer,
   );
 
@@ -1588,6 +1832,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_reading_start(
+    ReadingStart? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
@@ -1595,6 +1845,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     Uint8List? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_reading_start(ReadingStart self, SseSerializer serializer);
 
   @protected
   void sse_encode_record_i_32_i_32((int, int) self, SseSerializer serializer);
@@ -1753,6 +2006,40 @@ class RustLibWire implements BaseWire {
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTaskPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTaskPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTaskPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTask =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteImportTaskPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFavoriteStore(
     ffi.Pointer<ffi.Void> ptr,
   ) {
@@ -1886,6 +2173,40 @@ class RustLibWire implements BaseWire {
       );
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTask =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFollowUpdateTaskPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTaskPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_venera_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTaskPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTaskPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_venera_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTask =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHistoryRefreshTaskPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void

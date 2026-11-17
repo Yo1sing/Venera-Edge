@@ -4,6 +4,7 @@ import 'package:venera/foundation/appdata.dart';
 import 'package:venera/foundation/js_engine.dart';
 
 import 'package:flutter/widgets.dart' show ChangeNotifier;
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:venera/src/rust/api/local.dart' as backend;
 import 'package:venera/foundation/comic_source/comic_source.dart';
@@ -13,6 +14,7 @@ import 'package:venera/foundation/log.dart';
 import 'package:venera/network/download.dart';
 import 'package:venera/pages/reader/reader.dart';
 import 'package:venera/utils/io.dart';
+import 'package:venera/utils/translations.dart';
 
 import 'app.dart';
 import 'history.dart';
@@ -75,22 +77,13 @@ class LocalComic with HistoryMixin implements Comic {
       downloadedChapters = List<String>.from(row['downloaded_chapters']),
       createdAt = DateTime.fromMillisecondsSinceEpoch(row['created_at']);
 
-  Map<String, dynamic> toBackend() => {
-    'id': id,
-    'title': title,
-    'subtitle': subtitle,
-    'tags': tags,
-    'directory': directory,
-    'chapters': chapters?.toJson(),
-    'cover': cover,
-    'comic_type': comicType.value,
-    'downloaded_chapters': downloadedChapters,
-    'created_at': createdAt.millisecondsSinceEpoch,
-  };
-
   File get coverFile => File(FilePath.join(baseDir, cover));
 
-  String get baseDir => (directory.contains('/') || directory.contains('\\'))
+  String get baseDir =>
+      (directory.startsWith('android://') ||
+          directory.startsWith('/') ||
+          directory.startsWith('\\') ||
+          p.isAbsolute(directory))
       ? directory
       : FilePath.join(LocalManager().path, directory);
 
@@ -120,42 +113,16 @@ class LocalComic with HistoryMixin implements Comic {
 
   void read() {
     var history = HistoryManager().find(id, comicType);
-    int? firstDownloadedChapter;
-    int? firstDownloadedChapterGroup;
-    if (downloadedChapters.isNotEmpty && chapters != null) {
-      final chapters = this.chapters!;
-      if (chapters.isGrouped) {
-        for (int i = 0; i < chapters.groupCount; i++) {
-          var group = chapters.getGroupByIndex(i);
-          var keys = group.keys.toList();
-          for (int j = 0; j < keys.length; j++) {
-            var chapterId = keys[j];
-            if (downloadedChapters.contains(chapterId)) {
-              firstDownloadedChapter = j + 1;
-              firstDownloadedChapterGroup = i + 1;
-              break;
-            }
-          }
-        }
-      } else {
-        var keys = chapters.allChapters.keys;
-        for (int i = 0; i < keys.length; i++) {
-          if (downloadedChapters.contains(keys.elementAt(i))) {
-            firstDownloadedChapter = i + 1;
-            break;
-          }
-        }
-      }
-    }
+    final start = LocalManager().readingStart(this);
     App.rootContext.to(
       () => Reader(
         type: comicType,
         cid: id,
         name: title,
         chapters: chapters,
-        initialChapter: history?.ep ?? firstDownloadedChapter,
+        initialChapter: history?.ep ?? start?.chapter,
         initialPage: history?.page,
-        initialChapterGroup: history?.group ?? firstDownloadedChapterGroup,
+        initialChapterGroup: history?.group ?? start?.group,
         history: history ?? History.fromModel(model: this, ep: 0, page: 0),
         author: subtitle,
         tags: tags,
@@ -195,94 +162,42 @@ class LocalManager with ChangeNotifier {
 
   Directory get directory => Directory(path);
 
-  void _checkNoMedia() {
-    if (App.isAndroid) {
-      var file = File(FilePath.join(path, '.nomedia'));
-      if (!file.existsSync()) {
-        file.createSync();
-      }
-    }
-  }
-
-  // return error message if failed
   Future<String?> setNewPath(String newPath) async {
-    var newDir = Directory(newPath);
-    if (!await newDir.exists()) {
-      return "Directory does not exist";
-    }
-    if (!await newDir.list().isEmpty) {
-      return "Directory is not empty";
-    }
     try {
-      await copyDirectoryIsolate(directory, newDir);
-      await File(
-        FilePath.join(App.dataPath, 'local_path'),
-      ).writeAsString(newPath);
-    } catch (e, s) {
-      Log.error("IO", e, s);
-      return e.toString();
+      final result = await DownloadQueueView.moveStorage(newPath);
+      path = result['path'] as String;
+      notifyListeners();
+      final warnings = List<String>.from(result['warnings']);
+      return warnings.isEmpty ? null : warnings.join('\n');
+    } catch (error, stack) {
+      Log.error('Storage', error, stack);
+      return error.toString();
     }
-    await directory.deleteContents(recursive: true);
-    path = newPath;
-    _checkNoMedia();
-    return null;
   }
 
-  Future<String> findDefaultPath() async {
+  Future<String> _platformDefault() async {
     if (App.isAndroid) {
-      var external = await getExternalStorageDirectories();
+      final external = await getExternalStorageDirectories();
       if (external != null && external.isNotEmpty) {
         return FilePath.join(external.first.path, 'local');
-      } else {
-        return FilePath.join(App.dataPath, 'local');
       }
     } else if (App.isIOS) {
-      var oldPath = FilePath.join(App.dataPath, 'local');
-      if (Directory(oldPath).existsSync() &&
-          Directory(oldPath).listSync().isNotEmpty) {
-        return oldPath;
-      } else {
-        var directory = await getApplicationDocumentsDirectory();
-        return FilePath.join(directory.path, 'local');
-      }
-    } else {
-      return FilePath.join(App.dataPath, 'local');
+      final documents = await getApplicationDocumentsDirectory();
+      return FilePath.join(documents.path, 'local');
     }
-  }
-
-  Future<void> _checkPathValidation() async {
-    var testFile = File(FilePath.join(path, 'venera_test'));
-    try {
-      testFile.createSync();
-      testFile.deleteSync();
-    } catch (e) {
-      Log.error(
-        "IO",
-        "Failed to create test file in local path: $e\nUsing default path instead.",
-      );
-      path = await findDefaultPath();
-    }
+    return FilePath.join(App.dataPath, 'local');
   }
 
   Future<void> init() async {
     _store = await backend.LocalStore.open(path: '${App.dataPath}/local.db');
-    if (File(FilePath.join(App.dataPath, 'local_path')).existsSync()) {
-      path = File(FilePath.join(App.dataPath, 'local_path')).readAsStringSync();
-      if (!directory.existsSync()) {
-        path = await findDefaultPath();
-      }
-    } else {
-      path = await findDefaultPath();
-    }
-    try {
-      if (!directory.existsSync()) {
-        await directory.create();
-      }
-    } catch (e, s) {
-      Log.error("IO", "Failed to create local folder: $e", s);
-    }
-    await _checkPathValidation();
-    _checkNoMedia();
+    await JsEngine().ensureInit();
+    path = await backend.initializeStorage(
+      runtime: JsEngine().runtime,
+      dataPath: App.dataPath,
+      defaultPath: await _platformDefault(),
+      preferExistingInData: App.isIOS,
+      android: App.isAndroid,
+    );
     await ComicSourceManager().ensureInit();
   }
 
@@ -296,6 +211,9 @@ class LocalManager with ChangeNotifier {
     return json == null ? null : LocalComic.fromBackend(jsonDecode(json));
   }
 
+  backend.ReadingStart? readingStart(LocalComic comic) =>
+      _store.readingStart(id: comic.id, comicType: comic.comicType.value);
+
   @override
   void dispose() {
     _store.close();
@@ -306,11 +224,6 @@ class LocalManager with ChangeNotifier {
   List<LocalComic> getRecent() =>
       _comics(_store.list(sort: 'time_desc', limit: 20));
   int get count => _store.count();
-  LocalComic? findByName(String name) {
-    final json = _store.findName(name: name);
-    return json == null ? null : LocalComic.fromBackend(jsonDecode(json));
-  }
-
   List<LocalComic> search(String keyword) =>
       _comics(_store.list(sort: 'time_desc', keyword: keyword));
 
@@ -361,6 +274,7 @@ class LocalManager with ChangeNotifier {
     Map<String, dynamic> request, {
     bool showProgress = true,
   }) async {
+    final mode = request['mode'];
     final operation = await backend.LocalOperation.start(
       runtime: JsEngine().runtime,
       optionsJson: jsonEncode({
@@ -377,6 +291,8 @@ class LocalManager with ChangeNotifier {
             App.rootContext,
             barrierDismissible: false,
             onCancel: operation.cancel,
+            message: mode == 'export' ? 'Exporting'.tl : null,
+            withProgress: mode == 'export',
           )
         : null;
     try {
@@ -385,11 +301,15 @@ class LocalManager with ChangeNotifier {
         if (encoded == null) throw StateError('Missing local operation result');
         final event = jsonDecode(encoded);
         if (event['kind'] == 'progress') {
-          controller?.setMessage(event['path']);
+          if (mode == 'export') {
+            controller?.setProgress(event['current'] / event['total']);
+          } else {
+            controller?.setMessage(event['path']);
+          }
           continue;
         }
         final result = Map<String, dynamic>.from(event['result']);
-        if (request['mode'] != 'images' && request['mode'] != 'recover') {
+        if (mode != 'images' && mode != 'recover' && mode != 'export') {
           notifyListeners();
           LocalFavoritesManager().initCounts();
           HistoryManager().notifyExternalChanges();
@@ -409,6 +329,12 @@ class LocalManager with ChangeNotifier {
             controller?.close();
             App.rootContext.showMessage(message: message);
           }
+        }
+        final export = result['export_path'] as String?;
+        if (export != null && result['cancelled'] != true) {
+          controller?.close();
+          final file = File(export);
+          await saveFile(file: file, filename: file.name);
         }
         return result;
       }
@@ -465,9 +391,6 @@ class LocalManager with ChangeNotifier {
     });
     return (result['removed'] as List).isNotEmpty;
   }
-
-  static String getChapterDirectoryName(String name) =>
-      backend.chapterDirectoryName(name: name);
 }
 
 enum LocalSortType {

@@ -5,9 +5,17 @@
 
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'script.dart';
 
 // These functions are ignored because they are not marked as `pub`: `with`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `clone`, `eq`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `clone`, `clone`, `eq`, `fmt`
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryRefreshTask>>
+abstract class HistoryRefreshTask implements RustOpaqueInterface {
+  void cancel();
+
+  Future<HistoryRefreshProgress?> next();
+}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HistoryStore>>
 abstract class HistoryStore implements RustOpaqueInterface {
@@ -45,6 +53,12 @@ abstract class HistoryStore implements RustOpaqueInterface {
 
   static Future<HistoryStore> open({required String path}) =>
       RustLib.instance.api.crateApiHistoryHistoryStoreOpen(path: path);
+
+  Future<HistoryRefreshTask> refreshMetadata({
+    required ScriptRuntime runtime,
+    required String sourcesJson,
+    ComicKey? key,
+  });
 
   Future<void> save({required HistoryEntry entry});
 
@@ -126,4 +140,39 @@ class HistoryEntry {
           readEpisodes == other.readEpisodes &&
           maxPage == other.maxPage &&
           chapterGroup == other.chapterGroup;
+}
+
+class HistoryRefreshProgress {
+  final int total;
+  final int current;
+  final int success;
+  final int failed;
+  final int skipped;
+
+  const HistoryRefreshProgress({
+    required this.total,
+    required this.current,
+    required this.success,
+    required this.failed,
+    required this.skipped,
+  });
+
+  @override
+  int get hashCode =>
+      total.hashCode ^
+      current.hashCode ^
+      success.hashCode ^
+      failed.hashCode ^
+      skipped.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HistoryRefreshProgress &&
+          runtimeType == other.runtimeType &&
+          total == other.total &&
+          current == other.current &&
+          success == other.success &&
+          failed == other.failed &&
+          skipped == other.skipped;
 }

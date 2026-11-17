@@ -111,7 +111,12 @@ pub(crate) fn start(
     favorite.validate()?;
     Task::spawn(engine.clone(), move |state, id| async move {
         let _guard = crate::http_policy::serial(&favorite.lock_key(&cache_path)).await;
-        if let Some(bytes) = local(&engine, &data_path, &local_path, comic_type, &favorite).await? {
+        let local_copy = {
+            let _root = crate::local_storage::FILES.read().await;
+            let root = crate::local_storage::active(&engine, &local_path);
+            local(&engine, &data_path, &root, comic_type, &favorite).await?
+        };
+        if let Some(bytes) = local_copy {
             return Ok(bytes);
         }
         let path = favorite.cache_path(&cache_path);
@@ -255,25 +260,7 @@ async fn network(
         .get((favorite.page - 1) as usize)
         .and_then(|v| v.as_str())
         .context("Image favorite page out of range")?;
-    let mut delay = 1;
-    loop {
-        match fetch(engine, state, id, favorite, image).await {
-            Ok(bytes) => return Ok(bytes),
-            Err(error) => {
-                let message = format!("{error:#}");
-                delay *= 2;
-                if delay > 8
-                    || state.cancellation.is_cancelled()
-                    || message.contains("HTTP 403")
-                    || message.contains("HTTP 404")
-                    || message.contains("handshake")
-                {
-                    return Err(error);
-                }
-                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
-            }
-        }
-    }
+    crate::image_tasks::retry_image(|| fetch(engine, state, id, favorite, image)).await
 }
 
 async fn fetch(

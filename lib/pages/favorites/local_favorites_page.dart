@@ -451,15 +451,7 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
                     MenuEntry(
                       icon: Icons.update,
                       text: "Update Comics Info".tl,
-                      onClick: () {
-                        updateComicsInfo(widget.folder).then((newComics) {
-                          if (mounted) {
-                            setState(() {
-                              comics = newComics;
-                            });
-                          }
-                        });
-                      },
+                      onClick: () => updateComicsInfo(widget.folder),
                     ),
                     MenuEntry(
                       icon: Icons.delete_outline,

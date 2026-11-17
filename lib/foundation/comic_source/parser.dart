@@ -619,28 +619,22 @@ class ComicSourceParser {
       "favorites.singleFolderForSingleComic",
     );
 
-    Future<Res<T>> retryZone<T>(Future<Res<T>> Function() func) => func();
-
     Future<Res<bool>> addOrDelFavFunc(
       String comicId,
       String folderId,
       bool isAdding,
       String? favId,
     ) async {
-      func() async {
-        try {
-          await JsEngine().runCode("""
-            ComicSource.sources[${jsonEncode(_key)}].favorites.addOrDelFavorite(
-              ${jsonEncode(comicId)}, ${jsonEncode(folderId)}, ${jsonEncode(isAdding)})
-          """);
-          return const Res(true);
-        } catch (e, s) {
-          Log.error("Network", "$e\n$s");
-          return Res<bool>.error(e.toString());
-        }
+      try {
+        await JsEngine().runCode("""
+          ComicSource.sources[${jsonEncode(_key)}].favorites.addOrDelFavorite(
+            ${jsonEncode(comicId)}, ${jsonEncode(folderId)}, ${jsonEncode(isAdding)})
+        """);
+        return const Res(true);
+      } catch (e, s) {
+        Log.error("Network", "$e\n$s");
+        return Res<bool>.error(e.toString());
       }
-
-      return retryZone(func);
     }
 
     Future<Res<List<Comic>>> Function(int page, [String? folder])? loadComic;
@@ -649,51 +643,43 @@ class ComicSourceParser {
 
     if (_checkExists("favorites.loadComics")) {
       loadComic = (int page, [String? folder]) async {
-        Future<Res<List<Comic>>> func() async {
-          try {
-            var res = await JsEngine().runCode("""
-            ComicSource.sources[${jsonEncode(_key)}].favorites.loadComics(
-              ${jsonEncode(page)}, ${jsonEncode(folder)})
-          """);
-            return Res(
-              List.generate(
-                res["comics"].length,
-                (index) => Comic.fromJson(res["comics"][index], _key!),
-              ),
-              subData: res["maxPage"],
-            );
-          } catch (e, s) {
-            Log.error("Network", "$e\n$s");
-            return Res.error(e.toString());
-          }
+        try {
+          var res = await JsEngine().runCode("""
+          ComicSource.sources[${jsonEncode(_key)}].favorites.loadComics(
+            ${jsonEncode(page)}, ${jsonEncode(folder)})
+        """);
+          return Res(
+            List.generate(
+              res["comics"].length,
+              (index) => Comic.fromJson(res["comics"][index], _key!),
+            ),
+            subData: res["maxPage"],
+          );
+        } catch (e, s) {
+          Log.error("Network", "$e\n$s");
+          return Res.error(e.toString());
         }
-
-        return retryZone(func);
       };
     }
 
     if (_checkExists("favorites.loadNext")) {
       loadNext = (String? next, [String? folder]) async {
-        Future<Res<List<Comic>>> func() async {
-          try {
-            var res = await JsEngine().runCode("""
-            ComicSource.sources[${jsonEncode(_key)}].favorites.loadNext(
-              ${jsonEncode(next)}, ${jsonEncode(folder)})
-          """);
-            return Res(
-              List.generate(
-                res["comics"].length,
-                (index) => Comic.fromJson(res["comics"][index], _key!),
-              ),
-              subData: res["next"],
-            );
-          } catch (e, s) {
-            Log.error("Network", "$e\n$s");
-            return Res.error(e.toString());
-          }
+        try {
+          var res = await JsEngine().runCode("""
+          ComicSource.sources[${jsonEncode(_key)}].favorites.loadNext(
+            ${jsonEncode(next)}, ${jsonEncode(folder)})
+        """);
+          return Res(
+            List.generate(
+              res["comics"].length,
+              (index) => Comic.fromJson(res["comics"][index], _key!),
+            ),
+            subData: res["next"],
+          );
+        } catch (e, s) {
+          Log.error("Network", "$e\n$s");
+          return Res.error(e.toString());
         }
-
-        return retryZone(func);
       };
     }
 
@@ -705,23 +691,19 @@ class ComicSourceParser {
 
     if (multiFolder) {
       loadFolders = ([String? comicId]) async {
-        Future<Res<Map<String, String>>> func() async {
-          try {
-            var res = await JsEngine().runCode("""
-            ComicSource.sources[${jsonEncode(_key)}].favorites.loadFolders(${jsonEncode(comicId)})
-          """);
-            List<String>? subData;
-            if (res["favorited"] != null) {
-              subData = List.from(res["favorited"]);
-            }
-            return Res(Map.from(res["folders"]), subData: subData);
-          } catch (e, s) {
-            Log.error("Network", "$e\n$s");
-            return Res.error(e.toString());
+        try {
+          var res = await JsEngine().runCode("""
+          ComicSource.sources[${jsonEncode(_key)}].favorites.loadFolders(${jsonEncode(comicId)})
+        """);
+          List<String>? subData;
+          if (res["favorited"] != null) {
+            subData = List.from(res["favorited"]);
           }
+          return Res(Map.from(res["folders"]), subData: subData);
+        } catch (e, s) {
+          Log.error("Network", "$e\n$s");
+          return Res.error(e.toString());
         }
-
-        return retryZone(func);
       };
       if (_checkExists("favorites.addFolder")) {
         addFolder = (name) async {

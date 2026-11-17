@@ -421,6 +421,50 @@ impl Favorites {
             .unwrap_or_default())
     }
 
+    pub(crate) fn prepare_network_import(
+        &self,
+        folder: &str,
+        source: &str,
+        remote: &str,
+        comic_type: i32,
+    ) -> Result<HashSet<String>> {
+        let transaction = self.db.unchecked_transaction()?;
+        if self
+            .folders()?
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(folder))
+        {
+            self.require_network_folder(folder, source, remote)?;
+        } else {
+            self.create(folder, false)?;
+            self.link(folder, source, remote)?;
+        }
+        let ids = self
+            .db
+            .prepare(&format!(
+                "SELECT id FROM {} WHERE type=?",
+                self.table(folder)?
+            ))?
+            .query_map([comic_type], |row| row.get::<_, String>(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        transaction.commit()?;
+        Ok(ids)
+    }
+
+    pub(crate) fn require_network_folder(
+        &self,
+        folder: &str,
+        source: &str,
+        remote: &str,
+    ) -> Result<()> {
+        ensure!(
+            self.linked(folder)? == [source, remote],
+            "Folder already exists"
+        );
+        self.table(folder)?;
+        Ok(())
+    }
+
     pub fn edit_tags(
         &self,
         folder: &str,
@@ -455,9 +499,18 @@ impl Favorites {
     }
 
     pub fn update_info(&self, folder: &str, comic: &Favorite, traditional: bool) -> Result<()> {
-        self.db.execute(&format!("UPDATE {} SET name=?,author=?,cover_path=?,tags=?,translated_tags=? WHERE id=? AND type=?", self.table(folder)?),
-            params![comic.name,comic.author,comic.cover,comic.tags.join(","),crate::api::tags::translated_tags(&comic.tags,traditional),comic.id,comic.comic_type])?;
+        self.update_existing_info(folder, comic, traditional)?;
         Ok(())
+    }
+
+    pub fn update_existing_info(
+        &self,
+        folder: &str,
+        comic: &Favorite,
+        traditional: bool,
+    ) -> Result<bool> {
+        Ok(self.db.execute(&format!("UPDATE {} SET name=?,author=?,cover_path=?,tags=?,translated_tags=? WHERE id=? AND type=?", self.table(folder)?),
+            params![comic.name,comic.author,comic.cover,comic.tags.join(","),crate::api::tags::translated_tags(&comic.tags,traditional),comic.id,comic.comic_type])? != 0)
     }
 
     pub fn prepare_follow(&self, folder: &str, clear: bool) -> Result<()> {

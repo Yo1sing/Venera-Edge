@@ -203,7 +203,7 @@ pub async fn download(options: Options) -> Result<Option<String>> {
     }
     output.as_file().sync_all()?;
     let path = Path::new(&options.cache).join(format!("{}.venera", uuid::Uuid::new_v4()));
-    output.persist(&path)?;
+    crate::atomic_file::persist(output, &path)?;
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 #[cfg(test)]

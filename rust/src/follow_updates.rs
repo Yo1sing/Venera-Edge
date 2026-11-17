@@ -55,6 +55,7 @@ impl Progress {
 pub struct Job {
     pub folder: String,
     automatic: bool,
+    metadata_only: bool,
     cancel: HttpCancellation,
     stop_writes: Mutex<bool>,
     workers: Mutex<Vec<Arc<Engine>>>,
@@ -265,7 +266,7 @@ impl Service {
         {
             return Ok(());
         }
-        self.launch(folder, false, None, true, config)?;
+        self.launch(folder, false, None, true, false, config)?;
         Ok(())
     }
     pub async fn start(
@@ -273,6 +274,20 @@ impl Service {
         folder: String,
         force: bool,
         keys: Option<Vec<crate::favorites::Key>>,
+    ) -> Result<Arc<Job>> {
+        self.start_manual(folder, force, keys, false).await
+    }
+
+    pub async fn refresh_metadata(self: &Arc<Self>, folder: String) -> Result<Arc<Job>> {
+        self.start_manual(folder, true, None, true).await
+    }
+
+    async fn start_manual(
+        self: &Arc<Self>,
+        folder: String,
+        force: bool,
+        keys: Option<Vec<crate::favorites::Key>>,
+        metadata_only: bool,
     ) -> Result<Arc<Job>> {
         let _gate = self.gate.lock().await;
         ensure!(
@@ -301,7 +316,7 @@ impl Service {
             job.cancel();
             job.wait().await;
         }
-        self.launch(folder, force, keys, false, config)
+        self.launch(folder, force, keys, false, metadata_only, config)
     }
     fn publish(&self, job: &Job, progress: &Progress) {
         job.snapshots.send_replace(progress.clone());
@@ -317,6 +332,7 @@ impl Service {
         force: bool,
         keys: Option<Vec<crate::favorites::Key>>,
         automatic: bool,
+        metadata_only: bool,
         config: Config,
     ) -> Result<Arc<Job>> {
         let comics = self.with_store(|db| db.list(Some(&folder), None, false))?;
@@ -337,13 +353,20 @@ impl Service {
             .as_millis() as i64;
         let pending: Vec<_> = comics
             .into_iter()
-            .filter(|c| needs_check(c.last_check_time, force, now))
+            .filter(|c| {
+                if metadata_only {
+                    config.sources.contains_key(&c.comic_type) && c.comic_type != 0
+                } else {
+                    needs_check(c.last_check_time, force, now)
+                }
+            })
             .collect();
         progress.skipped = progress.total - pending.len();
         progress.current = progress.skipped;
         let job = Arc::new(Job {
             folder,
             automatic,
+            metadata_only,
             cancel: HttpCancellation::new(),
             stop_writes: Mutex::new(false),
             workers: Mutex::new(Vec::new()),
@@ -378,7 +401,7 @@ impl Service {
             let limiter = tokio::sync::Mutex::new(tokio::time::Instant::now());
             let mut results = stream::iter(pending)
                 .map(|comic| self.check(job, &config.sources, comic, &limiter))
-                .buffer_unordered(5);
+                .buffer_unordered(if job.metadata_only { 4 } else { 5 });
             while let Some((mut comic, result)) = results.next().await {
                 let stop = job.stop_writes.lock().unwrap_or_else(|e| e.into_inner());
                 if *stop {
@@ -388,8 +411,13 @@ impl Service {
                 progress.current += 1;
                 progress.error_message = None;
                 match result.and_then(|info| {
-                    let time = find_update_time(&info);
                     apply_info(&mut comic, &info)?;
+                    if job.metadata_only {
+                        return self.with_store(|db| {
+                            db.update_existing_info(&job.folder, &comic, config.traditional)
+                        });
+                    }
+                    let time = find_update_time(&info);
                     let updated = self.with_store(|db| {
                         db.apply_follow(&job.folder, &comic, time.as_deref(), config.traditional)
                     })?;
@@ -445,14 +473,19 @@ impl Service {
                 }
                 // Pace actual loadInfo attempts, including retries, globally for
                 // this folder. Five futures may be in flight at once.
-                {
+                if !job.metadata_only {
                     let mut next = limiter.lock().await;
                     tokio::time::sleep_until(*next).await;
                     *next = tokio::time::Instant::now() + self.policy.throttle;
                 }
+                let source_lock = self.runtime.source_lock(source);
+                let _source = source_lock.read().await;
                 let engine=Arc::new(self.runtime.fork_sources()?);
                 job.track_worker(engine.clone());
-                let result=tokio::time::timeout(self.policy.attempt_timeout,crate::image_tasks::evaluate(&engine,&code)).await;
+                let result = tokio::time::timeout(
+                    self.policy.attempt_timeout,
+                    crate::image_tasks::evaluate_worker(engine.clone(), code.clone()),
+                ).await;
                 engine.shutdown().await;
                 job.workers.lock().unwrap_or_else(|e|e.into_inner()).retain(|worker|!Arc::ptr_eq(worker,&engine));
                 match result {

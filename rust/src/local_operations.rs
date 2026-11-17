@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::{
     io::{Read, Write},
     path::Path,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 #[derive(Clone, Deserialize)]
@@ -28,6 +28,7 @@ pub struct Options {
 #[derive(Default, Serialize)]
 struct Outcome {
     images: Vec<String>,
+    export_path: Option<String>,
     imported: Vec<LocalComic>,
     removed: Vec<Value>,
     skipped: Vec<String>,
@@ -40,11 +41,13 @@ struct Outcome {
 pub struct Operation {
     cancel: Arc<HttpCancellation>,
     pub receiver: tokio::sync::Mutex<tokio::sync::mpsc::Receiver<String>>,
+    export: Arc<OnceLock<tempfile::TempDir>>,
 }
 
 struct Worker {
     cancel: Arc<HttpCancellation>,
     sender: tokio::sync::mpsc::Sender<String>,
+    export: Arc<OnceLock<tempfile::TempDir>>,
 }
 
 impl Drop for Operation {
@@ -59,10 +62,12 @@ impl Operation {
         let operation = Arc::new(Self {
             cancel: Arc::new(HttpCancellation::new()),
             receiver: tokio::sync::Mutex::new(receiver),
+            export: Arc::new(OnceLock::new()),
         });
         let worker = Worker {
             cancel: operation.cancel.clone(),
             sender,
+            export: operation.export.clone(),
         };
         std::thread::Builder::new()
             .name("venera-local-operation".into())
@@ -99,6 +104,87 @@ impl Operation {
 }
 
 impl Worker {
+    async fn export_books(
+        &self,
+        files: &Files,
+        options: &Options,
+        request: &Value,
+        outcome: &mut Outcome,
+    ) -> Result<()> {
+        let keys: Vec<Key> = serde_json::from_value(request["keys"].clone())?;
+        ensure!(!keys.is_empty(), "No comics selected");
+        let format = request["format"]
+            .as_str()
+            .context("Missing export format")?;
+        ensure!(
+            matches!(format, "cbz" | "pdf" | "epub"),
+            "Unsupported book format"
+        );
+        let library = LocalLibrary::open(&join(&options.data_path, "local.db"))?;
+        let export = tempfile::Builder::new()
+            .prefix("comics-export-")
+            .tempdir_in(&options.cache_path)?;
+        let output_dir = export.path().join("books");
+        std::fs::create_dir(&output_dir)?;
+        let mut names = std::collections::HashSet::new();
+        let mut single = None;
+        for (index, key) in keys.iter().enumerate() {
+            let lock = comic_lock(options, &key.id, key.comic_type);
+            let _guard = tokio::select! {
+                _ = self.cancel.cancelled() => anyhow::bail!("Local operation cancelled"),
+                guard = crate::http_policy::serial(&lock) => guard,
+            };
+            let comic = library
+                .find(&key.id, key.comic_type)?
+                .context("Comic not found")?;
+            let name = export_name(&comic.title);
+            let mut unique = name.clone();
+            let mut suffix = 2;
+            while !names.insert(unique.to_lowercase()) {
+                unique = format!("{name} ({suffix})");
+                suffix += 1;
+            }
+            let output = output_dir.join(format!("{unique}.{format}"));
+            let inputs = tempfile::tempdir_in(export.path())?;
+            let book = export_book(files, options, comic, inputs.path()).await?;
+            let target = output.clone();
+            let format = format.to_owned();
+            tokio::task::spawn_blocking(move || {
+                crate::api::media::write_book(&book, &target, &format)
+            })
+            .await??;
+            files.check()?;
+            single = Some(output);
+            let _ = self
+                .sender
+                .send(
+                    json!({
+                        "kind":"progress","current":index + 1,"total":keys.len(),
+                    })
+                    .to_string(),
+                )
+                .await;
+        }
+        let output = if keys.len() == 1 {
+            single.context("Missing export file")?
+        } else {
+            let output = export.path().join("comics_export.zip");
+            let target = output.clone();
+            tokio::task::spawn_blocking(move || {
+                crate::archives::compress_folder(&output_dir, &target)
+            })
+            .await??;
+            output
+        };
+        files.check()?;
+        let path = output.to_str().context("Invalid export path")?.to_owned();
+        self.export
+            .set(export)
+            .map_err(|_| anyhow::anyhow!("Export already set"))?;
+        outcome.export_path = Some(path);
+        Ok(())
+    }
+
     async fn run(
         &self,
         files: &Files,
@@ -115,6 +201,13 @@ impl Worker {
             _ = self.cancel.cancelled() => anyhow::bail!("Local operation cancelled"),
             guard = crate::backup_storage::OPERATIONS.read() => guard,
         };
+        let _root = tokio::select! {
+            _ = self.cancel.cancelled() => anyhow::bail!("Local operation cancelled"),
+            guard = crate::local_storage::FILES.read() => guard,
+        };
+        let mut options = options.clone();
+        options.local_path = crate::local_storage::active(&files.engine, &options.local_path);
+        let options = &options;
         let db = Database::open(options)?;
         std::fs::create_dir_all(&options.cache_path)?;
         let journals = journal_directory(options);
@@ -135,15 +228,19 @@ impl Worker {
         if mode == "recover" {
             return Ok(());
         }
+        if mode == "export" {
+            self.export_books(files, options, &request, outcome).await?;
+            return Ok(());
+        }
         if mode == "images" {
             let id = request["id"].as_str().context("Missing comic ID")?;
             let comic_type = i32::try_from(request["type"].as_i64().context("Missing comic type")?)
                 .context("Comic type out of range")?;
             let library = LocalLibrary::open(&join(&options.data_path, "local.db"))?;
             let comic = library.find(id, comic_type)?.context("Comic not found")?;
-            let mut path = resolve(&options.local_path, &comic.directory)?;
-            if !comic.chapters.is_null() {
-                let ids = crate::local::chapter_ids(&comic.chapters);
+            let episode = if comic.chapters.is_null() {
+                None
+            } else {
                 let chapter = if let Some(id) = request["episode"].as_str() {
                     id.to_owned()
                 } else {
@@ -151,37 +248,19 @@ impl Worker {
                         .as_u64()
                         .and_then(|v| v.checked_sub(1))
                         .context("Chapter must start at 1")?;
-                    ids.get(usize::try_from(index).context("Chapter out of range")?)
+                    crate::local::chapter_ids(&comic.chapters)
+                        .get(usize::try_from(index).context("Chapter out of range")?)
                         .context("Chapter out of range")?
                         .clone()
                 };
-                ensure!(ids.contains(&chapter), "Unknown chapter ID");
-                let raw = join(&path, &chapter);
-                path = if comic_type == 0
-                    && crate::archives::safe_relative(&chapter).is_ok()
-                    && files.exists(&raw).await?
-                {
-                    raw
-                } else {
-                    let directory = crate::api::local::chapter_directory_name(chapter);
-                    ensure!(
-                        crate::archives::safe_relative(&directory)?
-                            .components()
-                            .count()
-                            == 1,
-                        "Invalid chapter directory"
-                    );
-                    join(&path, &directory)
-                };
-            }
-            let paths = files
-                .list(&path)
-                .await?
-                .into_iter()
-                .filter(|entry| !entry.is_dir)
-                .map(|entry| entry.path)
-                .collect();
-            outcome.images = crate::api::local::sort_comic_images(paths);
+                ensure!(
+                    crate::local::chapter_ids(&comic.chapters).contains(&chapter),
+                    "Unknown chapter ID"
+                );
+                Some(chapter)
+            };
+            let path = resolve(&options.local_path, &comic.directory)?;
+            outcome.images = chapter_images(files, &comic, &path, episode.as_deref()).await?;
             return Ok(());
         }
         if matches!(mode, "delete" | "chapters") {
@@ -305,23 +384,176 @@ pub(crate) fn comic_lock(options: &Options, id: &str, comic_type: i32) -> String
     format!("local-comic:{}:{comic_type}:{id}", options.data_path)
 }
 
-#[derive(Deserialize)]
-struct Entry {
-    path: String,
-    is_dir: bool,
+async fn chapter_images(
+    files: &Files,
+    comic: &LocalComic,
+    base: &str,
+    chapter: Option<&str>,
+) -> Result<Vec<String>> {
+    let path = if let Some(chapter) = chapter {
+        let raw = join(base, chapter);
+        if comic.comic_type == 0
+            && crate::archives::safe_relative(chapter).is_ok()
+            && files.exists(&raw).await?
+        {
+            raw
+        } else {
+            let directory = crate::api::local::chapter_directory_name(chapter.into());
+            ensure!(
+                crate::archives::safe_relative(&directory)?
+                    .components()
+                    .count()
+                    == 1,
+                "Invalid chapter directory"
+            );
+            join(base, &directory)
+        }
+    } else {
+        base.into()
+    };
+    let paths = files
+        .list(&path)
+        .await?
+        .into_iter()
+        .filter(|entry| !entry.is_dir)
+        .map(|entry| entry.path)
+        .collect();
+    Ok(crate::api::local::sort_comic_images(paths))
 }
 
-struct Files {
+fn export_name(title: &str) -> String {
+    let name = crate::api::local::chapter_directory_name(title.chars().take(100).collect());
+    let name: String = name
+        .chars()
+        .map(|c| if c.is_control() { '_' } else { c })
+        .collect();
+    let name = name.trim_matches([' ', '.']);
+    let base = name
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
+    if name.is_empty() {
+        return "comic".into();
+    }
+    if matches!(base.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || base
+            .strip_prefix("COM")
+            .or_else(|| base.strip_prefix("LPT"))
+            .is_some_and(|n| {
+                matches!(
+                    n,
+                    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                )
+            })
+    {
+        return format!("_{name}");
+    }
+    name.into()
+}
+
+async fn export_book(
+    files: &Files,
+    options: &Options,
+    comic: LocalComic,
+    staging: &Path,
+) -> Result<crate::books::Book> {
+    let base = resolve(&options.local_path, &comic.directory)?;
+    let cover = resolve(&base, &comic.cover)?;
+    let cover = export_input(files, cover, staging, 0).await?;
+    let has_chapters = !comic.chapters.is_null();
+    let ids = crate::local::chapter_ids(&comic.chapters);
+    let chapters_to_export: Vec<_> = if has_chapters {
+        comic
+            .downloaded_chapters
+            .iter()
+            .map(|id| Some(id.as_str()))
+            .collect()
+    } else {
+        vec![None]
+    };
+    let mut chapters = Vec::new();
+    let mut image_index = 1;
+    for id in chapters_to_export {
+        let title = match id {
+            Some(id) => {
+                ensure!(ids.iter().any(|known| known == id), "Unknown chapter ID");
+                comic.chapters[id]
+                    .as_str()
+                    .or_else(|| {
+                        comic
+                            .chapters
+                            .as_object()?
+                            .values()
+                            .find_map(|group| group[id].as_str())
+                    })
+                    .unwrap_or(&comic.title)
+            }
+            None => &comic.title,
+        };
+        let mut images = Vec::new();
+        for image in chapter_images(files, &comic, &base, id).await? {
+            let path = image.strip_prefix("file://").unwrap_or(&image).to_owned();
+            images.push(export_input(files, path, staging, image_index).await?);
+            image_index += 1;
+        }
+        chapters.push(crate::books::Chapter {
+            title: title.into(),
+            images,
+        });
+    }
+    Ok(crate::books::Book {
+        title: comic.title,
+        author: comic.subtitle,
+        tags: comic.tags,
+        cover,
+        chapters,
+        has_chapters,
+    })
+}
+
+async fn export_input(files: &Files, path: String, staging: &Path, index: usize) -> Result<String> {
+    if !saf(&path) {
+        return Ok(path);
+    }
+    let extension = Path::new(&path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("img");
+    let output = staging.join(format!("{index}.{extension}"));
+    let output = output.to_str().context("Invalid export staging path")?;
+    files.copy(&path, output).await?;
+    Ok(output.into())
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Entry {
+    pub path: String,
+    pub is_dir: bool,
+}
+
+pub(crate) struct Files {
     engine: Arc<Engine>,
     cancel: Arc<HttpCancellation>,
 }
 
 impl Files {
+    pub(crate) fn new(engine: Arc<Engine>) -> Self {
+        Self {
+            engine,
+            cancel: Arc::new(HttpCancellation::new()),
+        }
+    }
     fn check(&self) -> Result<()> {
         ensure!(!self.cancel.is_cancelled(), "Local operation cancelled");
         Ok(())
     }
-    async fn platform(&self, operation: &str, path: &str, to: Option<&str>) -> Result<Value> {
+    pub(crate) async fn platform(
+        &self,
+        operation: &str,
+        path: &str,
+        to: Option<&str>,
+    ) -> Result<Value> {
         // Wait for the platform receipt even after cancellation, then safely undo completed work.
         self.engine
             .request_platform(
@@ -329,7 +561,7 @@ impl Files {
             )
             .await
     }
-    async fn list(&self, path: &str) -> Result<Vec<Entry>> {
+    pub(crate) async fn list(&self, path: &str) -> Result<Vec<Entry>> {
         self.check()?;
         if saf(path) {
             return Ok(serde_json::from_value(
@@ -353,7 +585,7 @@ impl Files {
         result.sort_by(|a, b| a.path.cmp(&b.path));
         Ok(result)
     }
-    async fn exists(&self, path: &str) -> Result<bool> {
+    pub(crate) async fn exists(&self, path: &str) -> Result<bool> {
         if saf(path) {
             return self
                 .platform("exists", path, None)
@@ -367,7 +599,7 @@ impl Files {
             Err(error) => Err(error.into()),
         }
     }
-    async fn mkdir(&self, path: &str) -> Result<()> {
+    pub(crate) async fn mkdir(&self, path: &str) -> Result<()> {
         if saf(path) {
             self.platform("mkdir", path, None).await?;
         } else {
@@ -375,7 +607,7 @@ impl Files {
         }
         Ok(())
     }
-    async fn rename(&self, from: &str, to: &str) -> Result<()> {
+    pub(crate) async fn rename(&self, from: &str, to: &str) -> Result<()> {
         ensure!(!self.exists(to).await?, "Destination already exists: {to}");
         if saf(from) || saf(to) {
             self.platform("rename", from, Some(to)).await?;
@@ -384,7 +616,7 @@ impl Files {
         }
         Ok(())
     }
-    async fn remove(&self, path: &str) -> Result<()> {
+    pub(crate) async fn remove(&self, path: &str) -> Result<()> {
         if !self.exists(path).await? {
             return Ok(());
         }
@@ -396,7 +628,7 @@ impl Files {
         }
         Ok(())
     }
-    async fn copy(&self, from: &str, to: &str) -> Result<()> {
+    pub(crate) async fn copy(&self, from: &str, to: &str) -> Result<()> {
         self.check()?;
         if saf(from) || saf(to) {
             self.platform("copy", from, Some(to)).await?;
@@ -441,13 +673,13 @@ impl Files {
     }
 }
 
-fn saf(path: &str) -> bool {
+pub(crate) fn saf(path: &str) -> bool {
     path.starts_with("android://")
 }
-fn join(root: &str, child: &str) -> String {
+pub(crate) fn join(root: &str, child: &str) -> String {
     format!("{}/{}", root.trim_end_matches(['/', '\\']), child)
 }
-fn name(path: &str) -> &str {
+pub(crate) fn name(path: &str) -> &str {
     path.trim_end_matches(['/', '\\'])
         .rsplit(['/', '\\'])
         .next()
@@ -459,7 +691,7 @@ fn identity(path: &str) -> Result<String> {
     }
     Ok(std::fs::canonicalize(path)?.to_string_lossy().into_owned())
 }
-fn resolve(root: &str, directory: &str) -> Result<String> {
+pub(crate) fn resolve(root: &str, directory: &str) -> Result<String> {
     if saf(directory) || Path::new(directory).is_absolute() {
         return Ok(directory.into());
     }
@@ -485,7 +717,7 @@ fn is_archive(path: &str) -> bool {
         .and_then(|v| v.to_str())
         .is_some_and(|v| ["cbz", "zip", "7z", "cb7"].contains(&v.to_ascii_lowercase().as_str()))
 }
-fn is_image(path: &str) -> bool {
+pub(crate) fn is_image(path: &str) -> bool {
     crate::comic_queue::is_image(Path::new(path))
         || Path::new(path)
             .extension()

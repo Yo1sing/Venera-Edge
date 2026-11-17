@@ -1,6 +1,23 @@
 use anyhow::{anyhow, Result};
 use std::sync::Mutex;
 
+pub async fn initialize_storage(
+    runtime: &crate::api::script::ScriptRuntime,
+    data_path: String,
+    default_path: String,
+    prefer_existing_in_data: bool,
+    android: bool,
+) -> Result<String> {
+    crate::local_storage::initialize(
+        runtime.inner.clone(),
+        &data_path,
+        &default_path,
+        prefer_existing_in_data,
+        android,
+    )
+    .await
+}
+
 #[flutter_rust_bridge::frb(opaque)]
 pub struct LocalOperation {
     inner: std::sync::Arc<crate::local_operations::Operation>,
@@ -40,7 +57,20 @@ pub struct LocalStore {
     inner: Mutex<Option<crate::local::LocalLibrary>>,
 }
 
+pub struct ReadingStart {
+    pub chapter: u32,
+    pub group: Option<u32>,
+}
+
 impl LocalStore {
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn reading_start(&self, id: String, comic_type: i32) -> Result<Option<ReadingStart>> {
+        self.with(|db| {
+            Ok(db
+                .find(&id, comic_type)?
+                .and_then(|comic| comic.reading_start()))
+        })
+    }
     pub fn open(path: String) -> Result<Self> {
         Ok(Self {
             inner: Mutex::new(Some(crate::local::LocalLibrary::open(&path)?)),

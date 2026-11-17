@@ -2,6 +2,9 @@ use crate::api::{http::HttpCancellation, media::ImageProgress};
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::time::Duration;
+
+static THUMBNAIL_REQUESTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(8);
 
 pub struct Request {
     pub cancellation: Arc<HttpCancellation>,
@@ -39,7 +42,20 @@ impl Drop for Task {
     }
 }
 pub async fn evaluate(engine: &crate::script::Engine, code: &str) -> Result<serde_json::Value> {
-    let mut wire: serde_json::Value = serde_json::from_str(&engine.evaluate(code)?)?;
+    settle(engine, engine.evaluate(code)?).await
+}
+
+pub(crate) async fn evaluate_worker(
+    engine: Arc<crate::script::Engine>,
+    code: String,
+) -> Result<serde_json::Value> {
+    let worker = engine.clone();
+    let wire = tokio::task::spawn_blocking(move || worker.evaluate(&code)).await??;
+    settle(&engine, wire).await
+}
+
+async fn settle(engine: &crate::script::Engine, wire: String) -> Result<serde_json::Value> {
+    let mut wire: serde_json::Value = serde_json::from_str(&wire)?;
     if wire[0] == "promise" {
         wire = serde_json::from_str(
             &engine
@@ -68,25 +84,18 @@ impl Task {
         comic: String,
         chapter: String,
         thumbnail: bool,
-        coordinate_source: bool,
+        interactive: bool,
     ) -> Result<Self> {
         Self::spawn(engine.clone(), move |state, id| async move {
-            let source_text = source.as_deref().unwrap_or("null");
-            let key = if thumbnail {
-                format!(
-                    "{image}@{source_text}{}",
-                    if comic.is_empty() {
-                        String::new()
-                    } else {
-                        format!("@{comic}")
-                    }
-                )
+            let key = cache_key(&image, source.as_deref(), &comic, &chapter, thumbnail);
+            let _permit = if thumbnail && interactive {
+                Some(THUMBNAIL_REQUESTS.acquire().await?)
             } else {
-                format!("{image}@{source_text}@{comic}@{chapter}")
+                None
             };
             let source_lock = source
                 .as_deref()
-                .filter(|_| coordinate_source)
+                .filter(|_| interactive)
                 .map(|key| engine.source_lock(key));
             let _source_guard = match source_lock {
                 Some(lock) => Some(lock.read_owned().await),
@@ -101,17 +110,25 @@ impl Task {
             if let Some(path) = hit {
                 return Ok(std::fs::read(path)?);
             }
-            let bytes = fetch(
-                &engine,
-                &state,
-                &id,
-                &image,
-                source.as_deref(),
-                &comic,
-                &chapter,
-                thumbnail,
-            )
-            .await?;
+            let load = || {
+                fetch(
+                    &engine,
+                    &state,
+                    &id,
+                    &image,
+                    source.as_deref(),
+                    &comic,
+                    &chapter,
+                    thumbnail,
+                )
+            };
+            // The download queue coordinates source access and its own retries.
+            let bytes = if interactive {
+                retry_image(load).await?
+            } else {
+                load().await?
+            };
+            anyhow::ensure!(!bytes.is_empty(), "Empty image data");
             cache
                 .lock()
                 .map_err(|_| anyhow::anyhow!("Cache poisoned"))?
@@ -121,6 +138,23 @@ impl Task {
     }
 
     pub(crate) fn spawn<F, Fut>(engine: Arc<crate::script::Engine>, work: F) -> Result<Self>
+    where
+        F: FnOnce(Arc<Request>, String) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<Vec<u8>>> + Send + 'static,
+    {
+        Self::spawn_managed(engine, move |state, id| {
+            let cancel = state.cancellation.clone();
+            async move {
+                tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => Err(anyhow::anyhow!("Image request cancelled")),
+                    result = work(state, id) => result,
+                }
+            }
+        })
+    }
+
+    pub(crate) fn spawn_managed<F, Fut>(engine: Arc<crate::script::Engine>, work: F) -> Result<Self>
     where
         F: FnOnce(Arc<Request>, String) -> Fut + Send + 'static,
         Fut: std::future::Future<Output = Result<Vec<u8>>> + Send + 'static,
@@ -141,11 +175,7 @@ impl Task {
             .unwrap_or_else(|e| e.into_inner())
             .insert(id.clone(), Arc::downgrade(&state));
         crate::script::executor().spawn(async move {
-            let result = tokio::select! {
-                biased;
-                _ = worker.cancellation.cancelled() => Err(anyhow::anyhow!("Image request cancelled")),
-                result = work(worker.clone(), id.clone()) => result,
-            };
+            let result = work(worker.clone(), id.clone()).await;
             let progress = match result {
                 Ok(bytes) => ImageProgress {
                     current: bytes.len() as u64,
@@ -162,7 +192,10 @@ impl Task {
             };
             worker_finished.store(true, std::sync::atomic::Ordering::Relaxed);
             let _ = worker.sender.send(progress).await;
-            registry().lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+            registry()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(&id);
         });
         Ok(Self {
             state,
@@ -172,6 +205,53 @@ impl Task {
             receiver: tokio::sync::Mutex::new(receiver),
         })
     }
+}
+
+pub(crate) fn cache_key(
+    image: &str,
+    source: Option<&str>,
+    comic: &str,
+    chapter: &str,
+    thumbnail: bool,
+) -> String {
+    let source = source.unwrap_or("null");
+    if !thumbnail {
+        format!("{image}@{source}@{comic}@{chapter}")
+    } else if comic.is_empty() {
+        format!("{image}@{source}")
+    } else {
+        format!("{image}@{source}@{comic}")
+    }
+}
+
+fn retryable_image_error(error: &anyhow::Error) -> bool {
+    let message = format!("{error:#}").to_ascii_lowercase();
+    ![
+        "http 403",
+        "http 404",
+        "invalid status code: 403",
+        "invalid status code: 404",
+        "handshake",
+        "cancelled",
+        "cloudflareexception:",
+    ]
+    .iter()
+    .any(|pattern| message.contains(pattern))
+}
+
+pub(crate) async fn retry_image<F, Fut>(mut load: F) -> Result<Vec<u8>>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<Vec<u8>>>,
+{
+    for delay in [2, 4, 8] {
+        match load().await {
+            Ok(bytes) => return Ok(bytes),
+            Err(error) if !retryable_image_error(&error) => return Err(error),
+            Err(_) => tokio::time::sleep(Duration::from_secs(delay)).await,
+        }
+    }
+    load().await
 }
 
 #[allow(clippy::too_many_arguments)]
