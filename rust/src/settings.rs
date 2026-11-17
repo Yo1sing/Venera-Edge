@@ -295,6 +295,103 @@ mod tests {
     }
 
     #[test]
+    fn multiple_source_list_repositories_migrate_and_normalize() -> Result<()> {
+        let legacy = crate::settings_edits::normalize(&json!({
+            "comicSourceListUrl": "https://legacy.example/index.json"
+        }));
+        assert_eq!(
+            legacy["comicSourceListUrls"],
+            json!(["https://legacy.example/index.json"])
+        );
+        assert_eq!(
+            legacy["comicSourceListUrl"],
+            "https://legacy.example/index.json"
+        );
+
+        let multiple = crate::settings_edits::normalize(&json!({
+            "comicSourceListUrl": "https://old.example/index.json",
+            "comicSourceListUrls": [
+                "https://one.example/index.json",
+                "invalid",
+                "https://one.example/index.json",
+                "https://two.example/index.json"
+            ]
+        }));
+        assert_eq!(
+            multiple["comicSourceListUrls"],
+            json!([
+                "https://one.example/index.json",
+                "https://two.example/index.json"
+            ])
+        );
+        assert_eq!(
+            multiple["comicSourceListUrl"],
+            "https://one.example/index.json"
+        );
+
+        let cleared = crate::settings_edits::normalize(&json!({
+            "comicSourceListUrl": "",
+            "comicSourceListUrls": []
+        }));
+        assert_eq!(cleared["comicSourceListUrls"], json!([]));
+        assert_eq!(cleared["comicSourceListUrl"], "");
+
+        let retired = crate::settings_edits::normalize(&json!({
+            "comicSourceListUrl": "https://git.nyne.dev/index.json"
+        }));
+        assert_eq!(
+            retired["comicSourceListUrls"][0],
+            crate::settings_edits::DEFAULTS["comicSourceListUrl"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn source_list_url_edits_add_remove_and_keep_legacy_value() -> Result<()> {
+        let mut data = json!({
+            "settings": crate::settings_edits::normalize(&json!({
+                "comicSourceListUrls": []
+            })),
+            "searchHistory": []
+        });
+        let edits: Vec<crate::settings_edits::Edit> = serde_json::from_value(json!([
+            {"scope":"global","key":"comicSourceListUrls","change":{"action":"add","value":"https://one.example/index.json"}},
+            {"scope":"global","key":"comicSourceListUrls","change":{"action":"add","value":"https://two.example/index.json"}},
+            {"scope":"global","key":"comicSourceListUrls","change":{"action":"add","value":"https://one.example/index.json"}},
+            {"scope":"global","key":"comicSourceListUrls","change":{"action":"add","value":"not a url"}}
+        ]))?;
+        let rejected = crate::settings_edits::apply(&mut data, edits, false)?;
+        assert_eq!(rejected.len(), 1);
+        assert_eq!(
+            data["settings"]["comicSourceListUrls"],
+            json!([
+                "https://one.example/index.json",
+                "https://two.example/index.json"
+            ])
+        );
+        assert_eq!(
+            data["settings"]["comicSourceListUrl"],
+            "https://one.example/index.json"
+        );
+
+        let edits: Vec<crate::settings_edits::Edit> = vec![serde_json::from_value(json!({
+            "scope":"global",
+            "key":"comicSourceListUrls",
+            "change":{"action":"remove","value":"https://one.example/index.json"}
+        }))?];
+        crate::settings_edits::apply(&mut data, edits, true)?;
+        assert_eq!(
+            data["settings"]["comicSourceListUrls"],
+            json!(["https://two.example/index.json"])
+        );
+        assert_eq!(
+            data["settings"]["comicSourceListUrl"],
+            "https://two.example/index.json"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn reader_edits_resolve_and_reset_in_scope_order() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let directory = temp.path().to_str().unwrap();

@@ -248,6 +248,12 @@ class Settings with ChangeNotifier {
   void removeBlockedWord(String key, String value) =>
       _change(key, {'action': 'remove', 'value': value});
 
+  void addComicSourceListUrl(String value) =>
+      _change('comicSourceListUrls', {'action': 'add', 'value': value});
+
+  void removeComicSourceListUrl(String value) =>
+      _change('comicSourceListUrls', {'action': 'remove', 'value': value});
+
   void _change(String key, _Edit change) => _app._edit([
     {'scope': 'global', 'key': key, 'change': change},
   ]);

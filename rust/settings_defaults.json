@@ -45,6 +45,7 @@
   "sni": true,
   "autoAddLanguageFilter": "none",
   "comicSourceListUrl": "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json",
+  "comicSourceListUrls": [],
   "preloadImageCount": 4,
   "followUpdatesFolder": null,
   "initialPage": "0",

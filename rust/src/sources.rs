@@ -54,6 +54,32 @@ fn check_cancel(cancel: &HttpCancellation) -> Result<()> {
 fn evaluate(engine: &Engine, code: &str) -> Result<Value> {
     crate::script::unpack(&serde_json::from_str(&engine.evaluate(code)?)?)
 }
+/// A source key may be listed by several repositories. Keep the greatest
+/// advertised version instead of trusting repository order.
+fn newest_version<'a>(
+    engine: &Engine,
+    entries: impl Iterator<Item = &'a Value>,
+) -> Result<Option<String>> {
+    let mut newest: Option<String> = None;
+    for entry in entries {
+        let Some(version) = entry["version"].as_str() else {
+            continue;
+        };
+        let is_newer = match &newest {
+            None => true,
+            Some(current) => {
+                evaluate(
+                    engine,
+                    &format!("__sources.newer({},{})", json!(version), json!(current)),
+                )? == true
+            }
+        };
+        if is_newer {
+            newest = Some(version.to_owned());
+        }
+    }
+    Ok(newest)
+}
 fn atomic_write(path: &Path, code: &str) -> Result<()> {
     let mut file =
         tempfile::NamedTempFile::new_in(path.parent().context("Missing source directory")?)?;
@@ -474,8 +500,34 @@ impl Manager {
         }
         Ok(serde_json::to_string(&entries)?)
     }
-    pub async fn check_updates(&self, url: String, cancel: &HttpCancellation) -> Result<String> {
-        let entries: Vec<Value> = serde_json::from_str(&self.catalog(url, cancel).await?)?;
+    pub async fn check_updates(
+        &self,
+        urls: Vec<String>,
+        cancel: &HttpCancellation,
+    ) -> Result<String> {
+        let mut seen_urls = HashSet::new();
+        let mut entries = Vec::new();
+        let mut fetched = 0usize;
+        let mut last_error = None;
+        for url in urls {
+            check_cancel(cancel)?;
+            if !seen_urls.insert(url.clone()) {
+                continue;
+            }
+            match self.catalog(url, cancel).await {
+                Ok(catalog) => {
+                    fetched += 1;
+                    entries.extend(serde_json::from_str::<Vec<Value>>(&catalog)?);
+                }
+                Err(error) => last_error = Some(error),
+            }
+        }
+        if fetched == 0 {
+            if let Some(error) = last_error {
+                return Err(error);
+            }
+        }
+        check_cancel(cancel)?;
         let _mutation = tokio::select! {_=cancel.cancelled()=>return Err(anyhow!("Source operation cancelled")),guard=self.mutations.lock()=>guard};
         let sources = self
             .state
@@ -485,22 +537,24 @@ impl Manager {
             .clone();
         let mut updates = HashMap::new();
         for source in sources {
-            if let Some(entry) = entries
-                .iter()
-                .find(|entry| entry["key"] == source.metadata["key"])
-            {
+            let key = source.key();
+            let newest = newest_version(
+                &self.engine,
+                entries
+                    .iter()
+                    .filter(|entry| entry["key"].as_str() == Some(key)),
+            )?;
+            if let Some(version) = newest {
                 if evaluate(
                     &self.engine,
                     &format!(
                         "__sources.newer({},{})",
-                        entry["version"], source.metadata["version"]
+                        json!(version),
+                        source.metadata["version"]
                     ),
                 )? == true
                 {
-                    updates.insert(
-                        source.key().to_owned(),
-                        entry["version"].as_str().unwrap().to_owned(),
-                    );
+                    updates.insert(key.to_owned(), version);
                 }
             }
         }
@@ -787,6 +841,26 @@ mod tests {
         assert!(evaluate(&manager.engine, "ComicSource.sources.sample==null")? == true);
         Ok(())
     }
+    #[tokio::test]
+    async fn newest_version_across_repositories_is_selected() -> Result<()> {
+        let (_directory, manager) = fixture()?;
+        let entries = [
+            json!({"key":"sample","version":"1.0.0"}),
+            json!({"key":"sample","version":"1.2.0"}),
+            json!({"key":"sample","version":"1.1.5"}),
+            json!({"key":"other","version":"9.0.0"}),
+        ];
+        let newest = newest_version(
+            &manager.engine,
+            entries
+                .iter()
+                .filter(|entry| entry["key"].as_str() == Some("sample")),
+        )?;
+        assert_eq!(newest.as_deref(), Some("1.2.0"));
+        assert_eq!(newest_version(&manager.engine, std::iter::empty())?, None);
+        Ok(())
+    }
+
     #[tokio::test]
     async fn cancelling_a_waiting_update_preserves_files_and_unblocks_source_calls() -> Result<()> {
         let (_directory, manager) = fixture()?;

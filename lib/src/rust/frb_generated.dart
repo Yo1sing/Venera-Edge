@@ -779,7 +779,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<String> crateApiSourcesSourceManagerCheckUpdates({
     required SourceManager that,
-    required String url,
+    required List<String> urls,
     required HttpCancellation cancellation,
   });
 
@@ -6286,7 +6286,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<String> crateApiSourcesSourceManagerCheckUpdates({
     required SourceManager that,
-    required String url,
+    required List<String> urls,
     required HttpCancellation cancellation,
   }) {
     return handler.executeNormal(
@@ -6297,7 +6297,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
-          sse_encode_String(url, serializer);
+          sse_encode_list_String(urls, serializer);
           sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerHttpCancellation(
             cancellation,
             serializer,
@@ -6314,7 +6314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiSourcesSourceManagerCheckUpdatesConstMeta,
-        argValues: [that, url, cancellation],
+        argValues: [that, urls, cancellation],
         apiImpl: this,
       ),
     );
@@ -6323,7 +6323,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiSourcesSourceManagerCheckUpdatesConstMeta =>
       const TaskConstMeta(
         debugName: "SourceManager_check_updates",
-        argNames: ["that", "url", "cancellation"],
+        argNames: ["that", "urls", "cancellation"],
       );
 
   @override
@@ -13363,11 +13363,11 @@ class SourceManagerImpl extends RustOpaque implements SourceManager {
   );
 
   Future<String> checkUpdates({
-    required String url,
+    required List<String> urls,
     required HttpCancellation cancellation,
   }) => RustLib.instance.api.crateApiSourcesSourceManagerCheckUpdates(
     that: this,
-    url: url,
+    urls: urls,
     cancellation: cancellation,
   );
 

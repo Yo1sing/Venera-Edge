@@ -18,7 +18,7 @@ abstract class SourceManager implements RustOpaqueInterface {
   });
 
   Future<String> checkUpdates({
-    required String url,
+    required List<String> urls,
     required HttpCancellation cancellation,
   });
 

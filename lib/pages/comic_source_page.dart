@@ -52,12 +52,13 @@ class ComicSourcePage extends StatelessWidget {
     HttpCancellation? cancellation,
   ]) async {
     if (ComicSource.all().isEmpty) return 0;
+    final urls = (appdata.settings['comicSourceListUrls'] as List? ?? [])
+        .whereType<String>()
+        .toList();
+    if (urls.isEmpty) return 0;
     final token = cancellation ?? HttpCancellation();
     try {
-      return await ComicSourceManager().checkUpdates(
-        appdata.settings['comicSourceListUrl'],
-        token,
-      );
+      return await ComicSourceManager().checkUpdates(urls, token);
     } catch (error, stack) {
       Log.error('Check source updates', error, stack);
       return -1;
@@ -337,69 +338,126 @@ class _ComicSourceList extends StatefulWidget {
 }
 
 class _ComicSourceListState extends State<_ComicSourceList> {
-  List? json;
-  bool changed = false;
-  late String originalCatalogUrl;
-  HttpCancellation? _loading;
-  var controller = TextEditingController();
+  late List<String> _urls;
+  final _catalogs = <String, List<dynamic>?>{};
+  final _errors = <String, String>{};
+  final _loads = <String, HttpCancellation>{};
+  final _controller = TextEditingController();
+  String? _inputError;
 
-  void load() async {
-    _loading?.cancel();
-    final cancellation = HttpCancellation();
-    _loading = cancellation;
-    setState(() {
-      json = null;
-    });
-    try {
-      final entries = controller.text.isEmpty
-          ? <dynamic>[]
-          : await ComicSourceManager().catalog(controller.text, cancellation);
-      if (mounted && identical(_loading, cancellation)) {
-        setState(() {
-          json = entries;
-        });
-      }
-    } catch (error) {
-      if (mounted && identical(_loading, cancellation)) {
-        context.showMessage(message: error.toString());
-        setState(() {
-          json = [];
-        });
-      }
-    } finally {
-      if (identical(_loading, cancellation)) _loading = null;
-      cancellation.dispose();
-    }
-  }
+  static const _helpUrl =
+      "https://github.com/Yo1sing/Venera-Edge/blob/master/doc/comic_source.md";
 
   @override
   void initState() {
     super.initState();
-    originalCatalogUrl = appdata.settings['comicSourceListUrl'];
-    controller.text = originalCatalogUrl;
-    load();
+    _urls = _readUrls();
+    for (final url in _urls) {
+      _load(url);
+    }
   }
 
   @override
   void dispose() {
-    _loading?.cancel();
-    final edited = controller.text.trim();
-    if (changed && edited != originalCatalogUrl) {
-      Future.microtask(() async {
-        try {
-          appdata.settings.replaceValue(
-            'comicSourceListUrl',
-            previous: originalCatalogUrl,
-            value: edited,
-          );
-          await appdata.saveData();
-        } catch (error) {
-          App.rootContext.showMessage(message: error.toString());
-        }
-      });
+    for (final cancellation in _loads.values) {
+      cancellation.cancel();
     }
-    controller.dispose();
+    _loads.clear();
+    _controller.dispose();
     super.dispose();
+  }
+
+  List<String> _readUrls() =>
+      (appdata.settings['comicSourceListUrls'] as List? ?? [])
+          .whereType<String>()
+          .toList();
+
+  Future<void> _load(String url) async {
+    _loads.remove(url)?.cancel();
+    final cancellation = HttpCancellation();
+    _loads[url] = cancellation;
+    setState(() {
+      _catalogs[url] = null;
+      _errors.remove(url);
+    });
+    try {
+      final entries = await ComicSourceManager().catalog(url, cancellation);
+      if (!mounted || !identical(_loads[url], cancellation)) return;
+      setState(() {
+        _catalogs[url] = entries;
+      });
+    } catch (error) {
+      if (!mounted || !identical(_loads[url], cancellation)) return;
+      setState(() {
+        _catalogs[url] = [];
+        _errors[url] = error.toString();
+      });
+    } finally {
+      if (identical(_loads[url], cancellation)) {
+        _loads.remove(url);
+      }
+      cancellation.dispose();
+    }
+  }
+
+  Future<void> _addUrl() async {
+    final url = _controller.text.trim();
+    final uri = Uri.tryParse(url);
+    if (url.isEmpty ||
+        uri == null ||
+        !(uri.scheme == 'http' || uri.scheme == 'https') ||
+        uri.host.isEmpty) {
+      setState(() {
+        _inputError = "Invalid URL".tl;
+      });
+      return;
+    }
+    if (_urls.contains(url)) {
+      setState(() {
+        _inputError = "This URL is already added".tl;
+      });
+      return;
+    }
+    final previous = _urls.toSet();
+    try {
+      appdata.settings.addComicSourceListUrl(url);
+      await appdata.saveData();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _inputError = error.toString();
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    final urls = _readUrls();
+    setState(() {
+      _inputError = null;
+      _controller.clear();
+      _urls = urls;
+    });
+    for (final url in urls) {
+      if (!previous.contains(url)) {
+        _load(url);
+      }
+    }
+  }
+
+  Future<void> _removeUrl(String url) async {
+    _loads.remove(url)?.cancel();
+    try {
+      appdata.settings.removeComicSourceListUrl(url);
+      await appdata.saveData();
+    } catch (error) {
+      if (mounted) context.showMessage(message: error.toString());
+    }
+    if (!mounted) return;
+    setState(() {
+      _urls = _readUrls();
+      _catalogs.remove(url);
+      _errors.remove(url);
+    });
   }
 
   @override
@@ -408,103 +466,144 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   }
 
   Widget buildBody() {
-    var currentKey = ComicSource.all().map((e) => e.key).toList();
-
+    final installed = ComicSource.all().map((e) => e.key).toSet();
     return ListView.builder(
-      itemCount: (json?.length ?? 1) + 1,
+      itemCount: _urls.length + 1,
       itemBuilder: (context, index) {
-        if (index == 0) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
-                width: 0.6,
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  leading: Icon(Icons.source_outlined),
-                  title: Text("Repo URL".tl),
-                ),
-                TextField(
-                  controller: controller,
+        if (index == 0) return _buildHeader();
+        return _buildRepository(_urls[index - 1], installed);
+      },
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+          width: 0.6,
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: Icon(Icons.source_outlined),
+            title: Text("Source repositories".tl),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
                   decoration: InputDecoration(
-                    hintText: "URL",
+                    hintText: "URL of index.json",
+                    errorText: _inputError,
                     border: const UnderlineInputBorder(),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  onChanged: (value) {
-                    changed = true;
+                  onChanged: (_) {
+                    if (_inputError != null) {
+                      setState(() {
+                        _inputError = null;
+                      });
+                    }
                   },
-                ).paddingHorizontal(16).paddingBottom(8),
-                Text(
-                  "The URL should point to a 'index.json' file".tl,
-                ).paddingLeft(16),
-                Text(
-                  "Do not report any issues related to sources to App repo.".tl,
-                ).paddingLeft(16),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        launchUrlString(
-                          "https://github.com/Yo1sing/Venera-Edge/blob/master/doc/comic_source.md",
-                        );
-                      },
-                      child: Text("Help".tl),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: load,
-                      child: Text("Refresh".tl),
-                    ),
-                    const SizedBox(width: 16),
-                  ],
+                  onSubmitted: (_) => _addUrl(),
                 ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          );
-        }
+              ),
+              IconButton(
+                tooltip: "Add".tl,
+                onPressed: _addUrl,
+                icon: const Icon(Icons.add),
+              ),
+            ],
+          ).paddingHorizontal(16).paddingBottom(8),
+          Text(
+            "The URL should point to an 'index.json' file. Installed sources are kept when a repository is removed."
+                .tl,
+          ).paddingLeft(16).paddingRight(16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => launchUrlString(_helpUrl),
+                child: Text("Help".tl),
+              ),
+              const SizedBox(width: 16),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
 
-        if (index == 1 && json == null) {
-          return Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-            ).fixWidth(24).fixHeight(24),
-          );
-        }
+  Widget _buildRepository(String url, Set<String> installed) {
+    final entries = _catalogs[url];
+    final error = _errors[url];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ListTile(
+          leading: const Icon(Icons.link),
+          title: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: "Refresh".tl,
+                onPressed: () => _load(url),
+                icon: const Icon(Icons.refresh),
+              ),
+              IconButton(
+                tooltip: "Remove".tl,
+                onPressed: () => _removeUrl(url),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+        ),
+        if (entries == null)
+          Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ).fixWidth(24).fixHeight(24).paddingVertical(8)
+        else if (error != null)
+          ListTile(
+            leading: const Icon(Icons.error_outline),
+            title: Text(error, maxLines: 3, overflow: TextOverflow.ellipsis),
+            subtitle: Text("Tap refresh to retry".tl),
+          )
+        else if (entries.isEmpty)
+          ListTile(title: Text("No sources found".tl))
+        else
+          ...entries.map((entry) => _buildEntry(entry, installed)),
+        const Divider(height: 1),
+      ],
+    );
+  }
 
-        index--;
-
-        var key = json![index]["key"];
-        var action = currentKey.contains(key)
-            ? const Icon(Icons.check, size: 20).paddingRight(8)
-            : Button.filled(
-                child: Text("Add".tl),
-                onPressed: () async {
-                  final String url = json![index]["url"];
-                  await widget.onAdd(url);
-                  if (mounted) setState(() {});
-                },
-              ).fixHeight(32);
-
-        var description = json![index]["version"];
-        if (json![index]["description"] != null) {
-          description = "$description\n${json![index]["description"]}";
-        }
-
-        return ListTile(
-          title: Text(json![index]["name"]),
-          subtitle: Text(description),
-          trailing: action,
-        );
-      },
+  Widget _buildEntry(dynamic entry, Set<String> installed) {
+    final key = entry["key"]?.toString() ?? "";
+    final name = entry["name"]?.toString() ?? key;
+    var description = entry["version"]?.toString() ?? "";
+    if (entry["description"] != null) {
+      description = "$description\n${entry["description"]}";
+    }
+    return ListTile(
+      title: Text(name),
+      subtitle: Text(description),
+      trailing: installed.contains(key)
+          ? const Icon(Icons.check, size: 20).paddingRight(8)
+          : Button.filled(
+              child: Text("Add".tl),
+              onPressed: () async {
+                await widget.onAdd(entry["url"] as String);
+                if (mounted) setState(() {});
+              },
+            ).fixHeight(32),
     );
   }
 }
@@ -917,36 +1016,44 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
         case 'select':
           final options = (setting['options'] as List? ?? [])
               .whereType<Map>()
-              .where((option) =>
-                  option['value'] is String ||
-                  option['value'] is num ||
-                  option['value'] is bool)
+              .where(
+                (option) =>
+                    option['value'] is String ||
+                    option['value'] is num ||
+                    option['value'] is bool,
+              )
               .toList();
           if (options.isEmpty) continue;
           String label(Map option) =>
               (option['text'] ?? option['value']).toString().ts(source.key);
-          final selected = options.indexWhere((option) => option['value'] == current);
+          final selected = options.indexWhere(
+            (option) => option['value'] == current,
+          );
           yield ListTile(
             title: Text(title),
-            trailing: actions(Select(
-              current: selected < 0 ? '' : label(options[selected]),
-              values: options.map(label).toList(),
-              onTap: (index) {
-                final error = save(options[index]['value']);
-                if (error != null) context.showMessage(message: error);
-              },
-            )),
+            trailing: actions(
+              Select(
+                current: selected < 0 ? '' : label(options[selected]),
+                values: options.map(label).toList(),
+                onTap: (index) {
+                  final error = save(options[index]['value']);
+                  if (error != null) context.showMessage(message: error);
+                },
+              ),
+            ),
           );
         case 'switch':
           yield ListTile(
             title: Text(title),
-            trailing: actions(Switch(
-              value: current == true,
-              onChanged: (value) {
-                final error = save(value);
-                if (error != null) context.showMessage(message: error);
-              },
-            )),
+            trailing: actions(
+              Switch(
+                value: current == true,
+                onChanged: (value) {
+                  final error = save(value);
+                  if (error != null) context.showMessage(message: error);
+                },
+              ),
+            ),
           );
         case 'input':
           final text = current?.toString() ?? '';
@@ -962,16 +1069,18 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           yield ListTile(
             title: Text(title),
             subtitle: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: actions(IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => showInputDialog(
-                context: context,
-                title: title,
-                initialValue: text,
-                inputValidator: hintValidator,
-                onConfirm: (value) => save(value),
+            trailing: actions(
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () => showInputDialog(
+                  context: context,
+                  title: title,
+                  initialValue: text,
+                  inputValidator: hintValidator,
+                  onConfirm: (value) => save(value),
+                ),
               ),
-            )),
+            ),
           );
         case 'callback':
           yield _CallbackSetting(setting: item, sourceKey: source.key);

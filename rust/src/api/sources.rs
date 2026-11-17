@@ -71,10 +71,10 @@ impl SourceManager {
     }
     pub async fn check_updates(
         &self,
-        url: String,
+        urls: Vec<String>,
         cancellation: &HttpCancellation,
     ) -> Result<String> {
-        self.inner.check_updates(url, cancellation).await
+        self.inner.check_updates(urls, cancellation).await
     }
     #[flutter_rust_bridge::frb(sync)]
     pub fn reconcile_pages(&self, settings_json: String, added: Option<String>) -> Result<String> {

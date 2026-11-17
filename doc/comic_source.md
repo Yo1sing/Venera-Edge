@@ -21,7 +21,13 @@ The repo is maintained by the Venera team.
 
 > The link is a mirror of the original repo. To contribute your comic source, please visit the [original repo](https://github.com/venera-app/venera-configs)
 
-You should provide a repository url to let the app load the comic source list.
+You can add more than one repository url to the app. All configured
+repositories are listed together in the comic source list, and the "Check
+updates" action checks installed sources against every configured repository.
+Removing a repository url only stops listing its sources; installed sources are
+not deleted.
+
+You should provide at least one repository url to let the app load the comic source list.
 The url should point to a JSON file that contains the list of comic sources.
 
 The JSON file should have the following format:

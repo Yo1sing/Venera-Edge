@@ -1,6 +1,7 @@
 use anyhow::{bail, ensure, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::sync::LazyLock;
 
 pub static DEFAULTS: LazyLock<Value> = LazyLock::new(|| {
@@ -57,6 +58,49 @@ fn validate_choice(value: &Value, choices: &[&str]) -> bool {
     value.as_str().is_some_and(|value| choices.contains(&value))
 }
 
+fn valid_source_list_url(value: &str) -> bool {
+    url::Url::parse(value)
+        .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.has_host())
+}
+
+fn deprecated_source_list_url(value: &str) -> bool {
+    url::Url::parse(value)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_owned))
+        .as_deref()
+        == Some("git.nyne.dev")
+}
+
+/// Filters invalid or duplicate entries and replaces the retired mirror with
+/// the bundled default repository.
+fn normalized_source_list_urls(values: &[Value]) -> Vec<Value> {
+    let fallback = DEFAULTS["comicSourceListUrl"].as_str().unwrap_or_default();
+    let mut seen = HashSet::new();
+    values
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|value| valid_source_list_url(value))
+        .map(|value| {
+            if deprecated_source_list_url(value) {
+                fallback
+            } else {
+                value
+            }
+        })
+        .filter(|value| !value.is_empty() && seen.insert((*value).to_owned()))
+        .map(|value| Value::String(value.to_owned()))
+        .collect()
+}
+
+fn sync_legacy_source_list_url(settings: &mut Value) {
+    let first = settings["comicSourceListUrls"]
+        .as_array()
+        .and_then(|values| values.first())
+        .cloned()
+        .unwrap_or_else(|| json!(""));
+    settings["comicSourceListUrl"] = first;
+}
+
 pub fn valid(key: &str, value: &Value) -> bool {
     match key {
         "searchSources" => value.is_null() || strings(value),
@@ -74,10 +118,13 @@ pub fn valid(key: &str, value: &Value) -> bool {
                         matches!(url.scheme(), "http" | "https") && url.has_host()
                     }))
         }),
-        "comicSourceListUrl" => value.as_str().is_some_and(|value| {
-            value.is_empty()
-                || url::Url::parse(value)
-                    .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.has_host())
+        "comicSourceListUrl" => value
+            .as_str()
+            .is_some_and(|value| value.is_empty() || valid_source_list_url(value)),
+        "comicSourceListUrls" => value.as_array().is_some_and(|values| {
+            values
+                .iter()
+                .all(|value| value.as_str().is_some_and(valid_source_list_url))
         }),
         "proxy" => value.as_str().is_some_and(|value| {
             matches!(value, "system" | "direct") || {
@@ -250,6 +297,7 @@ pub fn normalized_value(key: &str, value: &Value) -> Option<Value> {
                     .collect(),
             ))
         }
+        "comicSourceListUrls" => Some(Value::Array(normalized_source_list_urls(value.as_array()?))),
         _ if DEFAULTS.get(key).is_none() || valid(key, value) => Some(value.clone()),
         _ => None,
     }
@@ -257,22 +305,34 @@ pub fn normalized_value(key: &str, value: &Value) -> Option<Value> {
 
 pub fn normalize(saved: &Value) -> Value {
     let mut restored = DEFAULTS.clone();
-    if let Some(saved) = saved.as_object() {
+    let saved_object = saved.as_object();
+    if let Some(saved) = saved_object {
         for (key, value) in saved {
             if let Some(value) = normalized_value(key, value) {
                 restored[key] = value;
             }
         }
     }
-    if restored["comicSourceListUrl"]
-        .as_str()
-        .and_then(|value| url::Url::parse(value).ok())
-        .and_then(|url| url.host_str().map(str::to_owned))
-        .as_deref()
-        == Some("git.nyne.dev")
-    {
-        restored["comicSourceListUrl"] = DEFAULTS["comicSourceListUrl"].clone();
+    // Older versions stored a single repository. Seed the list from it unless
+    // the saved data already contains an explicit list (even an empty one).
+    let has_list = saved_object
+        .and_then(|saved| saved.get("comicSourceListUrls"))
+        .is_some_and(Value::is_array);
+    if !has_list {
+        let legacy = match saved_object.and_then(|saved| saved.get("comicSourceListUrl")) {
+            Some(Value::String(value)) if value.is_empty() => String::new(),
+            Some(Value::String(value)) if valid_source_list_url(value) => value.clone(),
+            _ => DEFAULTS["comicSourceListUrl"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned(),
+        };
+        restored["comicSourceListUrls"] =
+            Value::Array(normalized_source_list_urls(&[Value::String(legacy)]));
     }
+    // Keep the legacy single-value setting in step with the list so older
+    // builds and older synced clients still see the primary repository.
+    sync_legacy_source_list_url(&mut restored);
     restored
 }
 
@@ -365,34 +425,48 @@ fn change_global(settings: &mut Value, key: &str, change: Change) -> Result<()> 
             value
         }
         Change::Add { value } => {
+            let item = match key {
+                "blockedWords" | "blockedCommentWords" => {
+                    ensure!(!value.trim().is_empty(), "Invalid blocked word");
+                    Value::String(value)
+                }
+                "comicSourceListUrls" => {
+                    ensure!(valid_source_list_url(&value), "Invalid source list URL");
+                    Value::String(value)
+                }
+                _ => bail!("Invalid list setting"),
+            };
             let list = settings[key]
                 .as_array_mut()
                 .context("Setting is not a list")?;
-            ensure!(
-                matches!(key, "blockedWords" | "blockedCommentWords") && !value.trim().is_empty(),
-                "Invalid blocked word"
-            );
-            let value = Value::String(value);
-            if !list.contains(&value) {
-                list.push(value);
+            if !list.contains(&item) {
+                list.push(item);
             }
+            sync_legacy_source_list_url(settings);
             return Ok(());
         }
         Change::Remove { value } => {
-            let list = settings[key]
-                .as_array_mut()
-                .context("Setting is not a list")?;
             ensure!(
-                matches!(key, "blockedWords" | "blockedCommentWords"),
+                matches!(
+                    key,
+                    "blockedWords" | "blockedCommentWords" | "comicSourceListUrls"
+                ),
                 "Invalid list setting"
             );
-            list.retain(|item| item.as_str() != Some(&value));
+            settings[key]
+                .as_array_mut()
+                .context("Setting is not a list")?
+                .retain(|item| item.as_str() != Some(&value));
+            sync_legacy_source_list_url(settings);
             return Ok(());
         }
     };
     ensure!(valid(key, &value), "Invalid value for {key}");
     settings[key] = value;
     apply_reader_dependencies(settings, key);
+    if key == "comicSourceListUrls" {
+        sync_legacy_source_list_url(settings);
+    }
     Ok(())
 }
 

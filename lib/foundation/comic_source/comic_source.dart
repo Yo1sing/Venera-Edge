@@ -169,10 +169,13 @@ class ComicSourceManager with ChangeNotifier, Init {
   ) async =>
       jsonDecode(await _backend.catalog(url: url, cancellation: cancellation));
 
-  Future<int> checkUpdates(String url, HttpCancellation cancellation) async {
+  Future<int> checkUpdates(
+    List<String> urls,
+    HttpCancellation cancellation,
+  ) async {
     _availableUpdates = Map<String, String>.from(
       jsonDecode(
-        await _backend.checkUpdates(url: url, cancellation: cancellation),
+        await _backend.checkUpdates(urls: urls, cancellation: cancellation),
       ),
     );
     notifyListeners();
@@ -270,7 +273,6 @@ class ComicSource {
 
   final LikeCommentFunc? likeCommentFunc;
 
-
   final Map<String, Map<String, String>>? translations;
 
   final HandleClickTagEvent? handleClickTagEvent;
@@ -303,7 +305,9 @@ class ComicSource {
   /// Returns the currently installed script's dynamic setting descriptors and
   /// the effective values resolved by the Rust source store.
   Map<String, Map<String, dynamic>> getSettingsDynamic() {
-    final value = JsEngine().runCode('__venera.sourceSettings(${jsonEncode(key)})');
+    final value = JsEngine().runCode(
+      '__venera.sourceSettings(${jsonEncode(key)})',
+    );
     return (value as Map).map((key, value) {
       final field = Map<String, dynamic>.from(value as Map);
       final callback = field['callback'];
@@ -316,7 +320,9 @@ class ComicSource {
 
   void setSourceSetting(String setting, Object? value) {
     JsEngine().runtime.editSourceSetting(
-      key: key, setting: setting, valueJson: jsonEncode(value),
+      key: key,
+      setting: setting,
+      valueJson: jsonEncode(value),
     );
   }
 

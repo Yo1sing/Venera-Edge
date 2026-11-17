@@ -62,17 +62,21 @@ void main() {
       var code = source(base, '1.0.0');
       var status = 200;
       var advertised = '2.0.0';
+      var otherAdvertised = '2.5.0';
       var block = false;
       final arrived = Completer<void>();
       final disconnected = Completer<void>();
       final subscription = server.listen((request) async {
-        if (request.uri.path == '/index.json') {
+        if (request.uri.path == '/index.json' ||
+            request.uri.path == '/other.json') {
           request.response.write(
             jsonEncode([
               {
                 'key': 'native',
                 'name': 'Native',
-                'version': advertised,
+                'version': request.uri.path == '/index.json'
+                    ? advertised
+                    : otherAdvertised,
                 'fileName': 'native.js',
               },
             ]),
@@ -133,17 +137,18 @@ void main() {
         expect(
           jsonDecode(
             await manager.checkUpdates(
-              url: '$base/index.json',
+              urls: ['$base/index.json', '$base/other.json'],
               cancellation: cancellation,
             ),
           ),
-          {'native': '2.0.0'},
+          {'native': '2.5.0'},
         );
         advertised = '1.0.0';
+        otherAdvertised = '1.0.0';
         expect(
           jsonDecode(
             await manager.checkUpdates(
-              url: '$base/index.json',
+              urls: ['$base/index.json', '$base/other.json'],
               cancellation: cancellation,
             ),
           ),

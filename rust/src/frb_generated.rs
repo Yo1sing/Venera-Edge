@@ -7595,7 +7595,7 @@ fn wire__crate__api__sources__SourceManager_check_updates_impl(
             let api_that = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SourceManager>,
             >>::sse_decode(&mut deserializer);
-            let api_url = <String>::sse_decode(&mut deserializer);
+            let api_urls = <Vec<String>>::sse_decode(&mut deserializer);
             let api_cancellation = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<HttpCancellation>,
             >>::sse_decode(&mut deserializer);
@@ -7635,7 +7635,7 @@ fn wire__crate__api__sources__SourceManager_check_updates_impl(
                         let api_cancellation_guard = api_cancellation_guard.unwrap();
                         let output_ok = crate::api::sources::SourceManager::check_updates(
                             &*api_that_guard,
-                            api_url,
+                            api_urls,
                             &*api_cancellation_guard,
                         )
                         .await?;
