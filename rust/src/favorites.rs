@@ -289,8 +289,8 @@ impl Favorites {
             return Ok(());
         }
         let transaction = self.db.unchecked_transaction()?;
-        let mut order = self.bound(target, at_end)? + if at_end { 1 } else { -1 };
-        for key in keys {
+        let first_order = self.bound(target, at_end)? + if at_end { 1 } else { -1 };
+        for (key, order) in keys.iter().zip(first_order..) {
             let inserted = self.db.execute(&format!("INSERT OR IGNORE INTO {target_table}
                 (id,name,author,type,tags,cover_path,time,display_order,translated_tags,last_update_time,has_new_update,last_check_time)
                 SELECT id,name,author,type,tags,cover_path,time,?,translated_tags,last_update_time,has_new_update,last_check_time
@@ -301,7 +301,6 @@ impl Favorites {
                     params![key.id, key.comic_type],
                 )?;
             }
-            order += 1;
         }
         transaction.commit()?;
         Ok(())
