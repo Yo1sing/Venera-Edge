@@ -58,13 +58,13 @@ abstract class CargoKitBuildTask extends DefaultTask {
         def manifestDir = Paths.get(project.buildscript.sourceFile.parent, project.cargokit.manifestDir)
 
         def rootProjectDir = project.rootProject.projectDir
-        
+
         if (!Os.isFamily(Os.FAMILY_WINDOWS)) {
             project.exec {
                 commandLine 'chmod', '+x', path
             }
         }
-        
+
         project.exec {
             executable path
             args "build-gradle"
@@ -119,7 +119,7 @@ class CargoKitPlugin implements Plugin<Project> {
         }
 
         def cargoBuildDir = "${project.buildDir}/build"
-        
+
         // Determine if the project is an application or library
         def isApplication = plugin.project.plugins.hasPlugin('com.android.application')
         def variants = isApplication ? plugin.project.android.applicationVariants : plugin.project.android.libraryVariants
@@ -139,6 +139,10 @@ class CargoKitPlugin implements Plugin<Project> {
                 platforms.add("android-x86")
                 platforms.add("android-x64")
             }
+
+            // Flutter already lists the device ABI, so the debug additions above
+            // can duplicate it. Cargokit builds every entry without deduplicating.
+            platforms = platforms.unique()
 
             // The task name depends on plugin properties, which are not available
             // at this point
