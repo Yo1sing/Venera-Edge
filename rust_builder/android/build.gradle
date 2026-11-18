@@ -1,7 +1,7 @@
 // The Android Gradle Plugin builds the native code with the Android NDK.
 
-group 'com.flutter_rust_bridge.venera_backend'
-version '1.0'
+group = 'com.flutter_rust_bridge.venera_backend'
+version = '1.0'
 
 buildscript {
     repositories {
@@ -32,8 +32,8 @@ android {
     ndkVersion = appAndroid.ndkVersion
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     defaultConfig {

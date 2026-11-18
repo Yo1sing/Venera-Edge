@@ -1,0 +1,37 @@
+// Android build of flutter_file_dialog 3.3.6.
+apply plugin: 'com.android.library'
+
+group = 'com.kineapps.flutter_file_dialog'
+version = '1.0-SNAPSHOT'
+
+android {
+    namespace = 'com.kineapps.flutter_file_dialog'
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        disable 'InvalidPackage'
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+def coroutinesVersion = '1.7.3'
+dependencies {
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion"
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+}

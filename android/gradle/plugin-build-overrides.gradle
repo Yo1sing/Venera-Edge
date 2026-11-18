@@ -1,5 +1,6 @@
 // Build pinned Flutter plugins with AGP 9-compatible scripts in their original package directories.
 def pluginScripts = [
+    flutter_file_dialog: 'built-in-kotlin/flutter_file_dialog.gradle',
     flutter_memory_info: 'built-in-kotlin/flutter_memory_info.gradle',
     flutter_saf: 'built-in-kotlin/flutter_saf.gradle',
     share_plus: 'built-in-kotlin/share_plus.gradle',

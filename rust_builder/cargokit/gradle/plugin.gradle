@@ -6,6 +6,7 @@ import javax.inject.Inject
 import org.apache.tools.ant.taskdefs.condition.Os
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.process.ExecOperations
 
 CargoKitPlugin.file = buildscript.sourceFile
@@ -28,7 +29,17 @@ abstract class CargoKitBuildTask extends DefaultTask {
     String buildMode
 
     @Input
-    String buildDir
+    String manifestDir
+
+    @Input
+    String rootProjectDir
+
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getLocalPropertiesFile()
+
+    @Internal
+    abstract DirectoryProperty getProjectBuildDirectory()
 
     @OutputDirectory
     abstract DirectoryProperty getOutputDir()
@@ -53,24 +64,14 @@ abstract class CargoKitBuildTask extends DefaultTask {
 
     @TaskAction
     def build() {
-        if (project.cargokit.manifestDir == null) {
-            throw new GradleException("Property 'manifestDir' must be set on cargokit extension");
-        }
-
-        if (project.cargokit.libname == null) {
-            throw new GradleException("Property 'libname' must be set on cargokit extension");
-        }
-
         def executableName = Os.isFamily(Os.FAMILY_WINDOWS) ? "run_build_tool.cmd" : "run_build_tool.sh"
-        def path = Paths.get(new File(pluginFile).parent, "..", executableName);
+        def path = Paths.get(new File(pluginFile).parent, "..", executableName)
 
-        def manifestDir = Paths.get(project.buildscript.sourceFile.parent, project.cargokit.manifestDir)
-
-        def rootProjectDir = project.rootProject.projectDir
         def localProperties = new Properties()
-        project.rootProject.file("local.properties").withInputStream { localProperties.load(it) }
+        localPropertiesFile.get().asFile.withInputStream { localProperties.load(it) }
+        def buildDir = projectBuildDirectory.dir("build").get().asFile
         def generatedJniLibs = outputDir.get().asFile.canonicalFile
-        def projectBuildPath = project.layout.buildDirectory.get().asFile.canonicalFile.toPath()
+        def projectBuildPath = projectBuildDirectory.get().asFile.canonicalFile.toPath()
         def outputPath = generatedJniLibs.toPath()
         if (outputPath == projectBuildPath || !outputPath.startsWith(projectBuildPath)) {
             throw new GradleException("CargoKit JNI output must be inside the project build directory.")
@@ -111,7 +112,7 @@ class CargoKitPlugin implements Plugin<Project> {
 
     @Override
     void apply(Project project) {
-        project.extensions.create("cargokit", CargoKitExtension)
+        def cargokit = project.extensions.create("cargokit", CargoKitExtension)
 
         def flutterProject = project.rootProject.allprojects.find {
             it.pluginManager.hasPlugin("dev.flutter.flutter-gradle-plugin")
@@ -121,7 +122,6 @@ class CargoKitPlugin implements Plugin<Project> {
             return
         }
 
-        def cargoBuildDir = "${project.buildDir}/build"
         def flutterAndroid = flutterProject.extensions.getByName("android")
         def androidComponents = project.extensions.getByName("androidComponents")
         def androidSdkDir = androidComponents.sdkComponents.sdkDirectory
@@ -144,10 +144,21 @@ class CargoKitPlugin implements Plugin<Project> {
                 throw new GradleException("Please set 'android.ndkVersion' in 'app/build.gradle'.")
             }
 
-            def taskName = "cargokitCargoBuild${project.cargokit.libname.capitalize()}${variant.name.capitalize()}"
+            if (cargokit.manifestDir == null) {
+                throw new GradleException("Property 'manifestDir' must be set on cargokit extension")
+            }
+            if (cargokit.libname == null) {
+                throw new GradleException("Property 'libname' must be set on cargokit extension")
+            }
+
+            def manifestPath = Paths.get(project.buildscript.sourceFile.parent, cargokit.manifestDir).normalize()
+            def taskName = "cargokitCargoBuild${cargokit.libname.capitalize()}${variant.name.capitalize()}"
             def cargoBuildTask = project.tasks.register(taskName, CargoKitBuildTask) {
                 buildMode = buildType
-                buildDir = cargoBuildDir
+                manifestDir = manifestPath.toString()
+                rootProjectDir = project.rootProject.projectDir.absolutePath
+                localPropertiesFile.fileValue(project.rootProject.file("local.properties"))
+                projectBuildDirectory.set(project.layout.buildDirectory)
                 ndkVersion = flutterAndroid.ndkVersion
                 sdkDirectory = androidSdkDir.get().asFile.absolutePath
                 minSdkVersion = flutterAndroid.defaultConfig.minSdk
