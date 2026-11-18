@@ -1,11 +1,10 @@
 plugins {
     id "com.android.application"
-    id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // The Flutter Gradle Plugin must be applied after the Android Gradle Plugin.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
-ext.abiCodes = ["armeabi-v7a": 1, "arm64-v8a": 2, "x86_64": 3]
+def abiCodes = ["armeabi-v7a": 1, "arm64-v8a": 2, "x86_64": 3]
 
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file("local.properties")
@@ -35,7 +34,11 @@ if (hasSigningProperties) {
 android {
     namespace = "io.github.yo1sing.venera.edge"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.0.13004108"
+    ndkVersion = flutter.ndkVersion
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     packaging {
         jniLibs {
@@ -56,10 +59,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions{
-        jvmTarget = JavaVersion.VERSION_17
-    }
-
     signingConfigs {
         if (hasSigningProperties) {
             custom {
@@ -83,7 +82,7 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
+            minifyEnabled = true
             shrinkResources = true
             ndk {
                 abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
@@ -103,31 +102,35 @@ android {
         }
     }
 
-    applicationVariants.all { variant ->
-        variant.outputs.all { output ->
-            def abi = output.getFilter(com.android.build.OutputFile.ABI)
-            if (variant.buildType.name == "release") {
-                if (abi != null) {
-                    outputFileName = "venera-edge-${variant.versionName}-${abi}.apk"
-                    def abiVersionCode = project.ext.abiCodes.get(abi)
-                    if (abiVersionCode != null) {
-                        versionCodeOverride = variant.versionCode * 10 + abiVersionCode
-                    }
-                } else {
-                    outputFileName = "venera-edge-${variant.versionName}.apk"
-                    versionCodeOverride = variant.versionCode * 10
-                }
-            } else if (variant.buildType.name == "debug") {
-                versionCodeOverride = variant.versionCode * 10 + 4
-            }
-        }
-    }
-
     dependenciesInfo {
         // Disables dependency metadata when building APKs.
         includeInApk = false
         // Disables dependency metadata when building Android App Bundles.
         includeInBundle = false
+    }
+}
+
+androidComponents {
+    def baseVersionCode = flutterVersionCode.toInteger()
+
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.each { output ->
+            output.versionCode.set(baseVersionCode * 10 + 4)
+        }
+    }
+
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.each { output ->
+            def abi = output.filters.find {
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI
+            }?.identifier
+            def abiVersionCode = abi == null ? 0 : abiCodes[abi]
+            if (abiVersionCode != null) {
+                output.versionCode.set(baseVersionCode * 10 + abiVersionCode)
+            }
+            def abiSuffix = abi == null ? "" : "-${abi}"
+            output.outputFileName.set("venera-edge-${flutterVersionName}${abiSuffix}.apk".toString())
+        }
     }
 }
 

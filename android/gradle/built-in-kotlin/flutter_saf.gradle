@@ -1,0 +1,47 @@
+// Android build of flutter_saf at fe182cdf40e5fa6230f451bc1d643b860f610d13.
+apply plugin: 'com.android.library'
+
+group = 'org.pkuism.flutter_saf'
+version = '1.0-SNAPSHOT'
+
+android {
+    namespace = 'org.pkuism.flutter_saf'
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 21
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    splits {
+        abi {
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+            enable = true
+            universalApk = true
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file('src/main/cpp/CMakeLists.txt')
+            version = '3.22.1'
+        }
+    }
+
+    testOptions {
+        unitTests.all {
+            useJUnitPlatform()
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.documentfile:documentfile:1.0.1'
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'org.mockito:mockito-core:5.0.0'
+}

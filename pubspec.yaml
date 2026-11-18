@@ -8,7 +8,7 @@ version: 1.6.3+163
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
-  flutter: 3.41.4
+  flutter: 3.50.0
 
 dependencies:
   flutter:
@@ -27,7 +27,7 @@ dependencies:
       url: https://github.com/venera-app/photo_view
       ref: a1255d1b5945aad4b7323303ec2ecdf0c90ffc4c
   mime: ^2.0.0
-  share_plus: ^12.0.1
+  share_plus: 12.0.2
   scrollable_positioned_list:
     git:
       url: https://github.com/venera-app/flutter.widgets
@@ -54,9 +54,9 @@ dependencies:
     git: 
       url: https://github.com/venera-app/flutter_saf
       ref: fe182cdf40e5fa6230f451bc1d643b860f610d13
-  dynamic_color: ^1.8.1
+  dynamic_color: 1.9.0
   shimmer_animation: ^2.1.0
-  flutter_memory_info: ^0.0.3
+  flutter_memory_info: 0.0.3
   syntax_highlight: ^0.4.0
   flex_seed_scheme: ^4.0.1
   flutter_localizations:

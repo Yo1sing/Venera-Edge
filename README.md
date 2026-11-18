@@ -1,5 +1,5 @@
 # Venera Edge
-[![flutter](https://img.shields.io/badge/flutter-3.41.4-blue)](https://flutter.dev/)
+[![flutter](https://img.shields.io/badge/flutter-3.50.0-blue)](https://flutter.dev/)
 [![License](https://img.shields.io/github/license/Yo1sing/Venera-Edge)](https://github.com/Yo1sing/Venera-Edge/blob/master/LICENSE)
 [![stars](https://img.shields.io/github/stars/Yo1sing/Venera-Edge?style=flat)](https://github.com/Yo1sing/Venera-Edge/stargazers)
 

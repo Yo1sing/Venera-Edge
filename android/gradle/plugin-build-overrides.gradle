@@ -1,0 +1,22 @@
+// Build pinned Flutter plugins with AGP 9-compatible scripts in their original package directories.
+def pluginScripts = [
+    flutter_memory_info: 'built-in-kotlin/flutter_memory_info.gradle',
+    flutter_saf: 'built-in-kotlin/flutter_saf.gradle',
+    share_plus: 'built-in-kotlin/share_plus.gradle',
+    flutter_inappwebview_android: 'flutter_inappwebview_android.gradle',
+]
+def overrides = [:]
+pluginScripts.each { name, scriptPath ->
+    def plugin = findProject(":${name}")
+    if (plugin != null) {
+        plugin.buildFileName = 'venera-android-plugin.gradle'
+        overrides[plugin.path] = new File(settingsDir, "gradle/${scriptPath}")
+    }
+}
+
+gradle.beforeProject { project ->
+    def script = overrides[project.path]
+    if (script != null) {
+        project.apply(from: script)
+    }
+}

@@ -1,0 +1,40 @@
+// Android build of flutter_inappwebview_android at 3ef899b3db57c911b080979f1392253b835f98ab.
+apply plugin: 'com.android.library'
+
+group = 'com.pichillilorenzo.flutter_inappwebview_android'
+version = '1.0-SNAPSHOT'
+
+android {
+    namespace = 'com.pichillilorenzo.flutter_inappwebview_android'
+    compileSdk = 34
+
+    defaultConfig {
+        minSdk = 19
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+        vectorDrawables.useSupportLibrary = true
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    lint {
+        disable 'InvalidPackage'
+    }
+
+    def optimizedDefaults = getDefaultProguardFile('proguard-android-optimize.txt')
+    buildTypes {
+        debug {
+            minifyEnabled = false
+            proguardFiles optimizedDefaults, 'proguard-rules.pro'
+        }
+        release {
+            minifyEnabled = true
+            proguardFiles optimizedDefaults, 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.0'
+    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+}
