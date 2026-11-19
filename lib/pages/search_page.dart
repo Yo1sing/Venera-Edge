@@ -488,6 +488,15 @@ class SearchOptionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (option.type == 'dropdown') {
+      return ChoiceDropdown<String>(
+        title: Text(option.label.ts(sourceKey)),
+        options: option.options,
+        value: value,
+        onChanged: onChanged,
+        minWidth: 96,
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -529,15 +538,6 @@ class SearchOptionWidget extends StatelessWidget {
               );
             }).toList(),
           ),
-        if (option.type == 'dropdown')
-          Select(
-            current: option.options[value],
-            values: option.options.values.toList(),
-            onTap: (index) {
-              onChanged(option.options.keys.elementAt(index));
-            },
-            minWidth: 96,
-          )
       ],
     );
   }

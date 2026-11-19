@@ -371,18 +371,12 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
               title: "Choose Folder".tl,
               content: Column(
                 children: [
-                  ListTile(
+                  Select(
                     title: Text("Folder".tl),
-                    trailing: Select(
-                      minWidth: 120,
-                      current: selectedFolder,
-                      values: folders,
-                      onTap: (i) {
-                        setState(() {
-                          selectedFolder = folders[i];
-                        });
-                      },
-                    ),
+                    minWidth: 120,
+                    current: selectedFolder,
+                    values: folders,
+                    onTap: (i) => setState(() => selectedFolder = folders[i]),
                   ),
                 ],
               ),

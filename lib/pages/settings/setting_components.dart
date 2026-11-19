@@ -128,7 +128,7 @@ class SelectSetting extends StatelessWidget {
             : useDeviceSettings
             ? settings.getDeviceReaderSetting(settingKey)
             : settings[settingKey];
-        return SettingsChoiceRow<String>(
+        return ChoiceDropdown<String>(
           title: helpText == null
               ? Text(title)
               : Row(

@@ -42,6 +42,9 @@ import 'package:venera_edge/utils/ext.dart';
 import 'package:venera_edge/utils/io.dart';
 import 'package:venera_edge/utils/tags_translation.dart';
 import 'package:venera_edge/utils/translations.dart';
+import 'choice_dropdown.dart';
+
+export 'choice_dropdown.dart';
 
 part 'image.dart';
 part 'appbar.dart';

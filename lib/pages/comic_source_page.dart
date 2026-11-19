@@ -6,7 +6,6 @@ import 'package:prism_ui/switch.dart' as prism;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera_edge/components/components.dart';
-import 'package:venera_edge/components/settings_choice_row.dart';
 import 'package:venera_edge/foundation/app.dart';
 import 'package:venera_edge/foundation/appdata.dart';
 import 'package:venera_edge/foundation/comic_source/comic_source.dart';
@@ -1040,7 +1039,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           final selected = options.indexWhere(
             (option) => option['value'] == current,
           );
-          yield SettingsChoiceRow<int>(
+          yield ChoiceDropdown<int>(
             title: Text(title),
             trailingAction: resetButton,
             options: options.asMap().map(

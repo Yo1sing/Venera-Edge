@@ -424,19 +424,14 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
               ),
               Column(
                 children: [
-                  ListTile(
+                  ChoiceDropdown<TimeRangeType>(
                     title: Text("Time Filter".tl),
-                    trailing: Select(
-                      current: timeRangeType.value.tl,
-                      values:
-                          TimeRangeType.values.map((e) => e.value.tl).toList(),
-                      minWidth: 64,
-                      onTap: (index) {
-                        setState(() {
-                          timeRangeType = TimeRangeType.values[index];
-                        });
-                      },
-                    ),
+                    value: timeRangeType,
+                    options: {
+                      for (final type in TimeRangeType.values) type: type.value.tl,
+                    },
+                    minWidth: 64,
+                    onChanged: (type) => setState(() => timeRangeType = type),
                   ),
                   if (timeRangeType == TimeRangeType.custom)
                     Column(
@@ -485,18 +480,15 @@ class _ImageFavoritesDialogState extends State<_ImageFavoritesDialog> {
                         ),
                       ],
                     ),
-                  ListTile(
+                  ChoiceDropdown<int>(
                     title: Text("Image Favorites Greater Than".tl),
-                    trailing: Select(
-                      current: numFilter.toString(),
-                      values: numFilterList.map((e) => e.toString()).toList(),
-                      minWidth: 64,
-                      onTap: (index) {
-                        setState(() {
-                          numFilter = numFilterList[index];
-                        });
-                      },
-                    ),
+                    value: numFilter,
+                    fallbackLabel: numFilter.toString(),
+                    options: {
+                      for (final count in numFilterList) count: count.toString(),
+                    },
+                    minWidth: 64,
+                    onChanged: (count) => setState(() => numFilter = count),
                   )
                 ],
               )

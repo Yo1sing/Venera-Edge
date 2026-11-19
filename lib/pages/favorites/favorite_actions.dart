@@ -92,18 +92,12 @@ void addFavorite(List<Comic> comics) {
         builder: (context, setState) {
           return ContentDialog(
             title: "Select a folder".tl,
-            content: ListTile(
+            content: Select(
               title: Text("Folder".tl),
-              trailing: Select(
-                current: selectedFolder,
-                values: folders,
-                minWidth: 112,
-                onTap: (v) {
-                  setState(() {
-                    selectedFolder = folders[v];
-                  });
-                },
-              ),
+              current: selectedFolder,
+              values: folders,
+              minWidth: 112,
+              onTap: (v) => setState(() => selectedFolder = folders[v]),
             ),
             actions: [
               FilledButton(

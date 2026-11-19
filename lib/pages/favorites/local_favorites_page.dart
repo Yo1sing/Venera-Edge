@@ -1112,27 +1112,23 @@ class _SelectUpdatePageNumState extends State<_SelectUpdatePageNum> {
         Row(
           children: [Text(text)],
         ),
-        Row(
-          children: [
-            Text("Update the page number by the latest collection".tl),
-            Spacer(),
-            Select(
-              current: updatePageNum.toString() == '9999999'
-                  ? _allPageText
-                  : updatePageNum.toString(),
-              values: pageNumList,
-              minWidth: 48,
-              onTap: (index) {
-                setState(() {
-                  updatePageNum = int.parse(pageNumList[index] == _allPageText
-                      ? '9999999'
-                      : pageNumList[index]);
-                  appdata.setImplicitData("local_favorites_update_page_num", updatePageNum);
-                  appdata.writeImplicitData();
-                });
-              },
-            )
-          ],
+        Select(
+          title: Text("Update the page number by the latest collection".tl),
+          current:
+              updatePageNum == 9999999 ? _allPageText : updatePageNum.toString(),
+          values: pageNumList,
+          minWidth: 48,
+          onTap: (index) {
+            setState(() {
+              final page = pageNumList[index];
+              updatePageNum = page == _allPageText ? 9999999 : int.parse(page);
+              appdata.setImplicitData(
+                "local_favorites_update_page_num",
+                updatePageNum,
+              );
+              appdata.writeImplicitData();
+            });
+          },
         ),
       ],
     );
@@ -1178,18 +1174,15 @@ class _LocalFavoritesFilterDialogState
             TabViewBody(children: [
               Column(
                 children: [
-                  ListTile(
+                  ChoiceDropdown<String>(
                     title: Text("Filter reading status".tl),
-                    trailing: Select(
-                      current: readFilter.tl,
-                      values: readFilterList.map((e) => e.tl).toList(),
-                      minWidth: 64,
-                      onTap: (index) {
-                        setState(() {
-                          readFilter = readFilterList[index];
-                        });
-                      },
-                    ),
+                    value: readFilter,
+                    fallbackLabel: readFilter.tl,
+                    options: {
+                      for (final status in readFilterList) status: status.tl,
+                    },
+                    minWidth: 64,
+                    onChanged: (status) => setState(() => readFilter = status),
                   )
                 ],
               )

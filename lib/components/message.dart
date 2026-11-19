@@ -452,7 +452,11 @@ Future<int?> showSelectDialog({
   required List<String> options,
   int? initialIndex,
 }) async {
-  int? current = initialIndex;
+  int? current = initialIndex != null &&
+          initialIndex >= 0 &&
+          initialIndex < options.length
+      ? initialIndex
+      : null;
 
   await showDialog(
     context: App.rootContext,
@@ -466,11 +470,11 @@ Future<int?> showSelectDialog({
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Select(
-                    current: current == null ? "" : options[current!],
-                    values: options,
+                  ChoiceDropdown<int>(
+                    value: current,
+                    options: options.asMap(),
                     minWidth: 156,
-                    onTap: (i) {
+                    onChanged: (i) {
                       setState(() {
                         current = i;
                       });

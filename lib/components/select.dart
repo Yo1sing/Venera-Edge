@@ -1,5 +1,6 @@
 part of 'components.dart';
 
+/// A dropdown for callers that work with a list of labels and a selected index.
 class Select extends StatelessWidget {
   const Select({
     super.key,
@@ -7,68 +8,24 @@ class Select extends StatelessWidget {
     required this.values,
     this.onTap,
     this.minWidth,
+    this.title,
   });
 
   final String? current;
-
   final List<String> values;
-
-  final void Function(int index)? onTap;
-
+  final ValueChanged<int>? onTap;
   final double? minWidth;
+  final Widget? title;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: prism.AppRadius.md,
-      ),
-      child: InkWell(
-        onTap: () {
-          var renderBox = context.findRenderObject() as RenderBox;
-          var offset = renderBox.localToGlobal(Offset.zero);
-          var size = renderBox.size;
-          showMenu(
-            context: context,
-            useRootNavigator: true,
-            constraints: BoxConstraints(
-              minWidth: size.width,
-              maxWidth: size.width,
-            ),
-            position: RelativeRect.fromLTRB(
-              offset.dx,
-              offset.dy + size.height + 2,
-              offset.dx + size.height + 2,
-              offset.dy,
-            ),
-            items: values
-                .map((e) => PopupMenuItem(
-                      height: App.isMobile ? 46 : 40,
-                      value: e,
-                      child: Text(e),
-                    ))
-                .toList(),
-          ).then((value) {
-            if (value != null) {
-              onTap?.call(values.indexOf(value));
-            }
-          });
-        },
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: minWidth != null ? (minWidth! - 32) : 0,
-              ),
-              child: Text(current ?? ' ', style: ts.s14),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.arrow_drop_down, color: context.colorScheme.primary),
-          ],
-        ).padding(const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
-      ),
+    return ChoiceDropdown<int>(
+      title: title,
+      options: values.asMap(),
+      value: current == null ? null : values.indexOf(current!),
+      fallbackLabel: current ?? ' ',
+      minWidth: minWidth ?? 0,
+      onChanged: onTap,
     );
   }
 }

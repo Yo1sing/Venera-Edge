@@ -221,34 +221,31 @@ class _LogsPageState extends State<LogsPage> {
               ],
             ),
           ),
-          IconButton(
-              onPressed: () => setState(() {
-                    final RelativeRect position = RelativeRect.fromLTRB(
-                      MediaQuery.of(context).size.width,
-                      MediaQuery.of(context).padding.top + kToolbarHeight,
-                      0.0,
-                      0.0,
-                    );
-                    showMenu(context: context, position: position, items: [
-                      PopupMenuItem(
-                        child: Text("Clear".tl),
-                        onTap: () => setState(() => Log.clear()),
-                      ),
-                      PopupMenuItem(
-                        child: Text("Disable Length Limitation".tl),
-                        onTap: () {
-                          Log.ignoreLimitation = true;
-                          context.showMessage(
-                              message: "Only valid for this run".tl);
-                        },
-                      ),
-                      PopupMenuItem(
-                        child: Text("Export".tl),
-                        onTap: () => saveLog(Log().toString()),
-                      ),
-                    ]);
-                  }),
-              icon: const Icon(Icons.more_horiz))
+          prism.PopupAnchor(
+            targetBuilder: (open) => prism.IconButton(
+              onPressed: open,
+              icon: const Icon(Icons.more_horiz),
+            ),
+            popupBuilder: (_) => prism.PopupMenu(
+              items: [
+                prism.PopupMenuItem(
+                  label: "Clear".tl,
+                  onPressed: () => setState(() => Log.clear()),
+                ),
+                prism.PopupMenuItem(
+                  label: "Disable Length Limitation".tl,
+                  onPressed: () {
+                    Log.ignoreLimitation = true;
+                    context.showMessage(message: "Only valid for this run".tl);
+                  },
+                ),
+                prism.PopupMenuItem(
+                  label: "Export".tl,
+                  onPressed: () => saveLog(Log().toString()),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       body: ListView.builder(

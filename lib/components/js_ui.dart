@@ -170,10 +170,6 @@ mixin class JsUiApi {
     if (options.isEmpty) {
       return Future.value(null);
     }
-    if (initialIndex != null &&
-        (initialIndex >= options.length || initialIndex < 0)) {
-      initialIndex = null;
-    }
     return showSelectDialog(
       title: title,
       options: options,

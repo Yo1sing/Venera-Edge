@@ -525,18 +525,12 @@ class _ImportComicsWidgetState extends State<_ImportComicsWidget> {
                     );
                   }),
                   if (type != 4 && type != 5)
-                    ListTile(
+                    Select(
                       title: Text("Add to favorites".tl),
-                      trailing: Select(
-                        current: selectedFolder,
-                        values: folders,
-                        minWidth: 112,
-                        onTap: (v) {
-                          setState(() {
-                            selectedFolder = folders[v];
-                          });
-                        },
-                      ),
+                      current: selectedFolder,
+                      values: folders,
+                      minWidth: 112,
+                      onTap: (v) => setState(() => selectedFolder = folders[v]),
                     ).paddingHorizontal(8),
                   if (!App.isIOS &&
                       !App.isMacOS &&

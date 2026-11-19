@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -14,10 +15,14 @@ import 'package:prism_ui/switch.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
 import 'package:prism_ui/typography.dart' as prism;
 import 'package:venera_edge/components/app_theme.dart';
-import 'package:venera_edge/components/settings_choice_row.dart';
+import 'package:venera_edge/components/choice_dropdown.dart';
 import 'package:venera_edge/components/system_accent.dart';
 import 'package:venera_edge/components/components.dart'
-    show AnimatedTapRegion, Button, ContentDialog;
+    show AnimatedTapRegion, Button, ContentDialog, Select, showSelectDialog;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart'
+    show SearchOptions;
+import 'package:venera_edge/pages/search_page.dart' show SearchOptionWidget;
 import 'package:venera_edge/pages/settings/settings_page.dart';
 import 'package:venera_edge/src/rust/frb_generated.dart';
 import 'package:venera_edge/utils/translations.dart';
@@ -357,7 +362,7 @@ void main() {
           localizationsDelegates: const [PrismLocalizations.delegate],
           home: Scaffold(
             body: StatefulBuilder(
-              builder: (context, rebuild) => SettingsChoiceRow<String>(
+              builder: (context, rebuild) => ChoiceDropdown<String>(
                 title: const Text('Choice'),
                 options: options,
                 value: selected,
@@ -410,4 +415,122 @@ void main() {
       expect(changes, ['b']);
     }
   });
+
+  testWidgets('search dropdown keeps source keys for duplicate option labels', (
+    tester,
+  ) async {
+    final options = LinkedHashMap<String, String>.from({
+      'first': 'Same',
+      'second': 'Same',
+      'third': 'Another',
+    });
+    var value = 'first';
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: const [PrismLocalizations.delegate],
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, rebuild) => SearchOptionWidget(
+              option: SearchOptions(options, 'Source filter', 'dropdown', null),
+              sourceKey: 'test',
+              value: value,
+              onChanged: (selected) => rebuild(() => value = selected),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Source filter'));
+    await tester.pumpAndSettle();
+    final menu = find.byType(prism.PopupMenu);
+    await tester.tap(
+      find.descendant(of: menu, matching: find.text('Same')).last,
+    );
+    await tester.pumpAndSettle();
+    expect(value, 'second');
+    expect(menu, findsNothing);
+    await tester.tap(find.text('Same'));
+    await tester.pumpAndSettle();
+    final items = tester.widget<prism.PopupMenu>(menu).items;
+    expect(items.map((item) => item.label), options.values);
+    expect(items.map((item) => item.checked), [false, true, false]);
+  });
+
+  testWidgets(
+    'script dropdown returns the chosen index only after confirmation',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: App.rootNavigatorKey,
+          localizationsDelegates: const [PrismLocalizations.delegate],
+          home: const Scaffold(),
+        ),
+      );
+      final result = showSelectDialog(
+        title: 'Choose',
+        options: ['Same', 'Same'],
+        initialIndex: 0,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Same'));
+      await tester.pumpAndSettle();
+      final menu = find.byType(prism.PopupMenu);
+      await tester.tap(
+        find.descendant(of: menu, matching: find.text('Same')).last,
+      );
+      await tester.pumpAndSettle();
+      expect(menu, findsNothing);
+      expect(find.text('Choose'), findsOneWidget);
+      await tester.tap(find.text('Confirm'));
+      await tester.pumpAndSettle();
+      expect(await result, 1);
+
+      final cancelled = showSelectDialog(
+        title: 'Choose',
+        options: ['One'],
+        initialIndex: 10,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Confirm'))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(await cancelled, isNull);
+    },
+  );
+
+  testWidgets(
+    'folder picker fits an intrinsically sized dialog and selects by index',
+    (tester) async {
+      final picked = <int>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [PrismLocalizations.delegate],
+          home: ContentDialog(
+            title: 'Favorite folders',
+            content: Select(
+              title: const Text('Folder'),
+              current: null,
+              values: const ['First', 'Second'],
+              minWidth: 112,
+              onTap: picked.add,
+            ),
+            actions: const [],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Folder'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Second'));
+      await tester.pumpAndSettle();
+      expect(picked, [1]);
+    },
+  );
 }

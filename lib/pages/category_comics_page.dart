@@ -162,22 +162,16 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
     List<Widget> children = [];
     var group = 0;
     for (var optionList in options!) {
-      if (optionList.label.isNotEmpty) {
-        children.add(Padding(
-          padding: const EdgeInsets.only(
-            bottom: 8.0,
-            left: 4.0,
-          ),
-          child: Text(
-            optionList.label.ts(sourceKey),
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ));
-      }
       if (optionList.options.length <= 8) {
+        if (optionList.label.isNotEmpty) {
+          children.add(Padding(
+            padding: const EdgeInsets.only(bottom: 8, left: 4),
+            child: Text(
+              optionList.label.ts(sourceKey),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+          ));
+        }
         children.add(
           Wrap(
             spacing: 8,
@@ -195,11 +189,13 @@ class _CategoryComicsPageState extends State<CategoryComicsPage> {
         );
       } else {
         var g = group;
-        children.add(Select(
-          current: optionList.options[optionsValue[g]],
-          values: optionList.options.values.toList(),
-          onTap: (i) {
-            var key = optionList.options.keys.elementAt(i);
+        children.add(ChoiceDropdown<String>(
+          title: optionList.label.isEmpty
+              ? null
+              : Text(optionList.label.ts(sourceKey)),
+          options: optionList.options,
+          value: optionsValue[g],
+          onChanged: (key) {
             if (key == optionsValue[g]) return;
             setState(() {
               optionsValue[g] = key;
