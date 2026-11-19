@@ -10,6 +10,7 @@ import '../foundation/app.dart';
 import 'explore_page.dart';
 import 'favorites/favorites_page.dart';
 import 'home_page.dart';
+import 'main_navigation_glyphs.dart';
 
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
@@ -70,21 +71,25 @@ class _MainPageState extends State<MainPage> {
           label: 'Home'.tl,
           icon: Icons.home_outlined,
           activeIcon: Icons.home,
+          floatingIcon: MainNavigationGlyphs.dashboard,
         ),
         PaneItemEntry(
           label: 'Favorites'.tl,
           icon: Icons.local_activity_outlined,
           activeIcon: Icons.local_activity,
+          floatingIcon: MainNavigationGlyphs.proxies,
         ),
         PaneItemEntry(
           label: 'Explore'.tl,
           icon: Icons.explore_outlined,
           activeIcon: Icons.explore,
+          floatingIcon: MainNavigationGlyphs.profiles,
         ),
         PaneItemEntry(
           label: 'Categories'.tl,
           icon: Icons.category_outlined,
           activeIcon: Icons.category,
+          floatingIcon: MainNavigationGlyphs.tools,
         ),
       ],
       onPageChanged: (i) {

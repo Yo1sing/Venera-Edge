@@ -38,7 +38,8 @@ class HomePage extends StatelessWidget {
         const FollowUpdatesWidget(),
         const _ComicSourceWidget(),
         const ImageFavorites(),
-        SliverPadding(padding: EdgeInsets.only(top: context.padding.bottom)),
+        if (NaviPane.floatingBottomInsetOf(context) == 0)
+          SliverPadding(padding: EdgeInsets.only(top: context.padding.bottom)),
       ],
     );
     return context.width > changePoint ? widget.paddingHorizontal(8) : widget;

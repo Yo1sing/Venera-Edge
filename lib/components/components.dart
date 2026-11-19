@@ -9,6 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:prism_ui/animated_visibility.dart' as prism;
+import 'package:prism_ui/icons/glyph.dart' show Glyph;
+import 'package:prism_ui/motion.dart' as prism;
+import 'package:prism_ui/navigation_dock.dart' as prism;
 import 'package:syntax_highlight/syntax_highlight.dart';
 import 'package:venera/foundation/app.dart';
 import 'package:venera/foundation/app_page_route.dart';
@@ -31,6 +35,7 @@ import 'package:venera/utils/ext.dart';
 import 'package:venera/utils/io.dart';
 import 'package:venera/utils/tags_translation.dart';
 import 'package:venera/utils/translations.dart';
+import 'floating_navigation_theme.dart';
 
 part 'image.dart';
 part 'appbar.dart';

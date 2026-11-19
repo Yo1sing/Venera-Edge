@@ -50,3 +50,5 @@ add_translation.py
 # Local Rust tools and build outputs
 .tools/
 /rust/target/
+
+examples/

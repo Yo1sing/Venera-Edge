@@ -42,6 +42,14 @@ class _AppearanceSettingsState extends State<AppearanceSettings> {
             App.forceRebuild();
           },
         ).toSliver(),
+        SelectSetting(
+          title: "Bottom Navigation Style".tl,
+          settingKey: "bottomNavigationStyle",
+          optionTranslation: {
+            "standard": "Standard".tl,
+            "floating": "Floating".tl,
+          },
+        ).toSliver(),
       ],
     );
   }

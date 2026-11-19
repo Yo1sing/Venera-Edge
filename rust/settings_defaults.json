@@ -3,6 +3,7 @@
   "comicTileScale": 1.0,
   "color": "system",
   "theme_mode": "system",
+  "bottomNavigationStyle": "floating",
   "newFavoriteAddTo": "end",
   "moveFavoriteAfterRead": "none",
   "proxy": "system",

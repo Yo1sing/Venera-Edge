@@ -7,10 +7,13 @@ class PaneItemEntry {
 
   IconData activeIcon;
 
+  final Glyph floatingIcon;
+
   PaneItemEntry({
     required this.label,
     required this.icon,
     required this.activeIcon,
+    required this.floatingIcon,
   });
 }
 
@@ -60,6 +63,16 @@ class NaviPane extends StatefulWidget {
   static NaviPaneState of(BuildContext context) {
     return context.findAncestorStateOfType<NaviPaneState>()!;
   }
+
+  static double floatingBottomInsetOf(BuildContext context) {
+    final padding = MediaQuery.paddingOf(context);
+    final state = context.findAncestorStateOfType<NaviPaneState>();
+    return state != null &&
+            state._floatingBottomBar &&
+            state.controller.value < 2
+        ? padding.bottom
+        : 0;
+  }
 }
 
 typedef NaviItemTapListener = void Function(int);
@@ -100,8 +113,12 @@ class NaviPaneState extends State<NaviPane>
 
   static const _kTopBarHeight = 48.0;
 
-  double get bottomBarHeight =>
-      _kBottomBarHeight + MediaQuery.of(context).padding.bottom;
+  double get bottomBarHeight => _floatingBottomBar
+      ? prism.NavigationDock.insetOf(context)
+      : _kBottomBarHeight + MediaQuery.paddingOf(context).bottom;
+
+  bool get _floatingBottomBar =>
+      appdata.settings['bottomNavigationStyle'] == 'floating';
 
   void onNavigatorStateChange() {
     onRebuild(context);
@@ -212,10 +229,7 @@ class NaviPaneState extends State<NaviPane>
             ],
           );
           if (sideInsets != EdgeInsets.zero) {
-            content = Padding(
-              padding: sideInsets,
-              child: content,
-            );
+            content = Padding(padding: sideInsets, child: content);
           }
           return content;
         },
@@ -291,17 +305,14 @@ class NaviPaneState extends State<NaviPane>
   }
 
   Widget buildBottom() {
+    final theme = Theme.of(context);
     return Material(
-      textStyle: Theme.of(context).textTheme.labelSmall,
-      elevation: 0,
+      textStyle: theme.textTheme.labelSmall,
       child: Container(
         height: _kBottomBarHeight,
         decoration: BoxDecoration(
           border: Border(
-            top: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-              width: 1,
-            ),
+            top: BorderSide(color: theme.colorScheme.outlineVariant),
           ),
         ),
         child: Row(
@@ -317,6 +328,32 @@ class NaviPaneState extends State<NaviPane>
               ),
             );
           }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingBottom() {
+    final selected = currentPage;
+    return GestureDetector(
+      excludeFromSemantics: true,
+      // The dock commits a changed destination on pointer-up. Forward a tap
+      // on the current destination as well, e.g. to scroll Explore to the top.
+      onTap: () {
+        if (selected == currentPage) updatePage(selected);
+      },
+      child: FloatingNavigationTheme(
+        colorSetting: appdata.settings['color'] ?? 'system',
+        child: prism.NavigationDock(
+          selectedIndex: selected,
+          destinations: [
+            for (final item in widget.paneItems)
+              prism.NavigationDockDestination(
+                glyph: item.floatingIcon,
+                label: item.label,
+              ),
+          ],
+          onSelected: updatePage,
         ),
       ),
     );
@@ -670,23 +707,72 @@ class _NaviMainViewState extends State<_NaviMainView> {
 
   @override
   Widget build(BuildContext context) {
-    var shouldShowAppBar = state.controller.value < 2;
-    return Column(
-      children: [
-        if (shouldShowAppBar) state.buildTop().paddingTop(context.padding.top),
-        Expanded(
-          child: MediaQuery.removePadding(
-            context: context,
-            removeTop: shouldShowAppBar,
-            child: AnimatedSwitcher(
-              duration: _fastAnimationDuration,
-              child: state.buildMainViewContent(),
+    final media = MediaQuery.of(context);
+    return ListenableBuilder(
+      listenable: Listenable.merge([state.controller, appdata.settings]),
+      child: state.buildMainViewContent(),
+      builder: (context, page) {
+        final showBottomBar = state.controller.value < 2;
+        final floating = showBottomBar && state._floatingBottomBar;
+        final pageMedia = media.removePadding(removeTop: showBottomBar);
+        return Column(
+          children: [
+            if (showBottomBar) state.buildTop().paddingTop(media.padding.top),
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: showBottomBar && !floating
+                          ? state.bottomBarHeight
+                          : 0,
+                    ),
+                    child: MediaQuery(
+                      data: floating
+                          ? pageMedia.copyWith(
+                              padding: pageMedia.padding.copyWith(
+                                bottom: state.bottomBarHeight,
+                              ),
+                            )
+                          : pageMedia,
+                      child: AnimatedSwitcher(
+                        duration: floating
+                            ? prism.fadeTabDuration
+                            : _fastAnimationDuration,
+                        switchInCurve: floating
+                            ? prism.fadeTabCurve
+                            : Curves.linear,
+                        switchOutCurve: floating
+                            ? prism.fadeTabCurve
+                            : Curves.linear,
+                        child: page,
+                      ),
+                    ),
+                  ),
+                  if (showBottomBar && !floating)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: media.padding.bottom,
+                      child: state.buildBottom(),
+                    ),
+                  Positioned(
+                    key: const ValueKey('floatingNavigationDock'),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: prism.AnimatedVisibility.bottomNavigation(
+                      visible: floating,
+                      child: state._buildFloatingBottom(),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-        if (shouldShowAppBar)
-          state.buildBottom().paddingBottom(context.padding.bottom),
-      ],
+          ],
+        );
+      },
     );
   }
 }

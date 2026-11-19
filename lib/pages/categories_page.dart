@@ -200,6 +200,7 @@ class _CategoryPage extends StatelessWidget {
       }
     }
     return SingleChildScrollView(
+      padding: EdgeInsets.only(bottom: NaviPane.floatingBottomInsetOf(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,

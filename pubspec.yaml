@@ -13,6 +13,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  prism_ui:
+    git:
+      url: https://github.com/chen08209/prism_ui.git
+      ref: 63450c0ac0e8e1b2c0f3ed4ad7926dc94e083185
   flutter_rust_bridge: 2.11.1
   venera_backend:
     path: rust_builder

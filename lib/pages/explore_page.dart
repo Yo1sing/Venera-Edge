@@ -46,10 +46,10 @@ class _ExplorePageState extends State<ExplorePage>
   }
 
   void onNaviItemTapped(int index) {
-    if (index == 2) {
+    if (index == 2 && pages.isNotEmpty) {
       int page = controller.index;
       String currentPageId = pages[page];
-      GlobalState.find<_SingleExplorePageState>(currentPageId).toTop();
+      GlobalState.findOrNull<_SingleExplorePageState>(currentPageId)?.toTop();
     }
   }
 
@@ -207,7 +207,7 @@ class _ExplorePageState extends State<ExplorePage>
         ),
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: 16 + NaviPane.floatingBottomInsetOf(context),
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 150),
             reverseDuration: const Duration(milliseconds: 150),

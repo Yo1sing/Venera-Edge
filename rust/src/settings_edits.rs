@@ -150,6 +150,7 @@ pub fn valid(key: &str, value: &Value) -> bool {
                 .all(|(host, address)| valid_dns_override(host, address))
         }),
         "theme_mode" => validate_choice(value, &["system", "light", "dark"]),
+        "bottomNavigationStyle" => validate_choice(value, &["standard", "floating"]),
         "language" => validate_choice(value, &["system", "zh-CN", "zh-TW", "en-US"]),
         "color" => validate_choice(
             value,
