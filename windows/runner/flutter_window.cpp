@@ -226,6 +226,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
         mouse_side_button_listener(1);
     }
     if (flutter_controller_) {
+        if (message == WM_DWMCOLORIZATIONCOLORCHANGED || message == WM_SETTINGCHANGE) {
+            flutter::MethodChannel<> channel(
+                flutter_controller_->engine()->messenger(), "venera/system_colors",
+                &flutter::StandardMethodCodec::GetInstance());
+            channel.InvokeMethod("changed", nullptr);
+        }
         std::optional<LRESULT> result =
             flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,
                                                       lparam);

@@ -1,7 +1,5 @@
-import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:prism_ui/color.dart' as prism;
 import 'package:prism_ui/font.dart' as prism;
 import 'package:prism_ui/shape.dart' as prism;
@@ -9,6 +7,7 @@ import 'package:prism_ui/surface.dart' as prism;
 import 'package:prism_ui/theme_cross_fade.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
 import 'package:prism_ui/typography.dart' as prism;
+import 'system_accent.dart';
 
 /// One Prism palette drives both the reference widgets and Material pages.
 class AppTheme {
@@ -27,24 +26,17 @@ class AppTheme {
     'green': Color(0xFF34C759),
     'gray': Color(0xFF8E8E93),
   };
-  static final systemSeeds = _loadSystemSeeds();
   static final _cache = <Brightness, ({Object inputs, AppTheme theme})>{};
 
-  static Future<({Color light, Color dark})> _loadSystemSeeds() async {
-    final palette = await DynamicColorPlugin.getCorePalette()
-        .onError<PlatformException>((_, _) => null);
-    if (palette != null) {
-      return (
-        light: Color(palette.primary.get(40)),
-        dark: Color(palette.primary.get(80)),
-      );
-    }
-    final accent =
-        await DynamicColorPlugin.getAccentColor().onError<PlatformException>(
-          (_, _) => null,
-        ) ??
+  static Color seedOf(
+    BuildContext context,
+    String color,
+    Brightness brightness,
+  ) {
+    return (color == 'system'
+            ? SystemAccent.of(context, brightness)
+            : accents[color]) ??
         blue;
-    return (light: accent, dark: accent);
   }
 
   static AppTheme resolve({

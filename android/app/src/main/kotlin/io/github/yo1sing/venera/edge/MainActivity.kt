@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -44,6 +45,14 @@ class MainActivity : FlutterFragmentActivity() {
     private val sharedTexts = ArrayList<String>()
 
     private var textShareHandler: ((String) -> Unit)? = null
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        flutterEngine?.let { engine ->
+            MethodChannel(engine.dartExecutor.binaryMessenger, "venera/system_colors")
+                .invokeMethod("changed", null)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

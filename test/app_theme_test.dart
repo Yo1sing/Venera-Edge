@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/color.dart' as prism;
 import 'package:prism_ui/shape.dart' as prism;
@@ -9,6 +13,7 @@ import 'package:prism_ui/switch.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
 import 'package:prism_ui/typography.dart' as prism;
 import 'package:venera/components/app_theme.dart';
+import 'package:venera/components/system_accent.dart';
 import 'package:venera/components/components.dart'
     show AnimatedTapRegion, Button, ContentDialog;
 import 'package:venera/pages/settings/settings_page.dart';
@@ -29,6 +34,97 @@ void main() {
     await AppTranslation.init();
   });
   const locales = [Locale('en')];
+
+  testWidgets('system accent preview follows desktop changes and resume', (
+    tester,
+  ) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    const changes = MethodChannel('venera/system_colors');
+    Future<Object?> notify() => messenger.handlePlatformMessage(
+      changes.name,
+      changes.codec.encodeMethodCall(const MethodCall('changed')),
+      null,
+    );
+    final firstRead = Completer<int?>();
+    Future<int?> reply = firstRead.future;
+    messenger.setMockMethodCallHandler(DynamicColorPlugin.channel, (call) {
+      expect(call.method, 'getAccentColor');
+      return reply;
+    });
+    await tester.pumpWidget(
+      const SystemAccent(
+        child: MaterialApp(home: Scaffold(body: AppearanceSettings())),
+      ),
+    );
+    final row = find.widgetWithText(ListTile, 'System accent color');
+    final swatch = find.descendant(
+      of: row,
+      matching: find.byType(CircleAvatar),
+    );
+    Color? preview() => tester.widget<CircleAvatar>(swatch).backgroundColor;
+    expect(preview(), AppTheme.blue);
+
+    reply = Future.value(0xffae40c8);
+    await notify();
+    await tester.pump();
+    expect(preview(), const Color(0xffae40c8));
+    firstRead.complete(0xff123456);
+    await tester.pump();
+    expect(preview(), const Color(0xffae40c8));
+
+    reply = Future.value(0xff047abc);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(preview(), const Color(0xff047abc));
+    expect(
+      AppTheme.seedOf(tester.element(row), 'blue', Brightness.light),
+      AppTheme.blue,
+    );
+
+    reply = Future.value(null);
+    await notify();
+    await tester.pump();
+    expect(preview(), AppTheme.blue);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.windows));
+
+  testWidgets('Android wallpaper provides separate light and dark seeds', (
+    tester,
+  ) async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    // Android returns 13 tones for each of five palettes. Primary tones 40
+    // and 80 occupy indices 4 and 8 respectively.
+    final palette = Int32List.fromList(List.filled(65, 0xff888888))
+      ..[4] = 0xff326337
+      ..[8] = 0xff8bd695;
+    messenger.setMockMethodCallHandler(DynamicColorPlugin.channel, (
+      call,
+    ) async {
+      expect(call.method, 'getCorePalette');
+      return palette;
+    });
+    await tester.pumpWidget(
+      SystemAccent(
+        child: Builder(
+          builder: (context) {
+            return ColoredBox(
+              color: AppTheme.seedOf(context, 'system', Brightness.light),
+              child: ColoredBox(
+                color: AppTheme.seedOf(context, 'system', Brightness.dark),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widgetList<ColoredBox>(find.byType(ColoredBox))
+          .map((box) => box.color),
+      [const Color(0xff326337), const Color(0xff8bd695)],
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('page and comic card paint the default FlClash colors', (
     tester,

@@ -11,6 +11,7 @@ import 'package:venera/utils/io.dart';
 import 'package:venera/utils/data_sync.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/app_theme.dart';
+import 'components/system_accent.dart';
 import 'components/components.dart';
 import 'components/window_frame.dart';
 import 'foundation/app.dart';
@@ -29,7 +30,7 @@ void main(List<String> args) {
       () async {
         WidgetsFlutterBinding.ensureInitialized();
         await init();
-        runApp(const MyApp());
+        runApp(const SystemAccent(child: MyApp()));
         DataSync().start();
         if (App.isDesktop) {
           await windowManager.ensureInitialized();
@@ -181,107 +182,99 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _ => null,
     };
     final (color, style, mode, pureBlack) = _lastThemeSettings;
-    return FutureBuilder(
-      future: color == 'system' ? AppTheme.systemSeeds : null,
-      builder: (context, snapshot) {
-        AppTheme theme(Brightness brightness) {
-          final system = snapshot.data;
-          final seed = color == 'system'
-              ? (brightness == Brightness.light ? system?.light : system?.dark)
-              : AppTheme.accents[color];
-          return AppTheme.resolve(
-            seed: seed ?? AppTheme.blue,
-            brightness: brightness,
-            locales: [
-              if (locale != null) locale,
-              ...WidgetsBinding.instance.platformDispatcher.locales,
-            ],
-            style: prism.ColorStyle.values.byName(style),
-            pureBlack: pureBlack,
+    AppTheme theme(Brightness brightness) {
+      return AppTheme.resolve(
+        seed: AppTheme.seedOf(context, color, brightness),
+        brightness: brightness,
+        locales: [
+          if (locale != null) locale,
+          ...WidgetsBinding.instance.platformDispatcher.locales,
+        ],
+        style: prism.ColorStyle.values.byName(style),
+        pureBlack: pureBlack,
+      );
+    }
+
+    final light = theme(Brightness.light);
+    final dark = theme(Brightness.dark);
+    return MaterialApp(
+      title: "Venera Edge",
+      home: home,
+      debugShowCheckedModeBanner: false,
+      theme: light.material,
+      themeAnimationDuration: Duration.zero,
+      navigatorKey: App.rootNavigatorKey,
+      darkTheme: dark.material,
+      themeMode: switch (mode) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      },
+      color: Colors.transparent,
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      locale: locale,
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('zh', 'TW'),
+        Locale('en'),
+      ],
+      builder: (context, widget) {
+        ErrorWidget.builder = (details) {
+          Log.error(
+            "Unhandled Exception",
+            "${details.exception}\n${details.stack}",
+          );
+          return Material(
+            child: Center(child: Text(details.exception.toString())),
+          );
+        };
+        if (widget != null) {
+          /// 如果无法检测到状态栏高度设定指定高度
+          /// https://github.com/flutter/flutter/issues/161086
+          var isPaddingCheckError =
+              MediaQuery.of(context).viewPadding.top <= 0 ||
+              MediaQuery.of(context).viewPadding.top > 200;
+
+          if (isPaddingCheckError && Platform.isAndroid) {
+            widget = MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                viewPadding: const EdgeInsets.only(top: 15, bottom: 15),
+                padding: const EdgeInsets.only(top: 15, bottom: 15),
+              ),
+              child: widget,
+            );
+          }
+
+          widget = OverlayWidget(widget);
+          if (App.isDesktop) {
+            widget = Shortcuts(
+              shortcuts: {
+                LogicalKeySet(LogicalKeyboardKey.escape): VoidCallbackIntent(
+                  App.pop,
+                ),
+              },
+              child: MouseBackDetector(
+                onTapDown: App.pop,
+                child: WindowFrame(widget),
+              ),
+            );
+          }
+          final active = Theme.brightnessOf(context) == Brightness.dark
+              ? dark
+              : light;
+          return active.wrap(
+            _SystemUiProvider(
+              Material(
+                color: App.isLinux ? Colors.transparent : null,
+                child: widget,
+              ),
+            ),
           );
         }
-
-        final light = theme(Brightness.light);
-        final dark = theme(Brightness.dark);
-        return MaterialApp(
-          title: "Venera Edge",
-          home: home,
-          debugShowCheckedModeBanner: false,
-          theme: light.material,
-          themeAnimationDuration: Duration.zero,
-          navigatorKey: App.rootNavigatorKey,
-          darkTheme: dark.material,
-          themeMode: switch (mode) {
-            'light' => ThemeMode.light,
-            'dark' => ThemeMode.dark,
-            _ => ThemeMode.system,
-          },
-          color: Colors.transparent,
-          localizationsDelegates: [
-            GlobalMaterialLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          locale: locale,
-          supportedLocales: const [
-            Locale('zh', 'CN'),
-            Locale('zh', 'TW'),
-            Locale('en'),
-          ],
-          builder: (context, widget) {
-            ErrorWidget.builder = (details) {
-              Log.error(
-                "Unhandled Exception",
-                "${details.exception}\n${details.stack}",
-              );
-              return Material(
-                child: Center(child: Text(details.exception.toString())),
-              );
-            };
-            if (widget != null) {
-              /// 如果无法检测到状态栏高度设定指定高度
-              /// https://github.com/flutter/flutter/issues/161086
-              var isPaddingCheckError =
-                  MediaQuery.of(context).viewPadding.top <= 0 ||
-                  MediaQuery.of(context).viewPadding.top > 200;
-
-              if (isPaddingCheckError && Platform.isAndroid) {
-                widget = MediaQuery(
-                  data: MediaQuery.of(context).copyWith(
-                    viewPadding: const EdgeInsets.only(top: 15, bottom: 15),
-                    padding: const EdgeInsets.only(top: 15, bottom: 15),
-                  ),
-                  child: widget,
-                );
-              }
-
-              widget = OverlayWidget(widget);
-              if (App.isDesktop) {
-                widget = Shortcuts(
-                  shortcuts: {
-                    LogicalKeySet(LogicalKeyboardKey.escape):
-                        VoidCallbackIntent(App.pop),
-                  },
-                  child: MouseBackDetector(
-                    onTapDown: App.pop,
-                    child: WindowFrame(widget),
-                  ),
-                );
-              }
-              final active = Theme.brightnessOf(context) == Brightness.dark
-                  ? dark
-                  : light;
-              return active.wrap(
-                _SystemUiProvider(
-                  Material(
-                    color: App.isLinux ? Colors.transparent : null,
-                    child: widget,
-                  ),
-                ),
-              );
-            }
-            throw ('widget is null');
-          },
-        );
+        throw ('widget is null');
       },
     );
   }

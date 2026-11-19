@@ -13,9 +13,14 @@ struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
   FlMethodChannel* clipboard_channel;
+  FlMethodChannel* system_colors_channel;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
+
+static void on_system_style_updated(GtkWidget*, FlMethodChannel* channel) {
+  fl_method_channel_invoke_method(channel, "changed", nullptr, nullptr, nullptr, nullptr);
+}
 
 static void handle_clipboard_call(FlMethodChannel* channel, FlMethodCall* call, gpointer user_data) {
   if (strcmp(fl_method_call_get_name(call), "writeImageToClipboard") == 0) {
@@ -97,6 +102,11 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  self->system_colors_channel = fl_method_channel_new(
+    fl_engine_get_binary_messenger(fl_view_get_engine(view)),
+    "venera/system_colors", FL_METHOD_CODEC(codec));
+  g_signal_connect_object(view, "style-updated", G_CALLBACK(on_system_style_updated),
+                          self->system_colors_channel, GConnectFlags(0));
   self->clipboard_channel = fl_method_channel_new(
     fl_engine_get_binary_messenger(fl_view_get_engine(view)),
     "venera/clipboard", FL_METHOD_CODEC(codec));
@@ -150,6 +160,7 @@ static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_object(&self->clipboard_channel);
+  g_clear_object(&self->system_colors_channel);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 

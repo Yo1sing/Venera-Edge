@@ -44,33 +44,38 @@ class AppearanceSettings extends StatelessWidget {
                           style: Theme.of(context).textTheme.bodyLarge,
                         ),
                       ),
-                      FutureBuilder(
-                        future: AppTheme.systemSeeds,
-                        builder: (context, snapshot) {
-                          final system = snapshot.data;
-                          final isDark =
-                              Theme.brightnessOf(context) == Brightness.dark;
-                          final systemSeed =
-                              (isDark ? system?.dark : system?.light) ??
-                              AppTheme.blue;
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                            child: Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: [
-                                for (final entry in {
-                                  'system': systemSeed,
-                                  ...AppTheme.accents,
-                                }.entries)
-                                  _AccentSwatch(
-                                    name: entry.key,
-                                    color: entry.value,
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
+                      ListTile(
+                        title: Text('System accent color'.tl),
+                        subtitle: Text(
+                          'Follow the wallpaper or system accent'.tl,
+                        ),
+                        leading: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppTheme.seedOf(
+                            context,
+                            'system',
+                            Theme.brightnessOf(context),
+                          ),
+                        ),
+                        selected: appdata.settings['color'] == 'system',
+                        trailing: appdata.settings['color'] == 'system'
+                            ? const Icon(Icons.check_rounded)
+                            : null,
+                        onTap: () => _selectThemeColor('system'),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final entry in AppTheme.accents.entries)
+                              _AccentSwatch(
+                                name: entry.key,
+                                color: entry.value,
+                              ),
+                          ],
+                        ),
                       ),
                       SelectSetting(
                         title: "Color Style".tl,
@@ -104,6 +109,12 @@ class AppearanceSettings extends StatelessWidget {
   }
 }
 
+Future<void> _selectThemeColor(String name) async {
+  if (appdata.settings['color'] == name) return;
+  appdata.settings['color'] = name;
+  await appdata.saveData();
+}
+
 class _AccentSwatch extends StatelessWidget {
   const _AccentSwatch({required this.name, required this.color});
 
@@ -132,11 +143,7 @@ class _AccentSwatch extends StatelessWidget {
             selected: selected,
             ringStandsOff: selected,
             childFills: true,
-            onPressed: () async {
-              if (selected) return;
-              appdata.settings['color'] = name;
-              await appdata.saveData();
-            },
+            onPressed: () => _selectThemeColor(name),
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -160,20 +167,6 @@ class _AccentSwatch extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (name == 'system')
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: CircleAvatar(
-                      radius: 10,
-                      backgroundColor: Theme.of(context).cardColor,
-                      child: Icon(
-                        Icons.colorize,
-                        size: 12,
-                        color: context.colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
                 AnimatedScale(
                   scale: selected ? 1 : 0,
                   duration: duration,
