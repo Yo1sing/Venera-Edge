@@ -63,6 +63,10 @@ fn valid_source_list_url(value: &str) -> bool {
         .is_ok_and(|url| matches!(url.scheme(), "http" | "https") && url.has_host())
 }
 
+fn valid_source_key(key: &str) -> bool {
+    !key.is_empty() && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
 fn deprecated_source_list_url(value: &str) -> bool {
     url::Url::parse(value)
         .ok()
@@ -125,6 +129,11 @@ pub fn valid(key: &str, value: &Value) -> bool {
             values
                 .iter()
                 .all(|value| value.as_str().is_some_and(valid_source_list_url))
+        }),
+        "disabledComicSources" => value.as_array().is_some_and(|values| {
+            values
+                .iter()
+                .all(|value| value.as_str().is_some_and(valid_source_key))
         }),
         "proxy" => value.as_str().is_some_and(|value| {
             matches!(value, "system" | "direct") || {
@@ -302,6 +311,18 @@ pub fn normalized_value(key: &str, value: &Value) -> Option<Value> {
             ))
         }
         "comicSourceListUrls" => Some(Value::Array(normalized_source_list_urls(value.as_array()?))),
+        "disabledComicSources" => {
+            let mut seen = HashSet::new();
+            Some(Value::Array(
+                value
+                    .as_array()?
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .filter(|key| valid_source_key(key) && seen.insert(*key))
+                    .map(|key| Value::String(key.to_owned()))
+                    .collect(),
+            ))
+        }
         _ if DEFAULTS.get(key).is_none() || valid(key, value) => Some(value.clone()),
         _ => None,
     }
@@ -438,6 +459,10 @@ fn change_global(settings: &mut Value, key: &str, change: Change) -> Result<()> 
                     ensure!(valid_source_list_url(&value), "Invalid source list URL");
                     Value::String(value)
                 }
+                "disabledComicSources" => {
+                    ensure!(valid_source_key(&value), "Invalid comic source key");
+                    Value::String(value)
+                }
                 _ => bail!("Invalid list setting"),
             };
             let list = settings[key]
@@ -446,14 +471,19 @@ fn change_global(settings: &mut Value, key: &str, change: Change) -> Result<()> 
             if !list.contains(&item) {
                 list.push(item);
             }
-            sync_legacy_source_list_url(settings);
+            if key == "comicSourceListUrls" {
+                sync_legacy_source_list_url(settings);
+            }
             return Ok(());
         }
         Change::Remove { value } => {
             ensure!(
                 matches!(
                     key,
-                    "blockedWords" | "blockedCommentWords" | "comicSourceListUrls"
+                    "blockedWords"
+                        | "blockedCommentWords"
+                        | "comicSourceListUrls"
+                        | "disabledComicSources"
                 ),
                 "Invalid list setting"
             );
@@ -461,7 +491,9 @@ fn change_global(settings: &mut Value, key: &str, change: Change) -> Result<()> 
                 .as_array_mut()
                 .context("Setting is not a list")?
                 .retain(|item| item.as_str() != Some(&value));
-            sync_legacy_source_list_url(settings);
+            if key == "comicSourceListUrls" {
+                sync_legacy_source_list_url(settings);
+            }
             return Ok(());
         }
     };

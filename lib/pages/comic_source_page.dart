@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
-import 'package:prism_ui/switch.dart' as prism;
+import 'package:prism_ui/prism_ui.dart'
+    as prism
+    show IconButton, PopupAnchor, PopupMenu, PopupMenuItem, Switch;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera_edge/components/components.dart';
@@ -53,7 +55,7 @@ class ComicSourcePage extends StatelessWidget {
   static Future<int> checkComicSourceUpdate([
     HttpCancellation? cancellation,
   ]) async {
-    if (ComicSource.all().isEmpty) return 0;
+    if (ComicSource.installed().isEmpty) return 0;
     final urls = _readUrls();
     if (urls.isEmpty) return 0;
     final token = cancellation ?? HttpCancellation();
@@ -92,12 +94,14 @@ class _BodyState extends State<_Body> {
   void initState() {
     super.initState();
     ComicSourceManager().addListener(updateUI);
+    appdata.settings.addListener(updateUI);
   }
 
   @override
   void dispose() {
     super.dispose();
     ComicSourceManager().removeListener(updateUI);
+    appdata.settings.removeListener(updateUI);
     for (final operation in _operations) {
       operation.cancel();
     }
@@ -107,9 +111,35 @@ class _BodyState extends State<_Body> {
   Widget build(BuildContext context) {
     return SmoothCustomScrollView(
       slivers: [
-        SliverAppbar(title: Text('Comic Source'.tl), style: AppbarStyle.shadow),
-        buildCard(context),
-        for (var source in ComicSource.all())
+        SliverAppbar(
+          title: Text('Comic Source'.tl),
+          style: AppbarStyle.shadow,
+          actions: [
+            prism.PopupAnchor(
+              targetBuilder: (open) => prism.IconButton(
+                tooltip: 'Manage comic sources'.tl,
+                icon: const Icon(Icons.add_circle_outline),
+                onPressed: open,
+              ),
+              popupBuilder: (_) => prism.PopupMenu(
+                items: [
+                  prism.PopupMenuItem(
+                    label: 'Enable/disable comic sources'.tl,
+                    onPressed: () =>
+                        showPopUpWidget(context, const _SourceActivation()),
+                  ),
+                  prism.PopupMenuItem(
+                    label: 'Manage subscription URLs'.tl,
+                    onPressed: () =>
+                        showPopUpWidget(context, const _SubscriptionUrls()),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        buildCard(),
+        for (final source in ComicSource.installed())
           _SliverComicSource(
             key: ValueKey(source.key),
             source: source,
@@ -213,7 +243,7 @@ class _BodyState extends State<_Body> {
     }
   }
 
-  Widget buildCard(BuildContext context) {
+  Widget buildCard() {
     return SliverToBoxAdapter(
       child: SizedBox(
         width: double.infinity,
@@ -253,12 +283,6 @@ class _BodyState extends State<_Body> {
                       _ComicSourceList(handleAddSource),
                     );
                   },
-                ),
-                FilledButton.tonalIcon(
-                  icon: const Icon(Icons.link),
-                  label: Text("Subscription URLs".tl),
-                  onPressed: () =>
-                      showPopUpWidget(context, const _SubscriptionUrls()),
                 ),
                 FilledButton.tonalIcon(
                   icon: Icon(Icons.file_open_outlined),
@@ -331,6 +355,67 @@ class _BodyState extends State<_Body> {
       _operations.remove(cancellation);
       cancellation.dispose();
     }
+  }
+}
+
+class _SourceActivation extends StatefulWidget {
+  const _SourceActivation();
+
+  @override
+  State<_SourceActivation> createState() => _SourceActivationState();
+}
+
+class _SourceActivationState extends State<_SourceActivation> {
+  bool _saving = false;
+
+  Future<void> _setEnabled(ComicSource source, bool enabled) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      appdata.settings.setComicSourceEnabled(source.key, enabled);
+      App.forceRebuild();
+      await appdata.saveData();
+    } catch (error, stack) {
+      Log.error('Save comic source status', error, stack);
+      if (mounted) {
+        context.showMessage(message: 'Unable to save comic source status'.tl);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopUpWidgetScaffold(
+      title: 'Enable/disable comic sources'.tl,
+      body: ListenableBuilder(
+        listenable: Listenable.merge([ComicSourceManager(), appdata.settings]),
+        builder: (context, _) {
+          final sources = ComicSource.installed();
+          if (sources.isEmpty) {
+            return Center(child: Text('No installed comic sources'.tl));
+          }
+          return ListView.builder(
+            itemCount: sources.length,
+            itemBuilder: (context, index) {
+              final source = sources[index];
+              return ListTile(
+                key: ValueKey(source.key),
+                title: Text(source.name),
+                trailing: prism.Switch(
+                  semanticLabel: source.name,
+                  value: source.isEnabled,
+                  onChanged: _saving
+                      ? null
+                      : (enabled) => _setEnabled(source, enabled),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -433,7 +518,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     if (_urls.isEmpty) {
       return Center(child: Text("No subscription URLs configured".tl));
     }
-    final installed = ComicSource.all().map((e) => e.key).toSet();
+    final installed = ComicSource.installed().map((e) => e.key).toSet();
     return ListView.builder(
       itemCount: _urls.length,
       itemBuilder: (context, index) =>
@@ -894,6 +979,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
         SliverPadding(padding: const EdgeInsets.only(top: 16)),
         SliverToBoxAdapter(
           child: ListTile(
+            subtitle: source.isEnabled ? null : Text('Disabled'.tl),
             title: Row(
               children: [
                 Text(source.name, style: ts.s18),

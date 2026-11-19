@@ -277,7 +277,7 @@ class HistoryManager with ChangeNotifier {
       _store.refreshMetadata(
         runtime: JsEngine().runtime,
         sourcesJson: jsonEncode({
-          for (final source in ComicSource.all())
+          for (final source in ComicSource.installed())
             if (source.loadComicInfo != null)
               source.intKey.toString(): source.key,
         }),

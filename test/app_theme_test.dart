@@ -18,10 +18,17 @@ import 'package:venera_edge/components/app_theme.dart';
 import 'package:venera_edge/components/choice_dropdown.dart';
 import 'package:venera_edge/components/system_accent.dart';
 import 'package:venera_edge/components/components.dart'
-    show AnimatedTapRegion, Button, ContentDialog, Select, showSelectDialog;
+    show
+        AnimatedTapRegion,
+        Button,
+        ContentDialog,
+        Select,
+        SliverAppbar,
+        showSelectDialog;
 import 'package:venera_edge/foundation/app.dart';
 import 'package:venera_edge/foundation/comic_source/comic_source.dart'
     show SearchOptions;
+import 'package:venera_edge/pages/comic_source_page.dart';
 import 'package:venera_edge/pages/search_page.dart' show SearchOptionWidget;
 import 'package:venera_edge/pages/settings/settings_page.dart';
 import 'package:venera_edge/src/rust/frb_generated.dart';
@@ -42,6 +49,39 @@ void main() {
     await AppTranslation.init();
   });
   const locales = [Locale('en')];
+
+  testWidgets('comic source add button opens both management panels', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: App.rootNavigatorKey,
+        localizationsDelegates: const [PrismLocalizations.delegate],
+        home: const ComicSourcePage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final add = find.descendant(
+      of: find.byType(SliverAppbar),
+      matching: find.byIcon(Icons.add_circle_outline),
+    );
+
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(find.text('Manage subscription URLs'), findsOneWidget);
+    await tester.tap(find.text('Enable/disable comic sources'));
+    await tester.pumpAndSettle();
+    expect(find.text('No installed comic sources'), findsOneWidget);
+
+    App.rootPop();
+    await tester.pumpAndSettle();
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Manage subscription URLs'));
+    await tester.pumpAndSettle();
+    expect(find.text('URL of index.json'), findsOneWidget);
+  });
 
   testWidgets('system accent preview follows desktop changes and resume', (
     tester,

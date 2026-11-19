@@ -171,7 +171,9 @@ class _SearchPageState extends State<SearchPage> {
     msg += '\n';
     VoidCallback onTap;
     if (ComicSource.isEmpty) {
-      msg += "Please add some sources".tl;
+      msg += ComicSource.installed().isEmpty
+          ? "Please add some sources".tl
+          : "No enabled comic sources".tl;
       onTap = () {
         context.to(() => ComicSourcePage());
       };

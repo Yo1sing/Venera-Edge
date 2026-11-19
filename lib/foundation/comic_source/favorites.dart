@@ -62,5 +62,5 @@ FavoriteData getFavoriteData(String key) {
 
 FavoriteData? getFavoriteDataOrNull(String key) {
   var source = ComicSource.find(key);
-  return source?.favoriteData;
+  return source != null && source.isEnabled ? source.favoriteData : null;
 }

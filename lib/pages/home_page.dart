@@ -617,13 +617,13 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
 
   void onComicSourceChange() {
     setState(() {
-      comicSources = ComicSource.all().map((e) => e.name).toList();
+      comicSources = ComicSource.installed().map((e) => e.name).toList();
     });
   }
 
   @override
   void initState() {
-    comicSources = ComicSource.all().map((e) => e.name).toList();
+    comicSources = ComicSource.installed().map((e) => e.name).toList();
     ComicSourceManager().addListener(onComicSourceChange);
     super.initState();
   }

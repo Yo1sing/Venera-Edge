@@ -46,13 +46,17 @@ class _ReaderWithLoadingState
       widget.id,
       ComicType.fromKey(widget.sourceKey),
     );
-    if (comicSource == null) {
+    if (comicSource == null || !comicSource.isEnabled) {
       var localComic = LocalManager().find(
         widget.id,
         ComicType.fromKey(widget.sourceKey),
       );
       if (localComic == null) {
-        return Res.error("comic not found");
+        return Res.error(
+          comicSource == null
+              ? "comic not found"
+              : 'Comic source is disabled'.tl,
+        );
       }
       return Res(
         ReaderProps(

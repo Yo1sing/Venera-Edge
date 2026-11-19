@@ -420,6 +420,36 @@ mod tests {
     }
 
     #[test]
+    fn comic_source_activation_persists_each_source_independently() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let directory = temp.path().to_str().unwrap();
+        let key = "disabledComicSources";
+        assert_eq!(load(directory)?["settings"][key], json!([]));
+
+        for (action, source) in [("add", "first"), ("add", "second"), ("add", "first")] {
+            edit(
+                directory,
+                serde_json::from_value(json!([
+                    {"scope":"global","key":key,"change":{"action":action,"value":source}}
+                ]))?,
+            )?;
+        }
+        assert_eq!(
+            load(directory)?["settings"][key],
+            json!(["first", "second"])
+        );
+
+        edit(
+            directory,
+            serde_json::from_value(json!([
+                {"scope":"global","key":key,"change":{"action":"remove","value":"first"}}
+            ]))?,
+        )?;
+        assert_eq!(load(directory)?["settings"][key], json!(["second"]));
+        Ok(())
+    }
+
+    #[test]
     fn reader_edits_resolve_and_reset_in_scope_order() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let directory = temp.path().to_str().unwrap();
