@@ -3,15 +3,15 @@ import 'dart:io';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:venera/foundation/script_bridge.dart';
-import 'package:venera/src/rust/api/comic_queue.dart';
-import 'package:venera/src/rust/api/favorites.dart';
-import 'package:venera/src/rust/api/follow_updates.dart';
-import 'package:venera/src/rust/api/history.dart';
-import 'package:venera/src/rust/api/local.dart';
-import 'package:venera/src/rust/api/media.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/foundation/script_bridge.dart';
+import 'package:venera_edge/src/rust/api/comic_queue.dart';
+import 'package:venera_edge/src/rust/api/favorites.dart';
+import 'package:venera_edge/src/rust/api/follow_updates.dart';
+import 'package:venera_edge/src/rust/api/history.dart';
+import 'package:venera_edge/src/rust/api/local.dart';
+import 'package:venera_edge/src/rust/api/media.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 import 'native_follow_updates_test.dart' show finish;
 import 'native_local_operations_test.dart' show Fixture;

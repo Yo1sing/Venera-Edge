@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/pages/categories_page.dart';
-import 'package:venera/pages/search_page.dart';
-import 'package:venera/pages/settings/settings_page.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/pages/categories_page.dart';
+import 'package:venera_edge/pages/search_page.dart';
+import 'package:venera_edge/pages/settings/settings_page.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 import '../components/components.dart';
 import '../foundation/app.dart';

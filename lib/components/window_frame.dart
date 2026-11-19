@@ -4,10 +4,10 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:venera/utils/data_sync.dart';
+import 'package:venera_edge/utils/data_sync.dart';
 
 const _kTitleBarHeight = 36.0;
 

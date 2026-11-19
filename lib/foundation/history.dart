@@ -1,16 +1,16 @@
 import 'dart:async';
-import 'package:venera/src/rust/api/history.dart' as backend;
+import 'package:venera_edge/src/rust/api/history.dart' as backend;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show ChangeNotifier;
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/comic_type.dart';
-import 'package:venera/foundation/favorites.dart';
-import 'package:venera/foundation/image_provider/image_favorites_provider.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/comic_type.dart';
+import 'package:venera_edge/foundation/favorites.dart';
+import 'package:venera_edge/foundation/image_provider/image_favorites_provider.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 import 'app.dart';
 import 'consts.dart';

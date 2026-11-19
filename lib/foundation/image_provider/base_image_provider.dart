@@ -4,7 +4,7 @@ import 'dart:ui' as ui show Codec;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:venera/foundation/log.dart';
+import 'package:venera_edge/foundation/log.dart';
 
 abstract class BaseImageProvider<T extends BaseImageProvider<T>>
     extends ImageProvider<T> {

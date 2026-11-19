@@ -3,12 +3,12 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'package:venera/src/rust/frb_generated.dart';
-import 'package:venera/src/rust/api/cache.dart';
-import 'package:venera/src/rust/api/cookies.dart';
-import 'package:venera/src/rust/api/history.dart';
-import 'package:venera/src/rust/api/text.dart';
-import 'package:venera/src/rust/api/local.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
+import 'package:venera_edge/src/rust/api/cache.dart';
+import 'package:venera_edge/src/rust/api/cookies.dart';
+import 'package:venera_edge/src/rust/api/history.dart';
+import 'package:venera_edge/src/rust/api/text.dart';
+import 'package:venera_edge/src/rust/api/local.dart';
 
 void expect(bool condition, String message) {
   if (!condition) throw StateError(message);

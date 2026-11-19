@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:venera/foundation/app.dart';
-import 'package:venera/src/rust/api/script.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/src/rust/api/script.dart' as backend;
 
 /// Source data is read as a snapshot. Settings use the schema-aware script
 /// runtime API; account and other source data use explicit field writes.

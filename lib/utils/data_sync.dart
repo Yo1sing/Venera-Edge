@@ -2,16 +2,16 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:venera/components/components.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/favorites.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/foundation/res.dart';
-import 'package:venera/src/rust/api/backup.dart' as backend;
-import 'package:venera/utils/data.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/favorites.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/foundation/res.dart';
+import 'package:venera_edge/src/rust/api/backup.dart' as backend;
+import 'package:venera_edge/utils/data.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 import 'io.dart';
 

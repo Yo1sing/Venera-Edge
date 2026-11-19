@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:flutter/painting.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/local.dart';
-import 'package:venera/src/rust/api/media.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/src/rust/api/media.dart' as backend;
 
 /// Flutter owns subscriptions; source hooks, transport, retries and caching run in Rust.
 abstract class ImageDownloader {

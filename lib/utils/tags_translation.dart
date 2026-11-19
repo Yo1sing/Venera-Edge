@@ -1,9 +1,9 @@
 // Dictionary source: https://github.com/EhTagTranslation/Database/tree/master/database
 // Traditional Chinese contributed by https://github.com/NeKoOuO
 // Tag dictionaries and matching are owned by the Rust backend.
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/global_state.dart';
-import 'package:venera/src/rust/api/tags.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/global_state.dart';
+import 'package:venera_edge/src/rust/api/tags.dart' as backend;
 
 extension TagsTranslation on String {
   static bool get _traditional => App.locale.countryCode == 'TW';

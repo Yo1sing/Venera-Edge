@@ -5,16 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:prism_ui/switch.dart' as prism;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
-import 'package:venera/components/components.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/src/rust/api/http.dart' show HttpCancellation;
-import 'package:venera/network/cookie_jar.dart';
-import 'package:venera/pages/webview.dart';
-import 'package:venera/utils/io.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/src/rust/api/http.dart' show HttpCancellation;
+import 'package:venera_edge/network/cookie_jar.dart';
+import 'package:venera_edge/pages/webview.dart';
+import 'package:venera_edge/utils/io.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 class ComicSourcePage extends StatelessWidget {
   const ComicSourcePage({super.key});

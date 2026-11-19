@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:venera/src/rust/api/comic_queue.dart';
-import 'package:venera/src/rust/api/local.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/frb_generated.dart';
-import 'package:venera/network/download.dart' show DownloadQueueView;
-import 'package:venera/utils/io.dart' show copyDirectoryIsolate;
+import 'package:venera_edge/src/rust/api/comic_queue.dart';
+import 'package:venera_edge/src/rust/api/local.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
+import 'package:venera_edge/network/download.dart' show DownloadQueueView;
+import 'package:venera_edge/utils/io.dart' show copyDirectoryIsolate;
 import 'native_migration_test.dart' show runtimeOptions, httpOptions;
 
 Future<void> until(bool Function() check) async {

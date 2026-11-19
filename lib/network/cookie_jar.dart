@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:venera/src/rust/api/cookies.dart';
+import 'package:venera_edge/src/rust/api/cookies.dart';
 
 /// Compatibility adapter for platform Cookie values and the source JavaScript API.
 /// Persistence, expiry and request matching are owned by Rust.

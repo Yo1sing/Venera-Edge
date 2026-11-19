@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/favorites.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/src/rust/api/follow_updates.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/favorites.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/src/rust/api/follow_updates.dart' as backend;
 
 class ComicUpdateResult {
   final bool updated;

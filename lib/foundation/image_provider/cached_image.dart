@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:venera/network/images.dart';
+import 'package:venera_edge/network/images.dart';
 
 import 'base_image_provider.dart';
 

@@ -1,4 +1,4 @@
-import 'package:venera/src/rust/api/text.dart' as backend;
+import 'package:venera_edge/src/rust/api/text.dart' as backend;
 
 abstract class OpenCC {
   // Rust embeds the mapping table, so no asset loading is needed here.

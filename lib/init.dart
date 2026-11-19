@@ -1,24 +1,24 @@
 import 'dart:async';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 import 'package:display_mode/display_mode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_saf/flutter_saf.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/cache_manager.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/network/cookie_jar.dart';
-import 'package:venera/pages/comic_source_page.dart';
-import 'package:venera/pages/follow_updates_page.dart';
-import 'package:venera/pages/settings/settings_page.dart';
-import 'package:venera/utils/app_links.dart';
-import 'package:venera/utils/handle_text_share.dart';
-import 'package:venera/utils/opencc.dart';
-import 'package:venera/utils/tags_translation.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/cache_manager.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/network/cookie_jar.dart';
+import 'package:venera_edge/pages/comic_source_page.dart';
+import 'package:venera_edge/pages/follow_updates_page.dart';
+import 'package:venera_edge/pages/settings/settings_page.dart';
+import 'package:venera_edge/utils/app_links.dart';
+import 'package:venera_edge/utils/handle_text_share.dart';
+import 'package:venera_edge/utils/opencc.dart';
+import 'package:venera_edge/utils/tags_translation.dart';
+import 'package:venera_edge/utils/translations.dart';
 import 'foundation/appdata.dart';
 
 extension _FutureInit<T> on Future<T> {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:venera/src/rust/api/script.dart' as backend;
+import 'package:venera_edge/src/rust/api/script.dart' as backend;
 
 /// Transport and lifetime adapter for Rust-owned JavaScript values.
 class ScriptSession {

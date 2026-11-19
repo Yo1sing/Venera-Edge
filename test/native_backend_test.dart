@@ -1,21 +1,21 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
-import 'package:venera/network/file_downloader.dart';
-import 'package:venera/src/rust/api/favorites.dart' as favorites;
-import 'package:venera/src/rust/api/tags.dart' as tags;
+import 'package:venera_edge/network/file_downloader.dart';
+import 'package:venera_edge/src/rust/api/favorites.dart' as favorites;
+import 'package:venera_edge/src/rust/api/tags.dart' as tags;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/consts.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/foundation/script_bridge.dart';
-import 'package:venera/network/app_dio.dart';
-import 'package:venera/network/cloudflare.dart';
-import 'package:venera/network/cookie_jar.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/consts.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/foundation/script_bridge.dart';
+import 'package:venera_edge/network/app_dio.dart';
+import 'package:venera_edge/network/cloudflare.dart';
+import 'package:venera_edge/network/cookie_jar.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 void main() {
   final libraryPath = Platform.environment['VENERA_BACKEND_LIBRARY'];

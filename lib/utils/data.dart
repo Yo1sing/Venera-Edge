@@ -1,14 +1,14 @@
 import 'dart:convert';
 
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/favorites.dart';
-import 'package:venera/foundation/follow_updates.dart';
-import 'package:venera/foundation/history.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/utils/data_sync.dart';
-import 'package:venera/src/rust/api/backup.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/favorites.dart';
+import 'package:venera_edge/foundation/follow_updates.dart';
+import 'package:venera_edge/foundation/history.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/utils/data_sync.dart';
+import 'package:venera_edge/src/rust/api/backup.dart' as backend;
 
 import 'io.dart';
 

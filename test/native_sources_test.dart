@@ -4,13 +4,13 @@ import 'dart:io';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:venera/src/rust/api/http.dart';
-import 'package:venera/src/rust/api/media.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/api/sources.dart';
-import 'package:venera/src/rust/frb_generated.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart' as models;
-import 'package:venera/foundation/script_bridge.dart';
+import 'package:venera_edge/src/rust/api/http.dart';
+import 'package:venera_edge/src/rust/api/media.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/api/sources.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart' as models;
+import 'package:venera_edge/foundation/script_bridge.dart';
 
 String options(String directory) => jsonEncode({
   'data_path': directory,

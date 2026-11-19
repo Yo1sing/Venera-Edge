@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:venera/components/components.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_type.dart';
-import 'package:venera/foundation/local.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/pages/comic_details_page/comic_page.dart';
-import 'package:venera/pages/downloading_page.dart';
-import 'package:venera/pages/favorites/favorites_page.dart';
-import 'package:venera/utils/io.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/comic_type.dart';
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/pages/comic_details_page/comic_page.dart';
+import 'package:venera_edge/pages/downloading_page.dart';
+import 'package:venera_edge/pages/favorites/favorites_page.dart';
+import 'package:venera_edge/utils/io.dart';
+import 'package:venera_edge/utils/translations.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class LocalComicsPage extends StatefulWidget {

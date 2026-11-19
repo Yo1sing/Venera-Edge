@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/widgets.dart' show ChangeNotifier;
 import 'package:flutter_saf/flutter_saf.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/comic_type.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/local.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/src/rust/api/comic_queue.dart' as backend;
-import 'package:venera/utils/io.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/comic_type.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/src/rust/api/comic_queue.dart' as backend;
+import 'package:venera_edge/utils/io.dart';
 
 /// Observable presentation model. Rust owns scheduling, retries, files and checkpoints.
 class DownloadTask with ChangeNotifier {

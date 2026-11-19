@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/comic_type.dart';
-import 'package:venera/foundation/history.dart';
-import 'package:venera/foundation/js_engine.dart';
-import 'package:venera/foundation/local.dart';
-import 'package:venera/src/rust/api/media.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/comic_type.dart';
+import 'package:venera_edge/foundation/history.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/src/rust/api/media.dart' as backend;
 import 'base_image_provider.dart';
 
 class ImageFavoritesProvider extends BaseImageProvider<ImageFavoritesProvider> {

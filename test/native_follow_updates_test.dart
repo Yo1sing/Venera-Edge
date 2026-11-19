@@ -4,10 +4,10 @@ import 'dart:io';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:venera/src/rust/api/favorites.dart';
-import 'package:venera/src/rust/api/follow_updates.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/src/rust/api/favorites.dart';
+import 'package:venera_edge/src/rust/api/follow_updates.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 Future<Map<String, dynamic>> finish(FollowUpdateTask task) async {
   while (true) {

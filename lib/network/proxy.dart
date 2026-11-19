@@ -1,8 +1,8 @@
 import 'package:flutter/services.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/src/rust/api/http.dart';
-import 'package:venera/utils/ext.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/src/rust/api/http.dart';
+import 'package:venera_edge/utils/ext.dart';
 
 String? _cachedProxy;
 

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:venera/src/rust/api/cache.dart';
+import 'package:venera_edge/src/rust/api/cache.dart';
 import 'app.dart';
 import 'log.dart';
 

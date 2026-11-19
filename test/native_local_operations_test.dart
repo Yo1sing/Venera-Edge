@@ -4,13 +4,13 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:venera/foundation/script_bridge.dart';
-import 'package:venera/foundation/local.dart' as models;
-import 'package:venera/foundation/image_provider/local_comic_image.dart';
-import 'package:venera/src/rust/api/favorites.dart';
-import 'package:venera/src/rust/api/local.dart';
-import 'package:venera/src/rust/api/script.dart';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/foundation/script_bridge.dart';
+import 'package:venera_edge/foundation/local.dart' as models;
+import 'package:venera_edge/foundation/image_provider/local_comic_image.dart';
+import 'package:venera_edge/src/rust/api/favorites.dart';
+import 'package:venera_edge/src/rust/api/local.dart';
+import 'package:venera_edge/src/rust/api/script.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 class Fixture {
   final Directory directory;

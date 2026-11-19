@@ -4,16 +4,16 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-import 'package:venera/foundation/script_bridge.dart';
-import 'package:venera/src/rust/frb_generated.dart';
-import 'package:venera/src/rust/api/script.dart' as scripts;
-import 'package:venera/src/rust/api/media.dart' as media;
-import 'package:venera/src/rust/api/archive.dart' as archives;
-import 'package:venera/src/rust/api/comic_queue.dart' as downloads;
-import 'package:venera/src/rust/api/local.dart' as local;
-import 'package:venera/src/rust/api/history.dart' as history;
-import 'package:venera/src/rust/api/backup.dart' as backup;
-import 'package:venera/src/rust/api/settings.dart' as settings;
+import 'package:venera_edge/foundation/script_bridge.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
+import 'package:venera_edge/src/rust/api/script.dart' as scripts;
+import 'package:venera_edge/src/rust/api/media.dart' as media;
+import 'package:venera_edge/src/rust/api/archive.dart' as archives;
+import 'package:venera_edge/src/rust/api/comic_queue.dart' as downloads;
+import 'package:venera_edge/src/rust/api/local.dart' as local;
+import 'package:venera_edge/src/rust/api/history.dart' as history;
+import 'package:venera_edge/src/rust/api/backup.dart' as backup;
+import 'package:venera_edge/src/rust/api/settings.dart' as settings;
 
 const httpOptions = {
   'proxy': null,

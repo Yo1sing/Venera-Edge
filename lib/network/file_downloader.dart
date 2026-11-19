@@ -1,6 +1,6 @@
-import 'package:venera/network/proxy.dart';
-import 'package:venera/src/rust/api/download.dart' as backend;
-import 'package:venera/src/rust/api/http.dart' as http;
+import 'package:venera_edge/network/proxy.dart';
+import 'package:venera_edge/src/rust/api/download.dart' as backend;
+import 'package:venera_edge/src/rust/api/http.dart' as http;
 
 /// Presents Rust download progress to the existing Flutter task widgets.
 class FileDownloader {

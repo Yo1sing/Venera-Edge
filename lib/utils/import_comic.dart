@@ -1,7 +1,7 @@
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/local.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/utils/translations.dart';
 import 'io.dart';
 
 class ImportComic {

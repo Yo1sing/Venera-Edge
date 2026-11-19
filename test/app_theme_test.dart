@@ -12,13 +12,13 @@ import 'package:prism_ui/surface.dart' as prism;
 import 'package:prism_ui/switch.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
 import 'package:prism_ui/typography.dart' as prism;
-import 'package:venera/components/app_theme.dart';
-import 'package:venera/components/system_accent.dart';
-import 'package:venera/components/components.dart'
+import 'package:venera_edge/components/app_theme.dart';
+import 'package:venera_edge/components/system_accent.dart';
+import 'package:venera_edge/components/components.dart'
     show AnimatedTapRegion, Button, ContentDialog;
-import 'package:venera/pages/settings/settings_page.dart';
-import 'package:venera/src/rust/frb_generated.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/pages/settings/settings_page.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 class _SettingsApi extends Fake implements RustLibApi {
   @override

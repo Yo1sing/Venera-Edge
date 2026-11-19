@@ -1,4 +1,4 @@
-import 'package:venera/foundation/js_engine.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
 
 /// Compatibility entry point; the bounded compute pool is owned by Rust.
 class JSPool {

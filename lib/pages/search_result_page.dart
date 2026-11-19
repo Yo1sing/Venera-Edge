@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:venera/components/components.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/foundation/global_state.dart';
-import 'package:venera/pages/search_page.dart';
-import 'package:venera/utils/ext.dart';
-import 'package:venera/utils/tags_translation.dart';
-import 'package:venera/utils/translations.dart';
+import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/foundation/global_state.dart';
+import 'package:venera_edge/pages/search_page.dart';
+import 'package:venera_edge/utils/ext.dart';
+import 'package:venera_edge/utils/tags_translation.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 class SearchResultPage extends StatefulWidget {
   const SearchResultPage({

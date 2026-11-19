@@ -3,10 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/color.dart' as prism;
 import 'package:prism_ui/navigation_dock.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
-import 'package:venera/components/app_theme.dart';
-import 'package:venera/components/components.dart';
-import 'package:venera/pages/main_navigation_glyphs.dart';
-import 'package:venera/src/rust/frb_generated.dart';
+import 'package:venera_edge/components/app_theme.dart';
+import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/pages/main_navigation_glyphs.dart';
+import 'package:venera_edge/src/rust/frb_generated.dart';
 
 class _SettingsApi extends Fake implements RustLibApi {
   @override

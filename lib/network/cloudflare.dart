@@ -4,10 +4,10 @@ import 'dart:io' as io;
 import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/pages/webview.dart';
-import 'package:venera/src/rust/api/http.dart' as backend;
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/pages/webview.dart';
+import 'package:venera_edge/src/rust/api/http.dart' as backend;
 
 import 'cookie_jar.dart';
 

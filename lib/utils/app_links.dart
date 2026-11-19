@@ -1,7 +1,7 @@
 import 'package:app_links/app_links.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/comic_source/comic_source.dart';
-import 'package:venera/pages/comic_details_page/comic_page.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/comic_source/comic_source.dart';
+import 'package:venera_edge/pages/comic_details_page/comic_page.dart';
 
 void handleLinks() {
   final appLinks = AppLinks();

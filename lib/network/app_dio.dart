@@ -5,11 +5,11 @@ import 'package:dio/dio.dart';
 import 'dart:typed_data';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show AnyhowException;
-import 'package:venera/src/rust/api/http.dart' as backend;
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/consts.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/network/proxy.dart';
+import 'package:venera_edge/src/rust/api/http.dart' as backend;
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/consts.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/network/proxy.dart';
 
 import '../foundation/app.dart';
 import 'cloudflare.dart';

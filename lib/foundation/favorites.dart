@@ -1,12 +1,12 @@
 import 'dart:convert';
-import 'package:venera/src/rust/api/favorites.dart' as backend;
+import 'package:venera_edge/src/rust/api/favorites.dart' as backend;
 
 import 'package:flutter/foundation.dart';
-import 'package:venera/foundation/appdata.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/src/rust/api/media.dart' as media;
-import 'package:venera/foundation/local.dart';
-import 'package:venera/pages/follow_updates_page.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/src/rust/api/media.dart' as media;
+import 'package:venera_edge/foundation/local.dart';
+import 'package:venera_edge/pages/follow_updates_page.dart';
 
 import 'app.dart';
 import 'comic_source/comic_source.dart';

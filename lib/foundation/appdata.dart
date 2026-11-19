@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:venera/foundation/app.dart';
-import 'package:venera/foundation/log.dart';
-import 'package:venera/src/rust/api/settings.dart' as backend;
-import 'package:venera/utils/data_sync.dart';
-import 'package:venera/utils/init.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/log.dart';
+import 'package:venera_edge/src/rust/api/settings.dart' as backend;
+import 'package:venera_edge/utils/data_sync.dart';
+import 'package:venera_edge/utils/init.dart';
 
 typedef _Edit = Map<String, Object?>;
 
