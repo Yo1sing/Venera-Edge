@@ -9,6 +9,7 @@ import 'package:venera_edge/foundation/log.dart';
 import 'package:venera_edge/pages/auth_page.dart';
 import 'package:venera_edge/pages/main_page.dart';
 import 'package:venera_edge/utils/io.dart';
+import 'package:venera_edge/utils/prism_localizations.dart';
 import 'package:venera_edge/utils/data_sync.dart';
 import 'package:window_manager/window_manager.dart';
 import 'components/app_theme.dart';
@@ -213,6 +214,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       },
       color: Colors.transparent,
       localizationsDelegates: [
+        PrismLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],

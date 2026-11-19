@@ -7,18 +7,21 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/color.dart' as prism;
+import 'package:prism_ui/popup.dart' as prism;
 import 'package:prism_ui/shape.dart' as prism;
 import 'package:prism_ui/surface.dart' as prism;
 import 'package:prism_ui/switch.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
 import 'package:prism_ui/typography.dart' as prism;
 import 'package:venera_edge/components/app_theme.dart';
+import 'package:venera_edge/components/settings_choice_row.dart';
 import 'package:venera_edge/components/system_accent.dart';
 import 'package:venera_edge/components/components.dart'
     show AnimatedTapRegion, Button, ContentDialog;
 import 'package:venera_edge/pages/settings/settings_page.dart';
 import 'package:venera_edge/src/rust/frb_generated.dart';
 import 'package:venera_edge/utils/translations.dart';
+import 'package:venera_edge/utils/prism_localizations.dart';
 
 class _SettingsApi extends Fake implements RustLibApi {
   @override
@@ -274,6 +277,7 @@ void main() {
     Future<void> pump(AppTheme theme) async {
       await tester.pumpWidget(
         MaterialApp(
+          localizationsDelegates: const [PrismLocalizations.delegate],
           theme: theme.material,
           themeAnimationDuration: Duration.zero,
           builder: (context, child) => theme.wrap(child!),
@@ -301,6 +305,16 @@ void main() {
     expect(find.byType(prism.Switch), findsOneWidget);
     await tester.tap(find.text('Color Style'));
     await tester.pumpAndSettle();
+    final items = tester
+        .widget<prism.PopupMenu>(find.byType(prism.PopupMenu))
+        .items;
+    expect(items.where((item) => item.checked == true).single.label, 'Vivid');
+    expect(items.map((item) => item.label), [
+      'Vivid',
+      'Tinted',
+      'Soft',
+      'Monochrome',
+    ]);
     final option = find.text('Monochrome');
     expect(option, findsOneWidget);
 
@@ -325,5 +339,75 @@ void main() {
       Colors.black,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('settings choices keep their keys and dismiss at both widths', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    for (final width in [320.0, 800.0]) {
+      tester.view.physicalSize = Size(width, 680);
+      String? selected;
+      final changes = <String>[];
+      var resets = 0;
+      const options = {'a': 'Same name', 'b': 'Same name', 'c': 'Other'};
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: const [PrismLocalizations.delegate],
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, rebuild) => SettingsChoiceRow<String>(
+                title: const Text('Choice'),
+                options: options,
+                value: selected,
+                fallbackLabel: 'None',
+                trailingAction: IconButton(
+                  icon: const Icon(Icons.restart_alt),
+                  onPressed: () => resets++,
+                ),
+                onChanged: (key) => rebuild(() {
+                  selected = key;
+                  changes.add(key);
+                }),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final menu = find.byType(prism.PopupMenu);
+      await tester.tap(find.byIcon(Icons.restart_alt));
+      await tester.pumpAndSettle();
+      expect(resets, 1);
+      expect(menu, findsNothing);
+      expect(find.text('None'), findsOneWidget);
+      await tester.tap(find.text('Choice'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<prism.PopupMenu>(menu)
+            .items
+            .every((e) => e.checked == false),
+        isTrue,
+      );
+      await tester.tap(
+        find.descendant(of: menu, matching: find.text('Same name')).last,
+      );
+      await tester.pumpAndSettle();
+      expect(menu, findsNothing);
+      expect(changes, ['b']);
+      await tester.tap(find.text('Same name'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<prism.PopupMenu>(menu).items.map((e) => e.checked), [
+        false,
+        true,
+        false,
+      ]);
+      await tester.tapAt(Offset(20, 630));
+      await tester.pumpAndSettle();
+      expect(menu, findsNothing);
+      expect(changes, ['b']);
+    }
   });
 }

@@ -6,6 +6,7 @@ import 'package:prism_ui/switch.dart' as prism;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera_edge/components/components.dart';
+import 'package:venera_edge/components/settings_choice_row.dart';
 import 'package:venera_edge/foundation/app.dart';
 import 'package:venera_edge/foundation/appdata.dart';
 import 'package:venera_edge/foundation/comic_source/comic_source.dart';
@@ -1009,19 +1010,17 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
         }
       }
 
+      final resetButton = IconButton(
+        tooltip: "Reset".tl,
+        icon: const Icon(Icons.restart_alt),
+        onPressed: () {
+          final error = save(null, reset: true);
+          if (error != null) context.showMessage(message: error);
+        },
+      );
       Widget actions(Widget control) => Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: "Reset".tl,
-            icon: const Icon(Icons.restart_alt),
-            onPressed: () {
-              final error = save(null, reset: true);
-              if (error != null) context.showMessage(message: error);
-            },
-          ),
-          control,
-        ],
+        children: [resetButton, control],
       );
 
       switch (setting['type']) {
@@ -1041,18 +1040,17 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           final selected = options.indexWhere(
             (option) => option['value'] == current,
           );
-          yield ListTile(
+          yield SettingsChoiceRow<int>(
             title: Text(title),
-            trailing: actions(
-              Select(
-                current: selected < 0 ? '' : label(options[selected]),
-                values: options.map(label).toList(),
-                onTap: (index) {
-                  final error = save(options[index]['value']);
-                  if (error != null) context.showMessage(message: error);
-                },
-              ),
+            trailingAction: resetButton,
+            options: options.asMap().map(
+              (index, option) => MapEntry(index, label(option)),
             ),
+            value: selected,
+            onChanged: (index) {
+              final error = save(options[index]['value']);
+              if (error != null) context.showMessage(message: error);
+            },
           );
         case 'switch':
           yield ListTile(

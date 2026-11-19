@@ -205,34 +205,21 @@ class _LogsPageState extends State<LogsPage> {
       appBar: Appbar(
         title: Text("Logs".tl),
         actions: [
-          IconButton(
-              onPressed: () => setState(() {
-                    final RelativeRect position = RelativeRect.fromLTRB(
-                      MediaQuery.of(context).size.width,
-                      MediaQuery.of(context).padding.top + kToolbarHeight,
-                      0.0,
-                      0.0,
-                    );
-                    showMenu(context: context, position: position, items: [
-                      PopupMenuItem(
-                          child: Text("all"),
-                          onTap: () => setState(() => logLevelToShow = "all")
-                      ),
-                      PopupMenuItem(
-                          child: Text("info"),
-                          onTap: () => setState(() => logLevelToShow = "info")
-                      ),
-                      PopupMenuItem(
-                          child: Text("warning"),
-                          onTap: () => setState(() => logLevelToShow = "warning")
-                      ),
-                      PopupMenuItem(
-                          child: Text("error"),
-                          onTap: () => setState(() => logLevelToShow = "error")
-                      ),
-                    ]);
-              }),
-              icon: const Icon(Icons.filter_list_outlined)
+          prism.PopupAnchor(
+            targetBuilder: (open) => prism.IconButton(
+              onPressed: open,
+              icon: const Icon(Icons.filter_list_outlined),
+            ),
+            popupBuilder: (_) => prism.PopupMenu(
+              items: [
+                for (final level in const ['all', 'info', 'warning', 'error'])
+                  prism.PopupMenuItem(
+                    label: level,
+                    checked: level == logLevelToShow,
+                    onPressed: () => setState(() => logLevelToShow = level),
+                  ),
+              ],
+            ),
           ),
           IconButton(
               onPressed: () => setState(() {

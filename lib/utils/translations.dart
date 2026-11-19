@@ -1,12 +1,12 @@
 import 'dart:convert';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/services.dart';
 import 'package:venera_edge/foundation/comic_source/comic_source.dart';
 import '../foundation/app.dart';
 
 extension AppTranslation on String {
-  String _translate() {
-    final locale = App.locale;
+  String translateFor(Locale locale) {
     final key = switch (locale.languageCode) {
       "en" => "en_US",
       "zh" => switch ((locale.scriptCode, locale.countryCode)) {
@@ -20,12 +20,12 @@ extension AppTranslation on String {
     return (translations[key]?[this]) ?? this;
   }
 
-  String get tl => _translate();
+  String get tl => translateFor(App.locale);
 
   String get tlEN => translations["en_US"]![this] ?? this;
 
   String tlParams(Map<String, Object> values) {
-    var res = _translate();
+    var res = tl;
     for (var entry in values.entries) {
       res = res.replaceFirst("@${entry.key}", entry.value.toString());
     }

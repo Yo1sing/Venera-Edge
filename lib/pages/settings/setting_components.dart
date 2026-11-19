@@ -103,269 +103,65 @@ class SelectSetting extends StatelessWidget {
 
   final bool useDeviceSettings;
 
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 450) {
-            return _DoubleLineSelectSettings(
-              title: title,
-              settingKey: settingKey,
-              optionTranslation: optionTranslation,
-              onChanged: onChanged,
-              help: help,
-              comicId: comicId,
-              comicSource: comicSource,
-              useDeviceSettings: useDeviceSettings,
-            );
-          } else {
-            return _EndSelectorSelectSetting(
-              title: title,
-              settingKey: settingKey,
-              optionTranslation: optionTranslation,
-              onChanged: onChanged,
-              help: help,
-              comicId: comicId,
-              comicSource: comicSource,
-              useDeviceSettings: useDeviceSettings,
-            );
-          }
-        },
-      ),
-    );
+  void _select(String value) {
+    final settings = appdata.settings;
+    if (comicId != null) {
+      settings.setReaderSetting(comicId!, comicSource!, settingKey, value);
+    } else if (useDeviceSettings) {
+      settings.setDeviceReaderSetting(settingKey, value);
+    } else {
+      settings[settingKey] = value;
+    }
+    appdata.saveData();
+    onChanged?.call();
   }
-}
 
-class _DoubleLineSelectSettings extends StatefulWidget {
-  const _DoubleLineSelectSettings({
-    required this.title,
-    required this.settingKey,
-    required this.optionTranslation,
-    this.onChanged,
-    this.help,
-    this.comicId,
-    this.comicSource,
-    this.useDeviceSettings = false,
-  });
-
-  final String title;
-
-  final String settingKey;
-
-  final Map<String, String> optionTranslation;
-
-  final VoidCallback? onChanged;
-
-  final String? help;
-
-  final String? comicId;
-
-  final String? comicSource;
-
-  final bool useDeviceSettings;
-
-  @override
-  State<_DoubleLineSelectSettings> createState() =>
-      _DoubleLineSelectSettingsState();
-}
-
-class _DoubleLineSelectSettingsState extends State<_DoubleLineSelectSettings> {
   @override
   Widget build(BuildContext context) {
-    var value = widget.comicId != null
-        ? appdata.settings.getReaderSetting(
-            widget.comicId!,
-            widget.comicSource!,
-            widget.settingKey,
-          )
-        : widget.useDeviceSettings
-        ? appdata.settings.getDeviceReaderSetting(widget.settingKey)
-        : appdata.settings[widget.settingKey];
-
-    return ListTile(
-      title: Row(
-        children: [
-          Flexible(child: Text(widget.title)),
-          const SizedBox(width: 4),
-          if (widget.help != null)
-            Button.icon(
-              size: 18,
-              icon: const Icon(Icons.help_outline),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return ContentDialog(
-                      title: "Help".tl,
-                      content: Text(
-                        widget.help!,
-                      ).paddingHorizontal(16).fixWidth(double.infinity),
-                      actions: [
-                        Button.filled(
-                          onPressed: context.pop,
-                          child: Text("OK".tl),
+    final settings = appdata.settings;
+    final helpText = help;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) {
+        final value = comicId != null
+            ? settings.getReaderSetting(comicId!, comicSource!, settingKey)
+            : useDeviceSettings
+            ? settings.getDeviceReaderSetting(settingKey)
+            : settings[settingKey];
+        return SettingsChoiceRow<String>(
+          title: helpText == null
+              ? Text(title)
+              : Row(
+                  children: [
+                    Flexible(child: Text(title)),
+                    const SizedBox(width: 4),
+                    Button.icon(
+                      size: 18,
+                      icon: const Icon(Icons.help_outline),
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (context) => ContentDialog(
+                          title: "Help".tl,
+                          content: Text(helpText)
+                              .paddingHorizontal(16)
+                              .fixWidth(double.infinity),
+                          actions: [
+                            Button.filled(
+                              onPressed: context.pop,
+                              child: Text("OK".tl),
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-        ],
-      ),
-      subtitle: Text(widget.optionTranslation[value] ?? "None"),
-      trailing: const Icon(Icons.arrow_drop_down),
-      onTap: () {
-        var renderBox = context.findRenderObject() as RenderBox;
-        var offset = renderBox.localToGlobal(Offset.zero);
-        var size = renderBox.size;
-        var rect = offset & size;
-        showMenu(
-          context: context,
-          position: RelativeRect.fromRect(
-            rect,
-            Offset.zero & MediaQuery.of(context).size,
-          ),
-          items: widget.optionTranslation.keys
-              .map(
-                (key) => PopupMenuItem(
-                  value: key,
-                  height: App.isMobile ? 46 : 40,
-                  child: Text(widget.optionTranslation[key]!),
+                      ),
+                    ),
+                  ],
                 ),
-              )
-              .toList(),
-        ).then((value) {
-          if (value != null) {
-            setState(() {
-              if (widget.comicId != null) {
-                appdata.settings.setReaderSetting(
-                  widget.comicId!,
-                  widget.comicSource!,
-                  widget.settingKey,
-                  value,
-                );
-              } else if (widget.useDeviceSettings) {
-                appdata.settings.setDeviceReaderSetting(
-                  widget.settingKey,
-                  value,
-                );
-              } else {
-                appdata.settings[widget.settingKey] = value;
-              }
-            });
-            appdata.saveData();
-            widget.onChanged?.call();
-          }
-        });
+          options: optionTranslation,
+          value: value is String ? value : null,
+          fallbackLabel: 'None',
+          onChanged: _select,
+        );
       },
-    );
-  }
-}
-
-class _EndSelectorSelectSetting extends StatefulWidget {
-  const _EndSelectorSelectSetting({
-    required this.title,
-    required this.settingKey,
-    required this.optionTranslation,
-    this.onChanged,
-    this.help,
-    this.comicId,
-    this.comicSource,
-    this.useDeviceSettings = false,
-  });
-
-  final String title;
-
-  final String settingKey;
-
-  final Map<String, String> optionTranslation;
-
-  final VoidCallback? onChanged;
-
-  final String? help;
-
-  final String? comicId;
-
-  final String? comicSource;
-
-  final bool useDeviceSettings;
-
-  @override
-  State<_EndSelectorSelectSetting> createState() =>
-      _EndSelectorSelectSettingState();
-}
-
-class _EndSelectorSelectSettingState extends State<_EndSelectorSelectSetting> {
-  @override
-  Widget build(BuildContext context) {
-    var options = widget.optionTranslation;
-    var value = widget.comicId != null
-        ? appdata.settings.getReaderSetting(
-            widget.comicId!,
-            widget.comicSource!,
-            widget.settingKey,
-          )
-        : widget.useDeviceSettings
-        ? appdata.settings.getDeviceReaderSetting(widget.settingKey)
-        : appdata.settings[widget.settingKey];
-    return ListTile(
-      title: Row(
-        children: [
-          Flexible(child: Text(widget.title)),
-          const SizedBox(width: 4),
-          if (widget.help != null)
-            Button.icon(
-              size: 18,
-              icon: const Icon(Icons.help_outline),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return ContentDialog(
-                      title: "Help".tl,
-                      content: Text(
-                        widget.help!,
-                      ).paddingHorizontal(16).fixWidth(double.infinity),
-                      actions: [
-                        Button.filled(
-                          onPressed: context.pop,
-                          child: Text("OK".tl),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-        ],
-      ),
-      trailing: Select(
-        current: options[value],
-        values: options.values.toList(),
-        minWidth: 64,
-        onTap: (index) {
-          setState(() {
-            var value = options.keys.elementAt(index);
-            if (widget.comicId != null) {
-              appdata.settings.setReaderSetting(
-                widget.comicId!,
-                widget.comicSource!,
-                widget.settingKey,
-                value,
-              );
-            } else if (widget.useDeviceSettings) {
-              appdata.settings.setDeviceReaderSetting(widget.settingKey, value);
-            } else {
-              appdata.settings[widget.settingKey] = value;
-            }
-          });
-          appdata.saveData();
-          widget.onChanged?.call();
-        },
-      ),
     );
   }
 }
