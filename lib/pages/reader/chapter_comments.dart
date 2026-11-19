@@ -206,7 +206,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           top: BorderSide(
             color: context.colorScheme.outlineVariant,
@@ -215,7 +215,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
         ),
       ),
       child: Material(
-        color: context.colorScheme.surfaceContainer,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
@@ -223,6 +223,7 @@ class _ChapterCommentsPageState extends State<ChapterCommentsPage> {
               child: TextField(
                 controller: controller,
                 decoration: InputDecoration(
+                  filled: false,
                   border: InputBorder.none,
                   isCollapsed: true,
                   hintText: "Comment".tl,
@@ -472,7 +473,7 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
               Icon(
                 Icons.favorite,
                 size: 16,
-                color: context.useTextColor(Colors.red),
+                color: context.colorScheme.primary,
               )
             else
               const Icon(Icons.favorite_border, size: 16),
@@ -529,11 +530,11 @@ class _ChapterCommentTileState extends State<_ChapterCommentTile> {
   Widget buildVote() {
     var upColor = context.colorScheme.outline;
     if (voteStatus == 1) {
-      upColor = context.useTextColor(Colors.red);
+      upColor = context.colorScheme.primary;
     }
     var downColor = context.colorScheme.outline;
     if (voteStatus == -1) {
-      downColor = context.useTextColor(Colors.blue);
+      downColor = context.colorScheme.tertiary;
     }
 
     return Container(
@@ -676,7 +677,7 @@ class _EmbeddedChapterCommentsPageState
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      color: context.colorScheme.surface,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: SafeArea(
         child: Column(
           children: [
@@ -797,7 +798,7 @@ class _EmbeddedChapterCommentsPageState
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           top: BorderSide(
             color: context.colorScheme.outlineVariant,
@@ -806,7 +807,7 @@ class _EmbeddedChapterCommentsPageState
         ),
       ),
       child: Material(
-        color: context.colorScheme.surfaceContainer,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
@@ -814,6 +815,7 @@ class _EmbeddedChapterCommentsPageState
               child: TextField(
                 controller: textController,
                 decoration: InputDecoration(
+                  filled: false,
                   border: InputBorder.none,
                   isCollapsed: true,
                   hintText: "Comment".tl,

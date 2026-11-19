@@ -104,7 +104,7 @@ class ListLoadingIndicator extends StatelessWidget {
     return const SizedBox(
       width: double.infinity,
       height: 80,
-      child: Center(child: FiveDotLoadingAnimation()),
+      child: Center(child: prism.ActivityIndicator()),
     );
   }
 }
@@ -156,11 +156,7 @@ abstract class LoadingState<T extends StatefulWidget, S extends Object>
   Widget? buildFrame(BuildContext context, Widget child) => null;
 
   Widget buildLoading() {
-    return Center(
-      child: const CircularProgressIndicator(
-        strokeWidth: 2,
-      ).fixWidth(32).fixHeight(32),
-    );
+    return const Center(child: prism.ActivityIndicator.page());
   }
 
   void retry() {
@@ -321,9 +317,7 @@ abstract class MultiPageLoadingState<T extends StatefulWidget, S extends Object>
   }
 
   Widget buildLoading(BuildContext context) {
-    return Center(
-      child: const CircularProgressIndicator().fixWidth(32).fixHeight(32),
-    );
+    return const Center(child: prism.ActivityIndicator.page());
   }
 
   Widget buildError(BuildContext context, String error) {
@@ -352,81 +346,5 @@ abstract class MultiPageLoadingState<T extends StatefulWidget, S extends Object>
     }
 
     return buildFrame(context, child) ?? child;
-  }
-}
-
-class FiveDotLoadingAnimation extends StatefulWidget {
-  const FiveDotLoadingAnimation({super.key});
-
-  @override
-  State<FiveDotLoadingAnimation> createState() =>
-      _FiveDotLoadingAnimationState();
-}
-
-class _FiveDotLoadingAnimationState extends State<FiveDotLoadingAnimation>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-      upperBound: 6,
-    )..repeat(min: 0, max: 5.2, period: const Duration(milliseconds: 1200));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  static const _colors = [
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.yellow,
-    Colors.purple,
-  ];
-
-  static const _padding = 12.0;
-
-  static const _dotSize = 12.0;
-
-  static const _height = 24.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return SizedBox(
-          width: _dotSize * 5 + _padding * 6,
-          height: _height,
-          child: Stack(children: List.generate(5, (index) => buildDot(index))),
-        );
-      },
-    );
-  }
-
-  Widget buildDot(int index) {
-    var value = _controller.value;
-    var startValue = index * 0.8;
-    return Positioned(
-      left: index * _dotSize + (index + 1) * _padding,
-      bottom:
-          (math.sin(math.pi / 2 * (value - startValue).clamp(0, 2))) *
-          (_height - _dotSize),
-      child: Container(
-        width: _dotSize,
-        height: _dotSize,
-        decoration: BoxDecoration(
-          color: _colors[index],
-          shape: BoxShape.circle,
-        ),
-      ),
-    );
   }
 }

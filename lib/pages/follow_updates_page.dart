@@ -56,17 +56,9 @@ class _FollowUpdatesWidgetState
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: () {
             context.to(() => FollowUpdatesPage());
           },
@@ -78,9 +70,9 @@ class _FollowUpdatesWidgetState
                 height: 56,
                 child: Row(
                   children: [
-                    Center(child: Text('Follow Updates'.tl, style: ts.s18)),
+                    Center(child: Text('Follow Updates'.tl, style: Theme.of(context).textTheme.titleMedium)),
                     const Spacer(),
-                    const Icon(Icons.arrow_right),
+                    const Icon(Icons.chevron_right_rounded),
                   ],
                 ),
               ).paddingHorizontal(16),
@@ -187,15 +179,8 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
 
   Widget buildNotConfigured(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -221,15 +206,8 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
 
   Widget buildConfigured(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -283,7 +261,7 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
               children: [
                 Icon(Icons.update),
                 const SizedBox(width: 8),
-                Text("Updates".tl, style: ts.s18),
+                Text("Updates".tl, style: Theme.of(context).textTheme.titleMedium),
                 const Spacer(),
                 if (updatedComics.isNotEmpty)
                   IconButton(
@@ -367,7 +345,7 @@ class _FollowUpdatesPageState extends AutomaticGlobalState<FollowUpdatesPage> {
               children: [
                 Icon(Icons.list),
                 const SizedBox(width: 8),
-                Text("All Comics".tl, style: ts.s18),
+                Text("All Comics".tl, style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
           ),

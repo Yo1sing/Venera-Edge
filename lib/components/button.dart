@@ -36,7 +36,7 @@ class _HoverBoxState extends State<HoverBox> {
 
 enum ButtonType { filled, outlined, text, normal }
 
-class Button extends StatefulWidget {
+class Button extends StatelessWidget {
   const Button(
       {super.key,
       required this.type,
@@ -137,145 +137,42 @@ class Button extends StatefulWidget {
   final Color? color;
 
   @override
-  State<Button> createState() => _ButtonState();
-}
-
-class _ButtonState extends State<Button> {
-  bool isHover = false;
-
-  bool isLoading = false;
-
-  @override
-  void didUpdateWidget(covariant Button oldWidget) {
-    if (oldWidget.isLoading != widget.isLoading) {
-      setState(() => isLoading = widget.isLoading);
-    }
-    super.didUpdateWidget(oldWidget);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    var padding = widget.padding ??
-        const EdgeInsets.symmetric(horizontal: 16);
-    var width = widget.width;
-    if (width != null) {
-      width = width - padding.horizontal;
-    }
-    var height = widget.height;
-    if (height != null) {
-      height = height - padding.vertical;
-    }
-    Widget child = IconTheme(
-      data: IconThemeData(
-        color: textColor,
-      ),
-      child: DefaultTextStyle(
-        style: TextStyle(
-          color: textColor,
-          fontSize: 14,
-        ),
-        child: isLoading
-            ? CircularProgressIndicator(
-          color: widget.type == ButtonType.filled
-              ? context.colorScheme.inversePrimary
-              : context.colorScheme.primary,
-          strokeWidth: 1.8,
-        ).fixWidth(16).fixHeight(16)
-            : widget.child,
-      ),
+    final colors = Theme.of(context).colorScheme;
+    final normal = type == ButtonType.normal;
+    final filled = type == ButtonType.filled || normal;
+    final foreground = switch (type) {
+      ButtonType.normal => colors.onSurface,
+      ButtonType.filled => colors.onPrimary,
+      ButtonType.outlined || ButtonType.text => color,
+    };
+    final style = prism.ButtonStyle.from(
+      padding: padding,
+      foregroundColor: foreground,
+      backgroundColor: filled
+          ? color ?? (normal ? Theme.of(context).cardColor : colors.primary)
+          : null,
     );
-    if (width != null || height != null) {
-      child = child.toCenter();
+    void activate() {
+      final location = onPressedAt == null
+          ? null
+          : (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero);
+      onPressed();
+      if (location != null) onPressedAt!(location);
     }
-    return MouseRegion(
-      onEnter: (_) => setState(() => isHover = true),
-      onExit: (_) => setState(() => isHover = false),
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () {
-          if (isLoading) return;
-          widget.onPressed();
-          if (widget.onPressedAt != null) {
-            var renderBox = context.findRenderObject() as RenderBox;
-            var offset = renderBox.localToGlobal(Offset.zero);
-            widget.onPressedAt!(offset);
-          }
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: padding,
-          constraints: const BoxConstraints(
-            minWidth: 76,
-            minHeight: 32,
-          ),
-          decoration: BoxDecoration(
-            color: buttonColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: (isHover && !isLoading && (widget.type == ButtonType.filled || widget.type == ButtonType.normal))
-                ? [
-                    BoxShadow(
-                      color: Colors.black.toOpacity(0.1),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    )
-                  ]
-                : null,
-            border: widget.type == ButtonType.outlined
-                ? Border.all(
-                    color: widget.color ??
-                        Theme.of(context).colorScheme.outlineVariant,
-                    width: 0.6,
-                  )
-                : null,
-          ),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 160),
-            child: SizedBox(
-              width: width,
-              height: height,
-              child: Center(
-                widthFactor: 1,
-                child: child,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Color get buttonColor {
-    if (widget.type == ButtonType.filled) {
-      var color = widget.color ?? context.colorScheme.primary;
-      if (isHover) {
-        return color.toOpacity(0.9);
-      } else {
-        return color;
-      }
-    }
-    if (widget.type == ButtonType.normal) {
-      var color = widget.color ?? context.colorScheme.surfaceContainer;
-      if (isHover) {
-        return color.toOpacity(0.9);
-      } else {
-        return color;
-      }
-    }
-    if (isHover) {
-      return context.colorScheme.outline.toOpacity(0.2);
-    }
-    return Colors.transparent;
-  }
-
-  Color get textColor {
-    if (widget.type == ButtonType.outlined) {
-      return widget.color ?? context.colorScheme.primary;
-    }
-    return widget.type == ButtonType.filled
-        ? context.colorScheme.onPrimary
-        : (widget.type == ButtonType.text
-            ? widget.color ?? context.colorScheme.primary
-            : context.colorScheme.onSurface);
+    final action = isLoading ? null : activate;
+    final content = isLoading
+        ? prism.ActivityIndicator(size: 16, color: foreground ?? colors.primary)
+        : child;
+    final button = switch (type) {
+      ButtonType.filled || ButtonType.normal =>
+        prism.FilledButton(onPressed: action, style: style, child: content),
+      ButtonType.outlined =>
+        prism.OutlinedButton(onPressed: action, style: style, child: content),
+      ButtonType.text =>
+        prism.TextButton(onPressed: action, style: style, child: content),
+    };
+    return SizedBox(width: width, height: height, child: button);
   }
 }
 

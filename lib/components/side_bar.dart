@@ -94,20 +94,14 @@ class SideBarRoute<T> extends PopupRoute<T> {
         borderRadius: showSideBar
             ? const BorderRadius.horizontal(left: Radius.circular(16))
             : null,
-        color: Theme.of(context).colorScheme.surfaceTint,
-        boxShadow: context.brightness == ui.Brightness.dark ? [
-          BoxShadow(
-            color: Colors.white.withAlpha(50),
-            blurRadius: 10,
-            offset: Offset(0, 2),
-          ),
-        ] : null,
+        color: Theme.of(context).bottomSheetTheme.backgroundColor,
       ),
       clipBehavior: Clip.antiAlias,
       constraints: BoxConstraints(maxWidth: sideBarWidth),
       height: MediaQuery.of(context).size.height,
       child: GestureDetector(
         child: Material(
+          color: Theme.of(context).bottomSheetTheme.backgroundColor,
           child: ClipRect(
             clipBehavior: Clip.antiAlias,
             child: Container(

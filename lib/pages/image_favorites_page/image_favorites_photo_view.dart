@@ -106,7 +106,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
           Positioned.fill(
             child: PhotoViewGallery.builder(
               backgroundDecoration: BoxDecoration(
-                color: context.colorScheme.surface,
+                color: Theme.of(context).scaffoldBackgroundColor,
               ),
               builder: _buildItem,
               itemCount: images.length,
@@ -173,7 +173,7 @@ class _ImageFavoritesPhotoViewState extends State<ImageFavoritesPhotoView> {
 
   Widget buildAppBar() {
     return Material(
-      color: context.colorScheme.surface.toOpacity(0.72),
+      color: Theme.of(context).scaffoldBackgroundColor.toOpacity(0.72),
       child: BlurEffect(
         child: Container(
           decoration: BoxDecoration(

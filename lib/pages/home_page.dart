@@ -55,9 +55,9 @@ class _SearchBar extends StatelessWidget {
       child: Container(
         height: App.isMobile ? 52 : 46,
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Material(
-          color: context.colorScheme.surfaceContainerHigh,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(32),
           child: InkWell(
             borderRadius: BorderRadius.circular(32),
@@ -124,14 +124,8 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
       child = const SliverPadding(padding: EdgeInsets.zero);
     } else if (DataSync().isUploading || DataSync().isDownloading) {
       child = SliverToBoxAdapter(
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text('Syncing Data'.tl),
@@ -143,14 +137,8 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
       );
     } else {
       child = SliverToBoxAdapter(
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text('Sync Data'.tl),
@@ -180,7 +168,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: Colors.red,
+                            color: context.colorScheme.onErrorContainer,
                             size: 18,
                           ),
                           const SizedBox(width: 4),
@@ -251,17 +239,9 @@ class _HistoryState extends State<_History> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: () {
             context.to(() => const HistoryPage());
           },
@@ -273,7 +253,7 @@ class _HistoryState extends State<_History> {
                 child: Row(
                   children: [
                     Center(
-                      child: Text('History'.tl, style: ts.s18),
+                      child: Text('History'.tl, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -286,7 +266,7 @@ class _HistoryState extends State<_History> {
                       child: Text(count.toString(), style: ts.s12),
                     ),
                     const Spacer(),
-                    const Icon(Icons.arrow_right),
+                    const Icon(Icons.chevron_right_rounded),
                   ],
                 ),
               ).paddingHorizontal(16),
@@ -359,17 +339,9 @@ class _LocalState extends State<_Local> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: () {
             context.to(() => const LocalComicsPage());
           },
@@ -381,7 +353,7 @@ class _LocalState extends State<_Local> {
                 child: Row(
                   children: [
                     Center(
-                      child: Text('Local'.tl, style: ts.s18),
+                      child: Text('Local'.tl, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -396,7 +368,7 @@ class _LocalState extends State<_Local> {
                       child: Text(count.toString(), style: ts.s12),
                     ),
                     const Spacer(),
-                    const Icon(Icons.arrow_right),
+                    const Icon(Icons.chevron_right_rounded),
                   ],
                 ),
               ).paddingHorizontal(16),
@@ -673,17 +645,9 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: () {
             context.to(() => const ComicSourcePage());
           },
@@ -695,7 +659,7 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
                 child: Row(
                   children: [
                     Center(
-                      child: Text('Comic Source'.tl, style: ts.s18),
+                      child: Text('Comic Source'.tl, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     Container(
                       margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -709,7 +673,7 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
                           Text(comicSources.length.toString(), style: ts.s12),
                     ),
                     const Spacer(),
-                    const Icon(Icons.arrow_right),
+                    const Icon(Icons.chevron_right_rounded),
                   ],
                 ),
               ).paddingHorizontal(16),
@@ -876,17 +840,9 @@ class _ImageFavoritesState extends State<ImageFavorites> {
     bool hasData =
         imageFavoritesCompute != null && !imageFavoritesCompute!.isEmpty;
     return SliverToBoxAdapter(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-            width: 0.6,
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
           onTap: () {
             context.to(
               () => const ImageFavoritesPage()
@@ -900,7 +856,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
                 child: Row(
                   children: [
                     Center(
-                      child: Text('Image Favorites'.tl, style: ts.s18),
+                      child: Text('Image Favorites'.tl, style: Theme.of(context).textTheme.titleMedium),
                     ),
                     if (hasData)
                       Container(
@@ -918,7 +874,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
                         ),
                       ),
                     const Spacer(),
-                    const Icon(Icons.arrow_right),
+                    const Icon(Icons.chevron_right_rounded),
                   ],
                 ),
               ).paddingHorizontal(16),
@@ -1105,15 +1061,7 @@ class __ChartLineState extends State<_ChartLine>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
                     gradient: LinearGradient(
-                      colors: context.isDarkMode
-                          ? [
-                              Colors.blue.shade800,
-                              Colors.blue.shade500,
-                            ]
-                          : [
-                              Colors.blue.shade300,
-                              Colors.blue.shade600,
-                            ],
+                      colors: [context.colorScheme.primaryContainer, context.colorScheme.primary],
                     ),
                   ),
                 ).toAlign(Alignment.centerLeft);

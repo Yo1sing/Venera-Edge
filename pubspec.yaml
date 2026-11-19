@@ -62,7 +62,6 @@ dependencies:
   shimmer_animation: ^2.1.0
   flutter_memory_info: 0.0.3
   syntax_highlight: ^0.4.0
-  flex_seed_scheme: ^4.0.1
   flutter_localizations:
     sdk: flutter
   yaml: ^3.1.3

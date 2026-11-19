@@ -149,12 +149,15 @@ pub fn valid(key: &str, value: &Value) -> bool {
                 .iter()
                 .all(|(host, address)| valid_dns_override(host, address))
         }),
+        "colorStyle" => validate_choice(value, &["vivid", "tinted", "soft", "monochrome"]),
         "theme_mode" => validate_choice(value, &["system", "light", "dark"]),
         "bottomNavigationStyle" => validate_choice(value, &["standard", "floating"]),
         "language" => validate_choice(value, &["system", "zh-CN", "zh-TW", "en-US"]),
         "color" => validate_choice(
             value,
-            &["system", "red", "pink", "purple", "green", "orange", "blue"],
+            &[
+                "system", "blue", "purple", "pink", "red", "orange", "yellow", "green", "gray",
+            ],
         ),
         "comicDisplayMode" => validate_choice(value, &["detailed", "brief"]),
         "comicListDisplayMode" => validate_choice(value, &["paging", "Continuous"]),

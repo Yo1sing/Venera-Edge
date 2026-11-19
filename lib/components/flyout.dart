@@ -181,18 +181,18 @@ class FlyoutContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return IntrinsicWidth(
       child: BlurEffect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: prism.AppRadius.md,
         child: Material(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: prism.AppRadius.md,
           type: MaterialType.card,
-          color: context.colorScheme.surface.toOpacity(0.82),
+          color: Theme.of(context).popupMenuTheme.color,
           child: Container(
             constraints: const BoxConstraints(
               minWidth: minFlyoutWidth,
             ),
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: prism.AppRadius.md,
               border: context.brightness == ui.Brightness.dark
                   ? Border.all(color: context.colorScheme.outlineVariant)
                   : null,

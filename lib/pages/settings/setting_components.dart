@@ -47,7 +47,8 @@ class _SwitchSettingState extends State<_SwitchSetting> {
     return ListTile(
       title: Text(widget.title),
       subtitle: widget.subtitle == null ? null : Text(widget.subtitle!),
-      trailing: Switch(
+      trailing: prism.Switch(
+        semanticLabel: widget.title,
         value: value,
         onChanged: (value) {
           setState(() {
@@ -222,10 +223,6 @@ class _DoubleLineSelectSettingsState extends State<_DoubleLineSelectSettings> {
         var size = renderBox.size;
         var rect = offset & size;
         showMenu(
-          elevation: 3,
-          color: context.brightness == Brightness.light
-              ? const Color(0xFFF6F6F6)
-              : const Color(0xFF1E1E1E),
           context: context,
           position: RelativeRect.fromRect(
             rect,
@@ -550,11 +547,11 @@ class _MultiPagesFilterState extends State<_MultiPagesFilter> {
           : const Duration(milliseconds: 500),
       dragChildBoxDecoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
+            color: context.colorScheme.outlineVariant,
             blurRadius: 5,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
             spreadRadius: 2,
           ),
         ],

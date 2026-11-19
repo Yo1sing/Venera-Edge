@@ -369,21 +369,18 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                   icon: const Icon(Icons.menu_book),
                   text: 'Continue'.tl,
                   onPressed: continueRead,
-                  iconColor: context.useTextColor(Colors.yellow),
                 ),
               if (!isMobile || hasHistory)
                 _ActionButton(
                   icon: const Icon(Icons.play_circle_outline),
                   text: 'Start'.tl,
                   onPressed: read,
-                  iconColor: context.useTextColor(Colors.orange),
                 ),
               if (!isMobile && !isDownloaded)
                 _ActionButton(
                   icon: const Icon(Icons.download),
                   text: 'Download'.tl,
                   onPressed: download,
-                  iconColor: context.useTextColor(Colors.cyan),
                 ),
               if (data!.isLiked != null)
                 _ActionButton(
@@ -397,7 +394,6 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                           .toString(),
                   isLoading: isLiking,
                   onPressed: likeOrUnlike,
-                  iconColor: context.useTextColor(Colors.red),
                 ),
               _ActionButton(
                 icon: const Icon(Icons.bookmark_outline_outlined),
@@ -406,20 +402,17 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                 text: 'Favorite'.tl,
                 onPressed: openFavPanel,
                 onLongPressed: quickFavorite,
-                iconColor: context.useTextColor(Colors.purple),
               ),
               if (comicSource.commentsLoader != null)
                 _ActionButton(
                   icon: const Icon(Icons.comment),
                   text: (comic.commentCount ?? 'Comments'.tl).toString(),
                   onPressed: showComments,
-                  iconColor: context.useTextColor(Colors.green),
                 ),
               _ActionButton(
                 icon: const Icon(Icons.share),
                 text: 'Share'.tl,
                 onPressed: share,
-                iconColor: context.useTextColor(Colors.blue),
               ),
             ],
           ).fixHeight(48),
@@ -448,13 +441,13 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: context.colorScheme.surfaceContainerLow,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.history, color: context.useTextColor(Colors.teal)),
+                  Icon(Icons.history, color: context.colorScheme.primary),
                   const SizedBox(width: 8),
                   Builder(
                     builder: (context) {
@@ -530,31 +523,14 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
       return const SliverPadding(padding: EdgeInsets.zero);
     }
 
-    int i = 0;
-
     Widget buildTag({
       required String text,
       VoidCallback? onTap,
       bool isTitle = false,
     }) {
-      Color color;
-      if (isTitle) {
-        const colors = [
-          Colors.blue,
-          Colors.cyan,
-          Colors.red,
-          Colors.pink,
-          Colors.purple,
-          Colors.indigo,
-          Colors.teal,
-          Colors.green,
-          Colors.lime,
-          Colors.yellow,
-        ];
-        color = context.useBackgroundColor(colors[(i++) % (colors.length)]);
-      } else {
-        color = context.colorScheme.surfaceContainerLow;
-      }
+      final color = isTitle ? context.colorScheme.primaryContainer : Theme.of(context).cardColor;
+      final label = Text(text, style: TextStyle(color: isTitle
+          ? context.colorScheme.onPrimaryContainer : context.colorScheme.onSurface));
 
       final borderRadius = BorderRadius.circular(12);
 
@@ -588,13 +564,13 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
                 ),
               ]);
             },
-            child: Text(text).padding(padding),
+            child: label.padding(padding),
           ),
         );
       } else {
         return Container(
           decoration: BoxDecoration(color: color, borderRadius: borderRadius),
-          child: Text(text).padding(padding),
+          child: label.padding(padding),
         );
       }
     }
@@ -789,7 +765,6 @@ class _ActionButton extends StatelessWidget {
     this.activeIcon,
     this.isActive,
     this.isLoading,
-    this.iconColor,
   });
 
   final Widget icon;
@@ -804,21 +779,20 @@ class _ActionButton extends StatelessWidget {
 
   final bool? isLoading;
 
-  final Color? iconColor;
-
   final void Function()? onLongPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final active = isActive == true;
+    final foreground = active
+        ? context.colorScheme.onPrimaryContainer
+        : context.colorScheme.primary;
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: context.colorScheme.outlineVariant,
-          width: 0.6,
-        ),
-      ),
+      color: active
+          ? context.colorScheme.primaryContainer
+          : Theme.of(context).cardColor,
+      shape: const StadiumBorder(),
       child: InkWell(
         onTap: () {
           if (!(isLoading ?? false)) {
@@ -828,7 +802,7 @@ class _ActionButton extends StatelessWidget {
         onLongPress: onLongPressed,
         borderRadius: BorderRadius.circular(18),
         child: IconTheme.merge(
-          data: IconThemeData(size: 20, color: iconColor),
+          data: IconThemeData(size: 20, color: foreground),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -841,7 +815,10 @@ class _ActionButton extends StatelessWidget {
               else
                 (isActive ?? false) ? (activeIcon ?? icon) : icon,
               const SizedBox(width: 8),
-              Text(text),
+              Text(
+                text,
+                style: TextStyle(color: active ? foreground : context.colorScheme.onSurface),
+              ),
             ],
           ).paddingHorizontal(16),
         ),
@@ -869,7 +846,7 @@ class _SelectDownloadChapterState extends State<_SelectDownloadChapter> {
     return Scaffold(
       appBar: Appbar(
         title: Text("Download".tl),
-        backgroundColor: context.colorScheme.surfaceContainerLow,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -984,10 +961,13 @@ class _ComicPageLoadingPlaceHolder extends StatelessWidget {
     }
 
     return Shimmer(
-      color: context.isDarkMode ? Colors.grey.shade700 : Colors.white,
+      color: context.colorScheme.surfaceContainerHighest,
       child: Column(
         children: [
-          Appbar(title: Text(""), backgroundColor: context.colorScheme.surface),
+          Appbar(
+            title: const Text(""),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          ),
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

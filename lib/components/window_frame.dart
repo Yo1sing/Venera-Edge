@@ -147,12 +147,8 @@ class _WindowFrameState extends State<WindowFrame> with WindowListener {
                           child: DragToMoveArea(
                             child: Text(
                               'Venera Edge',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: (useDarkTheme ||
-                                        context.brightness == Brightness.dark)
-                                    ? Colors.white
-                                    : Colors.black,
+                              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                                color: useDarkTheme ? Colors.white : context.colorScheme.onSurface,
                               ),
                             )
                                 .toAlign(Alignment.centerLeft)

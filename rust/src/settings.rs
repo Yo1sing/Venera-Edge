@@ -239,6 +239,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn appearance_defaults_and_saved_choices() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let directory = temp.path().to_str().unwrap();
+        let initial = load(directory)?;
+        assert_eq!(initial["settings"]["color"], "blue");
+        assert_eq!(initial["settings"]["colorStyle"], "vivid");
+        assert_eq!(initial["settings"]["pureBlack"], false);
+
+        for (color, style) in [
+            ("system", "vivid"),
+            ("yellow", "tinted"),
+            ("gray", "soft"),
+            ("green", "monochrome"),
+        ] {
+            let settings = json!({"color": color, "colorStyle": style, "pureBlack": true});
+            save(
+                directory,
+                json!({"settings": settings, "searchHistory": []}),
+            )?;
+            let saved = load(directory)?;
+            for key in ["color", "colorStyle", "pureBlack"] {
+                assert_eq!(saved["settings"][key], settings[key]);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn persisted_settings_and_sync_exclusions() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let directory = temp.path().to_str().unwrap();

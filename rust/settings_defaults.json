@@ -1,7 +1,9 @@
 {
   "comicDisplayMode": "detailed",
   "comicTileScale": 1.0,
-  "color": "system",
+  "color": "blue",
+  "colorStyle": "vivid",
+  "pureBlack": false,
   "theme_mode": "system",
   "bottomNavigationStyle": "floating",
   "newFavoriteAddTo": "end",

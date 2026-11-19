@@ -160,7 +160,7 @@ class _CategoryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     var children = <Widget>[];
     if (data.enableRankingPage || data.buttons.isNotEmpty) {
-      children.add(buildTitle(data.title));
+      children.add(buildTitle(context, data.title));
       children.add(
         Padding(
           padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
@@ -187,7 +187,7 @@ class _CategoryPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  buildTitleWithRefresh(part.title, () => updater(() {})),
+                  buildTitleWithRefresh(context, part.title, () => updater(() {})),
                   buildTags(part.categories),
                 ],
               );
@@ -195,7 +195,7 @@ class _CategoryPage extends StatelessWidget {
           ),
         );
       } else {
-        children.add(buildTitle(part.title));
+        children.add(buildTitle(context, part.title));
         children.add(buildTags(part.categories));
       }
     }
@@ -208,24 +208,24 @@ class _CategoryPage extends StatelessWidget {
     );
   }
 
-  Widget buildTitle(String title) {
+  Widget buildTitle(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 5, 10),
       child: Text(
         title.tl,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+        style: Theme.of(context).textTheme.titleMedium,
       ),
     );
   }
 
-  Widget buildTitleWithRefresh(String title, void Function() onRefresh) {
+  Widget buildTitleWithRefresh(BuildContext context, String title, void Function() onRefresh) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 5, 10),
       child: Row(
         children: [
           Text(
             title.tl,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
+            style: Theme.of(context).textTheme.titleMedium,
           ),
           const Spacer(),
           IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh)),
@@ -259,14 +259,14 @@ class _CategoryPage extends StatelessWidget {
       child: Builder(
         builder: (context) {
           return Material(
-            borderRadius: const BorderRadius.all(Radius.circular(8)),
-            color: context.colorScheme.primaryContainer.toOpacity(0.72),
+            borderRadius: const BorderRadius.all(Radius.circular(24)),
+            color: Theme.of(context).cardColor,
             child: InkWell(
-              borderRadius: const BorderRadius.all(Radius.circular(8)),
+              borderRadius: const BorderRadius.all(Radius.circular(24)),
               onTap: onClick,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(label),
+                child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
               ),
             ),
           );

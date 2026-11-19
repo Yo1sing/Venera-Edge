@@ -23,14 +23,8 @@ class PopUpWidget<T> extends PopupRoute<T> {
       child: Container(
         decoration: showPopUp
             ? BoxDecoration(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-                boxShadow: context.brightness == ui.Brightness.dark ? [
-                  BoxShadow(
-                    color: Colors.white.withAlpha(50),
-                    blurRadius: 10,
-                    offset: Offset(0, 2),
-                  ),
-                ] : null,
+                borderRadius: prism.AppRadius.xl,
+                color: Theme.of(context).dialogTheme.backgroundColor,
               )
             : null,
         clipBehavior: showPopUp ? Clip.antiAlias : Clip.none,
@@ -115,6 +109,8 @@ class _PopUpWidgetScaffoldState extends State<PopUpWidgetScaffold> {
   @override
   Widget build(BuildContext context) {
     return Material(
+      color: context.width > 500 ? Theme.of(context).dialogTheme.backgroundColor
+          : Theme.of(context).scaffoldBackgroundColor,
       child: Column(
         children: [
           Container(
@@ -144,8 +140,7 @@ class _PopUpWidgetScaffoldState extends State<PopUpWidgetScaffold> {
                 ),
                 Text(
                   widget.title,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w500),
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const Spacer(),
                 if (widget.tailing != null) ...widget.tailing!,

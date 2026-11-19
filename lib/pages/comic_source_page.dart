@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
+import 'package:prism_ui/switch.dart' as prism;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera/components/components.dart';
@@ -1057,7 +1058,7 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
           yield ListTile(
             title: Text(title),
             trailing: actions(
-              Switch(
+              prism.Switch(
                 value: current == true,
                 onChanged: (value) {
                   final error = save(value);

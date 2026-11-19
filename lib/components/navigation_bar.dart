@@ -1,20 +1,10 @@
 part of 'components.dart';
 
 class PaneItemEntry {
-  String label;
+  final String label;
+  final Glyph glyph;
 
-  IconData icon;
-
-  IconData activeIcon;
-
-  final Glyph floatingIcon;
-
-  PaneItemEntry({
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-    required this.floatingIcon,
-  });
+  PaneItemEntry({required this.label, required this.glyph});
 }
 
 class PaneActionEntry {
@@ -105,7 +95,7 @@ class NaviPaneState extends State<NaviPane>
     _naviItemTapListeners.remove(listener);
   }
 
-  static const _kBottomBarHeight = 58.0;
+  static const _kBottomBarHeight = 80.0;
 
   static const _kFoldedSideBarWidth = 72.0;
 
@@ -287,7 +277,7 @@ class NaviPaneState extends State<NaviPane>
           children: [
             Text(
               widget.paneItems[currentPage].label,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
             const Spacer(),
             for (var action in widget.paneActions)
@@ -305,31 +295,19 @@ class NaviPaneState extends State<NaviPane>
   }
 
   Widget buildBottom() {
-    final theme = Theme.of(context);
-    return Material(
-      textStyle: theme.textTheme.labelSmall,
-      child: Container(
-        height: _kBottomBarHeight,
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: theme.colorScheme.outlineVariant),
+    return prism.NavigationBar(
+      selectedIndex: currentPage,
+      onDestinationSelected: updatePage,
+      destinations: [
+        for (final (index, entry) in widget.paneItems.indexed)
+          prism.NavigationDestination(
+            icon: prism.AnimatedGlyph(
+              glyph: entry.glyph,
+              filled: index == currentPage,
+            ),
+            label: entry.label,
           ),
-        ),
-        child: Row(
-          children: List<Widget>.generate(widget.paneItems.length, (index) {
-            return Expanded(
-              child: _SingleBottomNaviWidget(
-                enabled: currentPage == index,
-                entry: widget.paneItems[index],
-                onTap: () {
-                  updatePage(index);
-                },
-                key: ValueKey(index),
-              ),
-            );
-          }),
-        ),
-      ),
+      ],
     );
   }
 
@@ -342,19 +320,16 @@ class NaviPaneState extends State<NaviPane>
       onTap: () {
         if (selected == currentPage) updatePage(selected);
       },
-      child: FloatingNavigationTheme(
-        colorSetting: appdata.settings['color'] ?? 'system',
-        child: prism.NavigationDock(
-          selectedIndex: selected,
-          destinations: [
-            for (final item in widget.paneItems)
-              prism.NavigationDockDestination(
-                glyph: item.floatingIcon,
-                label: item.label,
-              ),
-          ],
-          onSelected: updatePage,
-        ),
+      child: prism.NavigationDock(
+        selectedIndex: selected,
+        destinations: [
+          for (final item in widget.paneItems)
+            prism.NavigationDockDestination(
+              glyph: item.glyph,
+              label: item.label,
+            ),
+        ],
+        onSelected: updatePage,
       ),
     );
   }
@@ -363,6 +338,7 @@ class NaviPaneState extends State<NaviPane>
     final value = controller.value;
     const paddingHorizontal = 12.0;
     return Material(
+      color: prism.ChromeSurfaceExt(prism.Theme.of(context).colorScheme).chromeSurface,
       child: Container(
         width:
             _kFoldedSideBarWidth +
@@ -381,17 +357,41 @@ class NaviPaneState extends State<NaviPane>
           children: [
             const SizedBox(height: 16),
             SizedBox(height: MediaQuery.of(context).padding.top),
-            ...List<Widget>.generate(
-              widget.paneItems.length,
-              (index) => _SideNaviWidget(
-                enabled: currentPage == index,
-                entry: widget.paneItems[index],
-                showTitle: value == 3,
-                onTap: () {
-                  updatePage(index);
-                },
-                key: ValueKey(index),
-              ),
+            Stack(
+              children: [
+                Column(
+                  children: [
+                    for (
+                      var index = 0;
+                      index < widget.paneItems.length;
+                      index++
+                    )
+                      _SideNaviWidget(
+                        key: ValueKey(index),
+                        enabled: currentPage == index,
+                        entry: widget.paneItems[index],
+                        showTitle: value == 3,
+                        onTap: () => updatePage(index),
+                      ),
+                  ],
+                ),
+                AnimatedPositionedDirectional(
+                  duration: const Duration(milliseconds: 320),
+                  curve: prism.Easing.standard,
+                  start: 0,
+                  top: currentPage * 44.0 + 14,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: context.colorScheme.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const Spacer(),
             ...List<Widget>.generate(
@@ -430,25 +430,41 @@ class _SideNaviWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final icon = Icon(enabled ? entry.activeIcon : entry.icon);
+    final icon = IconTheme.merge(
+      data: IconThemeData(
+        color: enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+      ),
+      child: prism.AnimatedGlyph(glyph: entry.glyph, filled: enabled),
+    );
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        height: 38,
+        height: 40,
         decoration: BoxDecoration(
-          color: enabled ? colorScheme.primaryContainer : null,
-          borderRadius: BorderRadius.circular(12),
+          color: enabled ? colorScheme.onSurface.withValues(alpha: 0.08) : null,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: showTitle
             ? Row(
-                children: [icon, const SizedBox(width: 12), Text(entry.label)],
+                children: [
+                  icon,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      entry.label,
+                      style: Theme.of(context).textTheme.labelLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               )
             : Align(alignment: Alignment.centerLeft, child: icon),
       ),
-    ).paddingVertical(4);
+    ).paddingVertical(2);
   }
 }
 
@@ -468,122 +484,29 @@ class _PaneActionWidget extends StatelessWidget {
     final icon = Icon(entry.icon);
     return InkWell(
       onTap: entry.onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        height: 38,
+        height: 40,
         child: showTitle
             ? Row(
-                children: [icon, const SizedBox(width: 12), Text(entry.label)],
+                children: [
+                  icon,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      entry.label,
+                      style: Theme.of(context).textTheme.labelLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               )
             : Align(alignment: Alignment.centerLeft, child: icon),
       ),
-    ).paddingVertical(4);
-  }
-}
-
-class _SingleBottomNaviWidget extends StatefulWidget {
-  const _SingleBottomNaviWidget({
-    required this.enabled,
-    required this.entry,
-    required this.onTap,
-    super.key,
-  });
-
-  final bool enabled;
-
-  final PaneItemEntry entry;
-
-  final VoidCallback onTap;
-
-  @override
-  State<_SingleBottomNaviWidget> createState() =>
-      _SingleBottomNaviWidgetState();
-}
-
-class _SingleBottomNaviWidgetState extends State<_SingleBottomNaviWidget>
-    with SingleTickerProviderStateMixin {
-  late AnimationController controller;
-
-  bool isHovering = false;
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant _SingleBottomNaviWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled != widget.enabled) {
-      if (widget.enabled) {
-        controller.forward(from: 0);
-      } else {
-        controller.reverse(from: 1);
-      }
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    controller = AnimationController(
-      value: widget.enabled ? 1 : 0,
-      vsync: this,
-      duration: _fastAnimationDuration,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: CurvedAnimation(parent: controller, curve: Curves.ease),
-      builder: (context, child) {
-        return MouseRegion(
-          cursor: SystemMouseCursors.click,
-          onEnter: (details) => setState(() => isHovering = true),
-          onExit: (details) => setState(() => isHovering = false),
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: widget.onTap,
-            child: buildContent(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget buildContent() {
-    final value = controller.value;
-    final colorScheme = Theme.of(context).colorScheme;
-    final icon = Icon(
-      widget.enabled ? widget.entry.activeIcon : widget.entry.icon,
-    );
-    return Center(
-      child: Container(
-        width: 64,
-        height: 28,
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(32)),
-          color: isHovering ? colorScheme.surfaceContainer : Colors.transparent,
-        ),
-        child: Center(
-          child: Container(
-            width: 32 + value * 32,
-            height: 28,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(32)),
-              color: value != 0
-                  ? colorScheme.secondaryContainer
-                  : Colors.transparent,
-            ),
-            child: Center(child: icon),
-          ),
-        ),
-      ),
-    );
+    ).paddingVertical(2);
   }
 }
 
@@ -754,8 +677,12 @@ class _NaviMainViewState extends State<_NaviMainView> {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: media.padding.bottom,
-                      child: state.buildBottom(),
+                      bottom: 0,
+                      child: MediaQuery.removePadding(
+                        context: context,
+                        removeTop: true,
+                        child: state.buildBottom(),
+                      ),
                     ),
                   Positioned(
                     key: const ValueKey('floatingNavigationDock'),

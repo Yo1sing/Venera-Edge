@@ -173,22 +173,23 @@ class ComicTile extends StatelessWidget {
                   Container(
                     height: 24,
                     width: 24,
-                    color: Colors.green,
-                    child: const Icon(
+                    color: context.colorScheme.primary,
+                    child: Icon(
                       Icons.bookmark_rounded,
                       size: 16,
-                      color: Colors.white,
+                      color: context.colorScheme.onPrimary,
                     ),
                   ),
                 if (history != null)
                   Container(
                     height: 24,
-                    color: Colors.blue.toOpacity(0.9),
+                    color: context.colorScheme.secondary,
                     constraints: const BoxConstraints(minWidth: 24),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: CustomPaint(
-                      painter:
-                          _ReadingHistoryPainter(history.page, history.maxPage),
+                      painter: _ReadingHistoryPainter(
+                        history.page, history.maxPage, context.colorScheme.onSecondary,
+                      ),
                     ),
                   )
               ],
@@ -661,7 +662,9 @@ class _ReadingHistoryPainter extends CustomPainter {
   final int page;
   final int? maxPage;
 
-  const _ReadingHistoryPainter(this.page, this.maxPage);
+  final Color foreground;
+
+  const _ReadingHistoryPainter(this.page, this.maxPage, this.foreground);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -672,7 +675,7 @@ class _ReadingHistoryPainter extends CustomPainter {
           text: "$page",
           style: TextStyle(
             fontSize: size.width * 0.8,
-            color: Colors.white,
+            color: foreground,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -685,7 +688,7 @@ class _ReadingHistoryPainter extends CustomPainter {
     } else if (page == maxPage) {
       // 在中央绘制勾
       final paint = Paint()
-        ..color = Colors.white
+        ..color = foreground
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke;
       canvas.drawLine(Offset(size.width * 0.2, size.height * 0.5),
@@ -699,7 +702,7 @@ class _ReadingHistoryPainter extends CustomPainter {
           text: "$page",
           style: TextStyle(
             fontSize: size.width * 0.8,
-            color: Colors.white,
+            color: foreground,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -711,7 +714,7 @@ class _ReadingHistoryPainter extends CustomPainter {
           text: "/$maxPage",
           style: TextStyle(
             fontSize: size.width * 0.5,
-            color: Colors.white,
+            color: foreground,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -727,6 +730,7 @@ class _ReadingHistoryPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return oldDelegate is! _ReadingHistoryPainter ||
+        oldDelegate.foreground != foreground ||
         oldDelegate.page != page ||
         oldDelegate.maxPage != maxPage;
   }

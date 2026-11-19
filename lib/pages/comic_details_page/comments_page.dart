@@ -196,7 +196,7 @@ class _CommentsPageState extends State<CommentsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           top: BorderSide(
             color: context.colorScheme.outlineVariant,
@@ -205,7 +205,7 @@ class _CommentsPageState extends State<CommentsPage> {
         ),
       ),
       child: Material(
-        color: context.colorScheme.surfaceContainer,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(24),
         child: Row(
           children: [
@@ -213,6 +213,7 @@ class _CommentsPageState extends State<CommentsPage> {
               child: TextField(
                 controller: controller,
                 decoration: InputDecoration(
+                    filled: false,
                     border: InputBorder.none,
                     isCollapsed: true,
                     hintText: "Comment".tl),
@@ -461,7 +462,7 @@ class _CommentTileState extends State<_CommentTile> {
               Icon(
                 Icons.favorite,
                 size: 16,
-                color: context.useTextColor(Colors.red),
+                color: context.colorScheme.primary,
               )
             else
               const Icon(Icons.favorite_border, size: 16),
@@ -520,11 +521,11 @@ class _CommentTileState extends State<_CommentTile> {
   Widget buildVote() {
     var upColor = context.colorScheme.outline;
     if (voteStatus == 1) {
-      upColor = context.useTextColor(Colors.red);
+      upColor = context.colorScheme.primary;
     }
     var downColor = context.colorScheme.outline;
     if (voteStatus == -1) {
-      downColor = context.useTextColor(Colors.blue);
+      downColor = context.colorScheme.tertiary;
     }
 
     return Container(

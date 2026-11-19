@@ -654,13 +654,8 @@ class _SearchHistoryState extends State<_SearchHistory> {
         },
         child: Container(
           decoration: BoxDecoration(
-            // color: context.colorScheme.surfaceContainer,
-            border: Border(
-              left: BorderSide(
-                color: context.colorScheme.outlineVariant,
-                width: 2,
-              ),
-            ),
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(20),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Text(appdata.searchHistory[index], style: ts.s14),

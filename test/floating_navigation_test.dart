@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/color.dart' as prism;
 import 'package:prism_ui/navigation_dock.dart' as prism;
 import 'package:prism_ui/theme_data.dart' as prism;
+import 'package:venera/components/app_theme.dart';
 import 'package:venera/components/components.dart';
 import 'package:venera/pages/main_navigation_glyphs.dart';
 import 'package:venera/src/rust/frb_generated.dart';
@@ -20,12 +21,7 @@ final _items = [
     ('Explore', MainNavigationGlyphs.profiles),
     ('Categories', MainNavigationGlyphs.tools),
   ])
-    PaneItemEntry(
-      label: label,
-      icon: Icons.circle_outlined,
-      activeIcon: Icons.circle,
-      floatingIcon: glyph,
-    ),
+    PaneItemEntry(label: label, glyph: glyph),
 ];
 
 void main() {
@@ -46,12 +42,15 @@ void main() {
         Finder label(int index) =>
             find.descendant(of: bar, matching: find.text(_items[index].label));
         Future<void> pump(Widget child) async {
+          final theme = AppTheme.resolve(
+            seed: seed,
+            brightness: brightness,
+            locales: const [Locale('en')],
+          );
           await tester.pumpWidget(
             MaterialApp(
-              theme: ThemeData(
-                brightness: brightness,
-                platform: TargetPlatform.android,
-              ),
+              theme: theme.material,
+              builder: (context, child) => theme.wrap(child!),
               home: child,
             ),
           );
@@ -74,7 +73,7 @@ void main() {
                 destinations: [
                   for (final item in _items)
                     prism.NavigationDockDestination(
-                      glyph: item.floatingIcon,
+                      glyph: item.glyph,
                       label: item.label,
                     ),
                 ],

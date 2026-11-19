@@ -83,7 +83,6 @@ class _CommentsPartState extends State<_CommentsPart> {
                 icon: const Icon(Icons.comment),
                 text: "View more".tl,
                 onPressed: widget.showMore,
-                iconColor: context.useTextColor(Colors.green),
               ).fixHeight(48).paddingRight(8).toAlign(Alignment.centerRight),
               const SizedBox(height: 8),
             ],
@@ -110,7 +109,7 @@ class _CommentWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       width: 324,
       decoration: BoxDecoration(
-        color: context.colorScheme.surfaceContainerLow,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

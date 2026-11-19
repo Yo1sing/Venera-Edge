@@ -80,7 +80,7 @@ class _AppbarState extends State<Appbar> {
     var content = Container(
       decoration: BoxDecoration(
         color: widget.backgroundColor ??
-            context.colorScheme.surface.toOpacity(0.86),
+            Theme.of(context).scaffoldBackgroundColor.toOpacity(0.86),
       ),
       height: _kAppBarHeight + context.padding.top,
       child: Row(
@@ -99,7 +99,7 @@ class _AppbarState extends State<Appbar> {
           ),
           Expanded(
             child: DefaultTextStyle(
-              style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+              style: Theme.of(context).textTheme.headlineSmall!,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               child: widget.title,
@@ -114,7 +114,7 @@ class _AppbarState extends State<Appbar> {
     );
     if (widget.style == AppbarStyle.shadow) {
       return Material(
-        color: context.colorScheme.surface,
+        color: Theme.of(context).scaffoldBackgroundColor,
         elevation: _scrolledUnder ? 2 : 0,
         child: content,
       );
@@ -213,7 +213,7 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
         ),
         Expanded(
           child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(fontSize: 20),
+            style: Theme.of(context).textTheme.headlineSmall!,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             child: title,
@@ -231,7 +231,7 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
         child: BlurEffect(
           blur: 15,
           child: Material(
-            color: context.colorScheme.surface.toOpacity(0.86),
+            color: Theme.of(context).scaffoldBackgroundColor.toOpacity(0.86),
             elevation: 0,
             borderRadius: BorderRadius.circular(radius),
             child: body,
@@ -241,7 +241,7 @@ class _MySliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     } else {
       return SizedBox.expand(
         child: Material(
-          color: context.colorScheme.surface,
+          color: Theme.of(context).scaffoldBackgroundColor,
           elevation: shrinkOffset == 0 ? 0 : 2,
           borderRadius: BorderRadius.circular(radius),
           child: body,
@@ -291,14 +291,13 @@ class AppTabBar extends StatefulWidget {
 
 class _AppTabBarState extends State<AppTabBar> {
   late TabController _controller;
-
-  late List<GlobalKey> keys;
+  Animation<double>? _tabAnimation;
 
   static const _kTabHeight = 48.0;
 
   static const tabPadding = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
 
-  static const tabRadius = 8.0;
+  static const tabRadius = 20.0;
 
   _IndicatorPainter? painter;
 
@@ -309,14 +308,18 @@ class _AppTabBarState extends State<AppTabBar> {
   var offsets = <double>[];
 
   @override
-  void initState() {
-    keys = widget.tabs.map((e) => GlobalKey()).toList();
-    super.initState();
+  void dispose() {
+    _tabAnimation?.removeListener(onTabChanged);
+    scrollController.dispose();
+    super.dispose();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
+  void _listenToController() {
+    final animation = _controller.animation;
+    if (animation == _tabAnimation) return;
+    _tabAnimation?.removeListener(onTabChanged);
+    _tabAnimation = animation;
+    animation?.addListener(onTabChanged);
   }
 
   PageStorageBucket get bucket => PageStorage.of(context);
@@ -333,14 +336,14 @@ class _AppTabBarState extends State<AppTabBar> {
         prevIndex < widget.tabs.length) {
       _controller.index = prevIndex;
     }
-    _controller.animation!.addListener(onTabChanged);
+    _listenToController();
   }
 
   @override
   void didUpdateWidget(covariant AppTabBar oldWidget) {
     if (widget.controller != oldWidget.controller) {
       _controller = widget.controller ?? DefaultTabController.of(context);
-      _controller.animation!.addListener(onTabChanged);
+      _listenToController();
       initPainter();
     }
     super.didUpdateWidget(oldWidget);
@@ -350,7 +353,7 @@ class _AppTabBarState extends State<AppTabBar> {
     var old = painter;
     painter = _IndicatorPainter(
       controller: _controller,
-      color: context.colorScheme.primary,
+      color: Theme.of(context).cardColor,
       padding: tabPadding,
       radius: tabRadius,
     );
@@ -417,7 +420,7 @@ class _AppTabBarState extends State<AppTabBar> {
 
   void onTabChanged() {
     final int i = _controller.index;
-    if (i == previousIndex) {
+    if (i == previousIndex || i + 1 >= offsets.length || !scrollController.hasClients) {
       return;
     }
     updateScrollOffset(i);
@@ -458,7 +461,7 @@ class _AppTabBarState extends State<AppTabBar> {
       onTap: () => onTabClicked(i),
       borderRadius: BorderRadius.circular(tabRadius),
       child: KeyedSubtree(
-        key: keys[i],
+        key: ValueKey(i),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: DefaultTextStyle(
@@ -566,16 +569,10 @@ class _IndicatorPainter extends CustomPainter {
     assert(tabIndex <= maxTabIndex);
     var (tabLeft, tabRight) = (offsets![tabIndex], offsets![tabIndex + 1]);
 
-    const horizontalPadding = 12.0;
-
-    var rect = Rect.fromLTWH(
-      tabLeft + padding.left + horizontalPadding,
-      _AppTabBarState._kTabHeight - 3.6,
-      tabRight - tabLeft - padding.horizontal - horizontalPadding * 2,
-      3,
+    return Rect.fromLTRB(
+      tabLeft + padding.left, padding.top,
+      tabRight - padding.right, tabBarSize.height - padding.bottom,
     );
-
-    return rect;
   }
 
   @override
@@ -592,14 +589,13 @@ class _IndicatorPainter extends CustomPainter {
     final Rect toRect = indicatorRect(size, to);
     _currentRect = Rect.lerp(fromRect, toRect, (value - from).abs());
     final Paint paint = Paint()..color = color;
-    final RRect rrect = RRect.fromRectAndCorners(_currentRect!,
-        topLeft: Radius.circular(radius), topRight: Radius.circular(radius));
+    final rrect = RRect.fromRectAndRadius(_currentRect!, Radius.circular(radius));
     canvas.drawRRect(rrect, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
+  bool shouldRepaint(covariant _IndicatorPainter oldDelegate) {
+    return color != oldDelegate.color || controller != oldDelegate.controller;
   }
 }
 
@@ -767,7 +763,7 @@ class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
       width: double.infinity,
       padding: EdgeInsets.only(top: topPadding),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
           bottom: BorderSide(
             color: Theme.of(context).colorScheme.outlineVariant,
@@ -784,10 +780,7 @@ class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
               child: TextField(
                 focusNode: focusNode,
                 controller: editingController,
-                decoration: InputDecoration(
-                  hintText: "Search".tl,
-                  border: InputBorder.none,
-                ),
+                decoration: _searchDecoration(context),
                 onSubmitted: (text) {
                   controller.onSearch?.call(text);
                 },
@@ -830,6 +823,22 @@ class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
         controller != oldDelegate.controller ||
         topPadding != oldDelegate.topPadding;
   }
+}
+
+InputDecoration _searchDecoration(BuildContext context) {
+  const border = OutlineInputBorder(
+    borderRadius: prism.AppRadius.full,
+    borderSide: BorderSide.none,
+  );
+  return InputDecoration(
+    hintText: "Search".tl,
+    fillColor: Theme.of(context).cardColor,
+    prefixIcon: const Icon(Icons.search_rounded, size: 20),
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    enabledBorder: border,
+    focusedBorder: border.copyWith(borderSide: BorderSide(color: context.colorScheme.primary)),
+  );
 }
 
 class AppSearchBar extends StatefulWidget {
@@ -889,10 +898,7 @@ class _SearchBarState extends State<AppSearchBar> with _SearchBarMixin {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: TextField(
                 controller: _editingController,
-                decoration: InputDecoration(
-                  hintText: "Search".tl,
-                  border: InputBorder.none,
-                ),
+                decoration: _searchDecoration(context),
                 onSubmitted: (text) {
                   _controller.onSearch?.call(text);
                 },

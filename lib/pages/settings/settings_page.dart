@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:prism_ui/press_surface.dart' as prism;
+import 'package:prism_ui/shape.dart' as prism;
+import 'package:prism_ui/switch.dart' as prism;
+import 'package:venera/components/app_theme.dart';
 import 'package:flutter_reorderable_grid_view/widgets/reorderable_builder.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -166,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               Text(
                 "Settings".tl,
-                style: ts.s20,
+                style: Theme.of(context).textTheme.headlineSmall,
               )
             ]),
           ),
@@ -192,30 +196,23 @@ class _SettingsPageState extends State<SettingsPage> {
         height: 46,
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
         decoration: BoxDecoration(
-          color: selected ? colors.primaryContainer.toOpacity(0.36) : null,
-          border: Border(
-            left: BorderSide(
-              color: selected ? colors.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          color: selected ? colors.onSurface.withValues(alpha: 0.08) : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(children: [
-          Icon(icons[id]),
+          Icon(icons[id], color: selected ? colors.primary : colors.onSurfaceVariant),
           const SizedBox(width: 16),
           Text(
             name,
-            style: ts.s16,
+            style: Theme.of(context).textTheme.bodyLarge,
           ),
           const Spacer(),
-          if (selected) const Icon(Icons.arrow_right)
+          Icon(Icons.chevron_right, size: 18, color: colors.onSurfaceVariant)
         ]),
       );
 
       return Padding(
-        padding: enableTwoViews
-            ? const EdgeInsets.fromLTRB(8, 0, 8, 0)
-            : EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: InkWell(
           onTap: () {
             if (enableTwoViews) {

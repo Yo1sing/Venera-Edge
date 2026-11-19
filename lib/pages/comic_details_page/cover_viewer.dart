@@ -23,7 +23,6 @@ class _CoverViewerState extends State<_CoverViewer> {
     return PopScope(
       canPop: true,
       child: Scaffold(
-        backgroundColor: context.colorScheme.surface,
         body: Stack(
           children: [
             Positioned.fill(
@@ -32,7 +31,7 @@ class _CoverViewerState extends State<_CoverViewer> {
                 minScale: PhotoViewComputedScale.contained * 1.0,
                 maxScale: PhotoViewComputedScale.covered * 3.0,
                 backgroundDecoration: BoxDecoration(
-                  color: context.colorScheme.surface,
+                  color: Theme.of(context).scaffoldBackgroundColor,
                 ),
                 loadingBuilder: (context, event) => Center(
                   child: SizedBox(
@@ -69,7 +68,7 @@ class _CoverViewerState extends State<_CoverViewer> {
 
   Widget _buildAppBar() {
     return Material(
-      color: context.colorScheme.surface.toOpacity(0.72),
+      color: Theme.of(context).scaffoldBackgroundColor.toOpacity(0.72),
       child: BlurEffect(
         child: Container(
           decoration: BoxDecoration(

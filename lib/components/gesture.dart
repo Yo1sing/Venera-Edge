@@ -61,7 +61,7 @@ class _AnimatedTapRegionState extends State<AnimatedTapRegion> {
         child: AnimatedPhysicalModel(
           duration: _fastAnimationDuration,
           elevation: isHovered ? 3 : 1,
-          color: context.colorScheme.surface,
+          color: Theme.of(context).cardColor,
           shadowColor: context.colorScheme.shadow,
           borderRadius: BorderRadius.circular(widget.borderRadius),
           child: widget.child,

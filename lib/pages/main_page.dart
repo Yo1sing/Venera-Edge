@@ -69,27 +69,19 @@ class _MainPageState extends State<MainPage> {
       paneItems: [
         PaneItemEntry(
           label: 'Home'.tl,
-          icon: Icons.home_outlined,
-          activeIcon: Icons.home,
-          floatingIcon: MainNavigationGlyphs.dashboard,
+          glyph: MainNavigationGlyphs.dashboard,
         ),
         PaneItemEntry(
           label: 'Favorites'.tl,
-          icon: Icons.local_activity_outlined,
-          activeIcon: Icons.local_activity,
-          floatingIcon: MainNavigationGlyphs.proxies,
+          glyph: MainNavigationGlyphs.proxies,
         ),
         PaneItemEntry(
           label: 'Explore'.tl,
-          icon: Icons.explore_outlined,
-          activeIcon: Icons.explore,
-          floatingIcon: MainNavigationGlyphs.profiles,
+          glyph: MainNavigationGlyphs.profiles,
         ),
         PaneItemEntry(
           label: 'Categories'.tl,
-          icon: Icons.category_outlined,
-          activeIcon: Icons.category,
-          floatingIcon: MainNavigationGlyphs.tools,
+          glyph: MainNavigationGlyphs.tools,
         ),
       ],
       onPageChanged: (i) {

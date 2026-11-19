@@ -46,7 +46,7 @@ class _MenuRoute<T> extends PopupRoute<T> {
           top: top,
           child: Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: prism.AppRadius.md,
               border: context.brightness == Brightness.dark
                   ? Border.all(color: context.colorScheme.outlineVariant)
                   : null,
@@ -59,10 +59,10 @@ class _MenuRoute<T> extends PopupRoute<T> {
               ],
             ),
             child: BlurEffect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: prism.AppRadius.md,
               child: Material(
-                color: context.colorScheme.surface.toOpacity(0.92),
-                borderRadius: BorderRadius.circular(4),
+                color: Theme.of(context).popupMenuTheme.color,
+                borderRadius: prism.AppRadius.md,
                 child: Container(
                   width: width,
                   padding:
@@ -83,7 +83,7 @@ class _MenuRoute<T> extends PopupRoute<T> {
 
   Widget buildEntry(MenuEntry entry, BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: prism.AppRadius.md,
       onTap: () {
         Navigator.of(context).pop();
         entry.onClick();

@@ -269,6 +269,12 @@ class _LogsPageState extends State<LogsPage> {
         controller: ScrollController(),
         itemCount: logToShow.length,
         itemBuilder: (context, index) {
+          final colors = context.colorScheme;
+          final (background, foreground) = switch (logToShow[index].level) {
+            LogLevel.error => (colors.error, colors.onError),
+            LogLevel.warning => (colors.errorContainer, colors.onErrorContainer),
+            LogLevel.info => (colors.primaryContainer, colors.onPrimaryContainer),
+          };
           index = logToShow.length - index - 1;
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -296,11 +302,7 @@ class _LogsPageState extends State<LogsPage> {
                       ),
                       Container(
                         decoration: BoxDecoration(
-                          color: [
-                            Theme.of(context).colorScheme.error,
-                            Theme.of(context).colorScheme.errorContainer,
-                            Theme.of(context).colorScheme.primaryContainer
-                          ][logToShow[index].level.index],
+                          color: background,
                           borderRadius:
                               const BorderRadius.all(Radius.circular(16)),
                         ),
@@ -308,10 +310,7 @@ class _LogsPageState extends State<LogsPage> {
                           padding: const EdgeInsets.fromLTRB(5, 0, 5, 1),
                           child: Text(
                             logToShow[index].level.name,
-                            style: TextStyle(
-                                color: logToShow[index].level.index == 0
-                                    ? Colors.white
-                                    : Colors.black),
+                            style: TextStyle(color: foreground),
                           ),
                         ),
                       ),
@@ -526,7 +525,7 @@ class _WebdavSettingState extends State<_WebdavSetting> {
               leading: Icon(Icons.sync),
               title: Text("Auto Sync Data".tl),
               contentPadding: EdgeInsets.zero,
-              trailing: Switch(
+              trailing: prism.Switch(
                 value: autoSync,
                 onChanged: onAutoSyncChanged,
               ),

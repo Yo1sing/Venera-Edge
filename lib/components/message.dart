@@ -307,27 +307,22 @@ class ContentDialog extends StatelessWidget {
               : const SizedBox.shrink(),
           this.content,
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          OverflowBar(
+            alignment: MainAxisAlignment.end,
+            overflowAlignment: OverflowBarAlignment.end,
+            spacing: 8,
+            overflowSpacing: 8,
             children: actions,
-          ).paddingRight(12),
+          ).paddingHorizontal(16),
           const SizedBox(height: 16),
         ],
       ),
     );
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: context.brightness == Brightness.dark
-            ? BorderSide(color: context.colorScheme.outlineVariant)
-            : BorderSide.none,
-      ),
+      clipBehavior: Clip.antiAlias,
       insetPadding: context.width < 400
           ? const EdgeInsets.symmetric(horizontal: 4)
           : const EdgeInsets.symmetric(horizontal: 16),
-      elevation: 2,
-      shadowColor: context.colorScheme.shadow,
-      backgroundColor: context.colorScheme.surface,
       child: AnimatedSize(
         duration: const Duration(milliseconds: 200),
         alignment: Alignment.topCenter,

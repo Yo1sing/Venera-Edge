@@ -59,6 +59,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         border: Border(
           right: BorderSide(
             color: context.colorScheme.outlineVariant,
@@ -78,7 +79,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
                   const SizedBox(width: 8),
                   Text(
                     "Folders".tl,
-                    style: ts.s18,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ],
               ),
@@ -125,7 +126,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
             color: context.colorScheme.secondary,
           ),
           const SizedBox(width: 12),
-          Text("Local".tl),
+          Text("Local".tl, style: Theme.of(context).textTheme.titleMedium),
           const Spacer(),
           MenuButton(
             entries: [
@@ -177,7 +178,7 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
             color: context.colorScheme.secondary,
           ),
           const SizedBox(width: 12),
-          Text("Network".tl),
+          Text("Network".tl, style: Theme.of(context).textTheme.titleMedium),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -214,18 +215,11 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
       },
       child: Container(
         height: 42,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
-          color: isSelected
-              ? context.colorScheme.primaryContainer.toOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? context.colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          color: isSelected ? context.colorScheme.onSurface.withValues(alpha: 0.08) : null,
+          borderRadius: BorderRadius.circular(12),
         ),
         padding: const EdgeInsets.only(left: 16),
         child: Row(
@@ -267,18 +261,11 @@ class _LeftBarState extends State<_LeftBar> implements FolderList {
       },
       child: Container(
         height: 42,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
-          color: isSelected
-              ? context.colorScheme.primaryContainer.toOpacity(0.36)
-              : null,
-          border: Border(
-            left: BorderSide(
-              color:
-                  isSelected ? context.colorScheme.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
+          color: isSelected ? context.colorScheme.onSurface.withValues(alpha: 0.08) : null,
+          borderRadius: BorderRadius.circular(12),
         ),
         padding: const EdgeInsets.only(left: 16),
         child: Text(data.title),

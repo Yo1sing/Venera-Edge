@@ -10,6 +10,10 @@ class _ReaderScaffold extends StatefulWidget {
 }
 
 class _ReaderScaffoldState extends State<_ReaderScaffold> {
+  Color get _toolbarColor =>
+      (Theme.of(context).popupMenuTheme.color ?? Theme.of(context).cardColor)
+          .toOpacity(0.92);
+
   bool _isOpen = false;
 
   static const kTopBarHeight = 56.0;
@@ -176,10 +180,10 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
       child: Container(
         padding: EdgeInsets.only(top: context.padding.top),
         decoration: BoxDecoration(
-          color: context.colorScheme.surface.toOpacity(0.92),
+          color: _toolbarColor,
           border: Border(
             bottom: BorderSide(
-              color: Colors.grey.toOpacity(0.5),
+              color: context.colorScheme.outlineVariant,
               width: 0.5,
             ),
           ),
@@ -555,11 +559,11 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     return BlurEffect(
       child: Container(
         decoration: BoxDecoration(
-          color: context.colorScheme.surface.toOpacity(0.92),
+          color: _toolbarColor,
           border: isOpen
               ? Border(
                   top: BorderSide(
-                    color: Colors.grey.toOpacity(0.5),
+                    color: context.colorScheme.outlineVariant,
                     width: 0.5,
                   ),
                 )
@@ -1154,7 +1158,7 @@ class _SelectImageOverlayContentState
             width: 232,
             height: 42,
             decoration: BoxDecoration(
-              color: context.colorScheme.surface,
+              color: Theme.of(context).popupMenuTheme.color ?? Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: context.colorScheme.outlineVariant),
             ),
