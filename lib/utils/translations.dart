@@ -6,11 +6,17 @@ import '../foundation/app.dart';
 
 extension AppTranslation on String {
   String _translate() {
-    var locale = App.locale;
-    var key = "${locale.languageCode}_${locale.countryCode}";
-    if (locale.languageCode == "en") {
-      key = "en_US";
-    }
+    final locale = App.locale;
+    final key = switch (locale.languageCode) {
+      "en" => "en_US",
+      "zh" => switch ((locale.scriptCode, locale.countryCode)) {
+        ("Hant", _) => "zh_TW",
+        ("Hans", _) => "zh_CN",
+        (_, "TW" || "HK" || "MO") => "zh_TW",
+        _ => "zh_CN",
+      },
+      _ => "${locale.languageCode}_${locale.countryCode}",
+    };
     return (translations[key]?[this]) ?? this;
   }
 
@@ -32,7 +38,7 @@ extension AppTranslation on String {
     var data = await rootBundle.load("assets/translation.json");
     var json = jsonDecode(utf8.decode(data.buffer.asUint8List()));
     translations = {
-      for (var e in json.entries) e.key: Map<String, String>.from(e.value)
+      for (var e in json.entries) e.key: Map<String, String>.from(e.value),
     };
   }
 

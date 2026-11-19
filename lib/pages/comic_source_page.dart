@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -52,9 +53,7 @@ class ComicSourcePage extends StatelessWidget {
     HttpCancellation? cancellation,
   ]) async {
     if (ComicSource.all().isEmpty) return 0;
-    final urls = (appdata.settings['comicSourceListUrls'] as List? ?? [])
-        .whereType<String>()
-        .toList();
+    final urls = _readUrls();
     if (urls.isEmpty) return 0;
     final token = cancellation ?? HttpCancellation();
     try {
@@ -227,7 +226,7 @@ class _BodyState extends State<_Body> {
             ),
             TextField(
               decoration: InputDecoration(
-                hintText: "URL",
+                hintText: "URL".tl,
                 border: const UnderlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 suffix: IconButton(
@@ -253,6 +252,12 @@ class _BodyState extends State<_Body> {
                       _ComicSourceList(handleAddSource),
                     );
                   },
+                ),
+                FilledButton.tonalIcon(
+                  icon: const Icon(Icons.link),
+                  label: Text("Subscription URLs".tl),
+                  onPressed: () =>
+                      showPopUpWidget(context, const _SubscriptionUrls()),
                 ),
                 FilledButton.tonalIcon(
                   icon: Icon(Icons.file_open_outlined),
@@ -340,18 +345,13 @@ class _ComicSourceList extends StatefulWidget {
 class _ComicSourceListState extends State<_ComicSourceList> {
   late List<String> _urls;
   final _catalogs = <String, List<dynamic>?>{};
-  final _errors = <String, String>{};
+  final _failedUrls = <String>{};
   final _loads = <String, HttpCancellation>{};
-  final _controller = TextEditingController();
-  String? _inputError;
-
-  static const _helpUrl =
-      "https://github.com/Yo1sing/Venera-Edge/blob/master/doc/comic_source.md";
-
   @override
   void initState() {
     super.initState();
     _urls = _readUrls();
+    appdata.settings.addListener(_syncUrls);
     for (final url in _urls) {
       _load(url);
     }
@@ -359,18 +359,30 @@ class _ComicSourceListState extends State<_ComicSourceList> {
 
   @override
   void dispose() {
+    appdata.settings.removeListener(_syncUrls);
     for (final cancellation in _loads.values) {
       cancellation.cancel();
     }
     _loads.clear();
-    _controller.dispose();
     super.dispose();
   }
 
-  List<String> _readUrls() =>
-      (appdata.settings['comicSourceListUrls'] as List? ?? [])
-          .whereType<String>()
-          .toList();
+  void _syncUrls() {
+    final urls = _readUrls();
+    if (listEquals(_urls, urls)) return;
+    final previous = _urls.toSet();
+    setState(() {
+      for (final url in previous.difference(urls.toSet())) {
+        _loads.remove(url)?.cancel();
+        _catalogs.remove(url);
+        _failedUrls.remove(url);
+      }
+      _urls = urls;
+    });
+    for (final url in urls) {
+      if (!previous.contains(url)) _load(url);
+    }
+  }
 
   Future<void> _load(String url) async {
     _loads.remove(url)?.cancel();
@@ -378,7 +390,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     _loads[url] = cancellation;
     setState(() {
       _catalogs[url] = null;
-      _errors.remove(url);
+      _failedUrls.remove(url);
     });
     try {
       final entries = await ComicSourceManager().catalog(url, cancellation);
@@ -386,11 +398,12 @@ class _ComicSourceListState extends State<_ComicSourceList> {
       setState(() {
         _catalogs[url] = entries;
       });
-    } catch (error) {
+    } catch (error, stack) {
       if (!mounted || !identical(_loads[url], cancellation)) return;
+      Log.error('Load comic source list', error, stack);
       setState(() {
         _catalogs[url] = [];
-        _errors[url] = error.toString();
+        _failedUrls.add(url);
       });
     } finally {
       if (identical(_loads[url], cancellation)) {
@@ -400,180 +413,55 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     }
   }
 
-  Future<void> _addUrl() async {
-    final url = _controller.text.trim();
-    final uri = Uri.tryParse(url);
-    if (url.isEmpty ||
-        uri == null ||
-        !(uri.scheme == 'http' || uri.scheme == 'https') ||
-        uri.host.isEmpty) {
-      setState(() {
-        _inputError = "Invalid URL".tl;
-      });
-      return;
-    }
-    if (_urls.contains(url)) {
-      setState(() {
-        _inputError = "This URL is already added".tl;
-      });
-      return;
-    }
-    final previous = _urls.toSet();
-    try {
-      appdata.settings.addComicSourceListUrl(url);
-      await appdata.saveData();
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _inputError = error.toString();
-        });
-      }
-      return;
-    }
-    if (!mounted) return;
-    final urls = _readUrls();
-    setState(() {
-      _inputError = null;
-      _controller.clear();
-      _urls = urls;
-    });
-    for (final url in urls) {
-      if (!previous.contains(url)) {
-        _load(url);
-      }
-    }
-  }
-
-  Future<void> _removeUrl(String url) async {
-    _loads.remove(url)?.cancel();
-    try {
-      appdata.settings.removeComicSourceListUrl(url);
-      await appdata.saveData();
-    } catch (error) {
-      if (mounted) context.showMessage(message: error.toString());
-    }
-    if (!mounted) return;
-    setState(() {
-      _urls = _readUrls();
-      _catalogs.remove(url);
-      _errors.remove(url);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    return PopUpWidgetScaffold(title: "Comic Source".tl, body: buildBody());
-  }
-
-  Widget buildBody() {
-    final installed = ComicSource.all().map((e) => e.key).toSet();
-    return ListView.builder(
-      itemCount: _urls.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) return _buildHeader();
-        return _buildRepository(_urls[index - 1], installed);
-      },
+    return PopUpWidgetScaffold(
+      title: "Comic Source list".tl,
+      tailing: [
+        IconButton(
+          tooltip: "Subscription URLs".tl,
+          icon: const Icon(Icons.link),
+          onPressed: () => showPopUpWidget(context, const _SubscriptionUrls()),
+        ),
+      ],
+      body: buildBody(),
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-          width: 0.6,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            leading: Icon(Icons.source_outlined),
-            title: Text("Source repositories".tl),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: "URL of index.json",
-                    errorText: _inputError,
-                    border: const UnderlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  onChanged: (_) {
-                    if (_inputError != null) {
-                      setState(() {
-                        _inputError = null;
-                      });
-                    }
-                  },
-                  onSubmitted: (_) => _addUrl(),
-                ),
-              ),
-              IconButton(
-                tooltip: "Add".tl,
-                onPressed: _addUrl,
-                icon: const Icon(Icons.add),
-              ),
-            ],
-          ).paddingHorizontal(16).paddingBottom(8),
-          Text(
-            "The URL should point to an 'index.json' file. Installed sources are kept when a repository is removed."
-                .tl,
-          ).paddingLeft(16).paddingRight(16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => launchUrlString(_helpUrl),
-                child: Text("Help".tl),
-              ),
-              const SizedBox(width: 16),
-            ],
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
+  Widget buildBody() {
+    if (_urls.isEmpty) {
+      return Center(child: Text("No subscription URLs configured".tl));
+    }
+    final installed = ComicSource.all().map((e) => e.key).toSet();
+    return ListView.builder(
+      itemCount: _urls.length,
+      itemBuilder: (context, index) =>
+          _buildRepository(_urls[index], installed),
     );
   }
 
   Widget _buildRepository(String url, Set<String> installed) {
     final entries = _catalogs[url];
-    final error = _errors[url];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ListTile(
           leading: const Icon(Icons.link),
           title: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                tooltip: "Refresh".tl,
-                onPressed: () => _load(url),
-                icon: const Icon(Icons.refresh),
-              ),
-              IconButton(
-                tooltip: "Remove".tl,
-                onPressed: () => _removeUrl(url),
-                icon: const Icon(Icons.delete_outline),
-              ),
-            ],
+          trailing: IconButton(
+            tooltip: "Refresh".tl,
+            onPressed: () => _load(url),
+            icon: const Icon(Icons.refresh),
           ),
         ),
         if (entries == null)
           Center(
             child: CircularProgressIndicator(strokeWidth: 2),
           ).fixWidth(24).fixHeight(24).paddingVertical(8)
-        else if (error != null)
+        else if (_failedUrls.contains(url))
           ListTile(
             leading: const Icon(Icons.error_outline),
-            title: Text(error, maxLines: 3, overflow: TextOverflow.ellipsis),
+            title: Text("Unable to load comic source list".tl),
             subtitle: Text("Tap refresh to retry".tl),
           )
         else if (entries.isEmpty)
@@ -605,6 +493,129 @@ class _ComicSourceListState extends State<_ComicSourceList> {
               },
             ).fixHeight(32),
     );
+  }
+}
+
+List<String> _readUrls() =>
+    (appdata.settings['comicSourceListUrls'] as List? ?? [])
+        .whereType<String>()
+        .toList();
+
+class _SubscriptionUrls extends StatefulWidget {
+  const _SubscriptionUrls();
+
+  @override
+  State<_SubscriptionUrls> createState() => _SubscriptionUrlsState();
+}
+
+class _SubscriptionUrlsState extends State<_SubscriptionUrls> {
+  final _controller = TextEditingController();
+  String? _inputError;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save(VoidCallback edit, {bool clearInput = false}) async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      edit();
+      await appdata.saveData();
+      if (mounted && clearInput) _controller.clear();
+    } catch (error, stack) {
+      Log.error('Save subscription URLs', error, stack);
+      if (mounted) {
+        context.showMessage(message: "Unable to save subscription URLs".tl);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _addUrl() {
+    if (_saving) return;
+    final url = _controller.text.trim();
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      setState(() => _inputError = "Invalid URL");
+      return;
+    }
+    if (_readUrls().contains(url)) {
+      setState(() => _inputError = "This URL is already added");
+      return;
+    }
+    setState(() => _inputError = null);
+    _save(() => appdata.settings.addComicSourceListUrl(url), clearInput: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopUpWidgetScaffold(
+      title: "Subscription URLs".tl,
+      body: ListenableBuilder(
+        listenable: appdata.settings,
+        builder: (context, _) {
+          final urls = _readUrls();
+          return ListView.builder(
+            itemCount: urls.length + 1,
+            itemBuilder: (context, index) {
+              if (index == 0) return _buildInput();
+              final url = urls[index - 1];
+              return ListTile(
+                leading: const Icon(Icons.link),
+                title: SelectableText(url),
+                trailing: IconButton(
+                  tooltip: "Remove".tl,
+                  onPressed: _saving
+                      ? null
+                      : () => _save(
+                          () => appdata.settings.removeComicSourceListUrl(url),
+                        ),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildInput() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _controller,
+          readOnly: _saving,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(
+            labelText: "URL of index.json".tl,
+            errorText: _inputError?.tl,
+            suffixIcon: IconButton(
+              tooltip: "Add".tl,
+              onPressed: _saving ? null : _addUrl,
+              icon: const Icon(Icons.add),
+            ),
+          ),
+          onChanged: (_) {
+            if (_inputError != null) setState(() => _inputError = null);
+          },
+          onSubmitted: (_) => _addUrl(),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          "The URL should point to an 'index.json' file. Installed sources are kept when a repository is removed."
+              .tl,
+        ),
+      ],
+    ).paddingHorizontal(16).paddingVertical(8);
   }
 }
 
