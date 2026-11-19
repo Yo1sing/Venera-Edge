@@ -103,8 +103,7 @@ abstract class DownloadQueueView {
       runtime: JsEngine().runtime,
       optionsJson: await _options(),
       sourceTypesJson: jsonEncode({
-        for (final source in ComicSource.installed())
-          source.key: source.key.hashCode,
+        for (final source in ComicSource.all()) source.key: source.key.hashCode,
       }),
     );
     _apply(_queue!.snapshot());

@@ -50,9 +50,18 @@ void main() {
   });
   const locales = [Locale('en')];
 
-  testWidgets('comic source add button opens both management panels', (
+  testWidgets('comic source add menu opens the file picker and URL dialog', (
     tester,
   ) async {
+    const filePicker = MethodChannel('plugins.flutter.io/file_selector');
+    final messenger = tester.binding.defaultBinaryMessenger;
+    final fileRequests = <MethodCall>[];
+    messenger.setMockMethodCallHandler(filePicker, (call) async {
+      fileRequests.add(call);
+      return null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(filePicker, null));
+
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: App.rootNavigatorKey,
@@ -69,16 +78,32 @@ void main() {
 
     await tester.tap(add);
     await tester.pumpAndSettle();
-    expect(find.text('Manage subscription URLs'), findsOneWidget);
-    await tester.tap(find.text('Enable/disable comic sources'));
+    final menu = tester.widget<prism.PopupMenu>(find.byType(prism.PopupMenu));
+    expect(menu.items.map((item) => item.label), ['File', 'Link']);
+    await tester.tap(find.text('File'));
     await tester.pumpAndSettle();
-    expect(find.text('No installed comic sources'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(fileRequests.single.method, 'openFile');
+    if (!App.isMacOS) {
+      final typeGroups = fileRequests.single.arguments['acceptedTypeGroups'];
+      expect(typeGroups.single['extensions'], ['js']);
+    }
+
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Link'));
+    await tester.pumpAndSettle();
+    expect(find.text('URL'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'file:///source.js');
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    expect(find.text('Invalid URL'), findsOneWidget);
 
     App.rootPop();
     await tester.pumpAndSettle();
-    await tester.tap(add);
+    await tester.tap(find.text('Comic Source list'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Manage subscription URLs'));
+    await tester.tap(find.byTooltip('Subscription URLs'));
     await tester.pumpAndSettle();
     expect(find.text('URL of index.json'), findsOneWidget);
   });

@@ -79,7 +79,7 @@ Future<void> importPicaData(File file) async {
       ])
         key: key.hashCode,
     }),
-    installed: ComicSource.installed().map((s) => s.key).toList(),
+    installed: ComicSource.all().map((s) => s.key).toList(),
     traditional: App.locale.countryCode == 'TW',
     atEnd: appdata.settings['newFavoriteAddTo'] == 'end',
   );

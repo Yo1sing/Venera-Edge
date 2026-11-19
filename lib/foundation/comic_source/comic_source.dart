@@ -45,10 +45,7 @@ class ComicSourceManager with ChangeNotifier, Init {
 
   factory ComicSourceManager() => _instance ??= ComicSourceManager._create();
 
-  List<ComicSource> installed() => List.of(_sources);
-
-  /// Sources currently available for browsing and update tracking.
-  List<ComicSource> all() => _sources.where((source) => source.isEnabled).toList();
+  List<ComicSource> all() => List.from(_sources);
 
   ComicSource? find(String key) =>
       _sources.firstWhereOrNull((element) => element.key == key);
@@ -185,7 +182,7 @@ class ComicSourceManager with ChangeNotifier, Init {
     return _availableUpdates.length;
   }
 
-  bool get isEmpty => !_sources.any((source) => source.isEnabled);
+  bool get isEmpty => _sources.isEmpty;
 
   /// Key is the source key, value is the version.
   Map<String, String> _availableUpdates = {};
@@ -200,9 +197,6 @@ class ComicSourceManager with ChangeNotifier, Init {
 class ComicSource {
   static List<ComicSource> all() => ComicSourceManager().all();
 
-  static List<ComicSource> installed() => ComicSourceManager().installed();
-
-  // Keep lookups by identity available for management and local records.
   static ComicSource? find(String key) => ComicSourceManager().find(key);
 
   static ComicSource? fromIntKey(int key) =>
@@ -215,8 +209,6 @@ class ComicSource {
 
   /// Identifier of this source.
   final String key;
-
-  bool get isEnabled => appdata.settings.isComicSourceEnabled(key);
 
   int get intKey {
     return key.hashCode;

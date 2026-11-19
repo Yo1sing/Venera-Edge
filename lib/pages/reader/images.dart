@@ -69,13 +69,10 @@ class _ReaderImagesState extends State<_ReaderImages> {
       }
     } else {
       var cp = reader.widget.chapters?.ids.elementAtOrNull(reader.chapter - 1);
-      final source = reader.type.comicSource;
-      final res = switch (source) {
-        null => const Res<List<String>>.error('Comic source not found'),
-        ComicSource(isEnabled: false) =>
-          Res<List<String>>.error('Comic source is disabled'.tl),
-        _ => await source.loadComicPages!(reader.widget.cid, cp),
-      };
+      var res = await reader.type.comicSource!.loadComicPages!(
+        reader.widget.cid,
+        cp,
+      );
       if (res.error) {
         setState(() {
           error = res.errorMessage;

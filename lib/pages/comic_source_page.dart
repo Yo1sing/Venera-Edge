@@ -55,7 +55,7 @@ class ComicSourcePage extends StatelessWidget {
   static Future<int> checkComicSourceUpdate([
     HttpCancellation? cancellation,
   ]) async {
-    if (ComicSource.installed().isEmpty) return 0;
+    if (ComicSource.all().isEmpty) return 0;
     final urls = _readUrls();
     if (urls.isEmpty) return 0;
     final token = cancellation ?? HttpCancellation();
@@ -83,7 +83,6 @@ class _Body extends StatefulWidget {
 }
 
 class _BodyState extends State<_Body> {
-  var url = "";
   final _operations = <HttpCancellation>{};
 
   void updateUI() {
@@ -94,14 +93,12 @@ class _BodyState extends State<_Body> {
   void initState() {
     super.initState();
     ComicSourceManager().addListener(updateUI);
-    appdata.settings.addListener(updateUI);
   }
 
   @override
   void dispose() {
     super.dispose();
     ComicSourceManager().removeListener(updateUI);
-    appdata.settings.removeListener(updateUI);
     for (final operation in _operations) {
       operation.cancel();
     }
@@ -117,21 +114,19 @@ class _BodyState extends State<_Body> {
           actions: [
             prism.PopupAnchor(
               targetBuilder: (open) => prism.IconButton(
-                tooltip: 'Manage comic sources'.tl,
+                tooltip: 'Add comic source'.tl,
                 icon: const Icon(Icons.add_circle_outline),
                 onPressed: open,
               ),
               popupBuilder: (_) => prism.PopupMenu(
                 items: [
                   prism.PopupMenuItem(
-                    label: 'Enable/disable comic sources'.tl,
-                    onPressed: () =>
-                        showPopUpWidget(context, const _SourceActivation()),
+                    label: 'File'.tl,
+                    onPressed: _selectFile,
                   ),
                   prism.PopupMenuItem(
-                    label: 'Manage subscription URLs'.tl,
-                    onPressed: () =>
-                        showPopUpWidget(context, const _SubscriptionUrls()),
+                    label: 'Link'.tl,
+                    onPressed: _addFromLink,
                   ),
                 ],
               ),
@@ -139,7 +134,7 @@ class _BodyState extends State<_Body> {
           ],
         ),
         buildCard(),
-        for (final source in ComicSource.installed())
+        for (final source in ComicSource.all())
           _SliverComicSource(
             key: ValueKey(source.key),
             source: source,
@@ -245,63 +240,45 @@ class _BodyState extends State<_Body> {
 
   Widget buildCard() {
     return SliverToBoxAdapter(
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text("Add comic source".tl),
-              leading: const Icon(Icons.dashboard_customize),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.article_outlined),
+            label: Text("Comic Source list".tl),
+            onPressed: () => showPopUpWidget(
+              App.rootContext,
+              _ComicSourceList(handleAddSource),
             ),
-            TextField(
-              decoration: InputDecoration(
-                hintText: "URL".tl,
-                border: const UnderlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                suffix: IconButton(
-                  onPressed: () => handleAddSource(url),
-                  icon: const Icon(Icons.check),
-                ),
-              ),
-              onChanged: (value) {
-                url = value;
-              },
-              onSubmitted: handleAddSource,
-            ).paddingHorizontal(16).paddingBottom(8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.tonalIcon(
-                  icon: Icon(Icons.article_outlined),
-                  label: Text("Comic Source list".tl),
-                  onPressed: () {
-                    showPopUpWidget(
-                      App.rootContext,
-                      _ComicSourceList(handleAddSource),
-                    );
-                  },
-                ),
-                FilledButton.tonalIcon(
-                  icon: Icon(Icons.file_open_outlined),
-                  label: Text("Use a config file".tl),
-                  onPressed: _selectFile,
-                ),
-                FilledButton.tonalIcon(
-                  icon: Icon(Icons.help_outline),
-                  label: Text("Help".tl),
-                  onPressed: help,
-                ),
-                _CheckUpdatesButton(),
-              ],
-            ).paddingHorizontal(12).paddingVertical(8),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+          ),
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.help_outline),
+            label: Text("Help".tl),
+            onPressed: help,
+          ),
+          const _CheckUpdatesButton(),
+        ],
+      ).paddingHorizontal(12).paddingVertical(8),
     );
+  }
+
+  Future<void> _addFromLink() async {
+    String? link;
+    await showInputDialog(
+      context: context,
+      title: 'Add comic source'.tl,
+      hintText: 'URL'.tl,
+      confirmText: 'Add',
+      onConfirm: (value) {
+        final url = value.trim();
+        if (!_isHttpUrl(url)) return 'Invalid URL'.tl;
+        link = url;
+        return null;
+      },
+    );
+    final url = link;
+    if (mounted && url != null) await handleAddSource(url);
   }
 
   void _selectFile() async {
@@ -355,67 +332,6 @@ class _BodyState extends State<_Body> {
       _operations.remove(cancellation);
       cancellation.dispose();
     }
-  }
-}
-
-class _SourceActivation extends StatefulWidget {
-  const _SourceActivation();
-
-  @override
-  State<_SourceActivation> createState() => _SourceActivationState();
-}
-
-class _SourceActivationState extends State<_SourceActivation> {
-  bool _saving = false;
-
-  Future<void> _setEnabled(ComicSource source, bool enabled) async {
-    if (_saving) return;
-    setState(() => _saving = true);
-    try {
-      appdata.settings.setComicSourceEnabled(source.key, enabled);
-      App.forceRebuild();
-      await appdata.saveData();
-    } catch (error, stack) {
-      Log.error('Save comic source status', error, stack);
-      if (mounted) {
-        context.showMessage(message: 'Unable to save comic source status'.tl);
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopUpWidgetScaffold(
-      title: 'Enable/disable comic sources'.tl,
-      body: ListenableBuilder(
-        listenable: Listenable.merge([ComicSourceManager(), appdata.settings]),
-        builder: (context, _) {
-          final sources = ComicSource.installed();
-          if (sources.isEmpty) {
-            return Center(child: Text('No installed comic sources'.tl));
-          }
-          return ListView.builder(
-            itemCount: sources.length,
-            itemBuilder: (context, index) {
-              final source = sources[index];
-              return ListTile(
-                key: ValueKey(source.key),
-                title: Text(source.name),
-                trailing: prism.Switch(
-                  semanticLabel: source.name,
-                  value: source.isEnabled,
-                  onChanged: _saving
-                      ? null
-                      : (enabled) => _setEnabled(source, enabled),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
   }
 }
 
@@ -518,7 +434,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     if (_urls.isEmpty) {
       return Center(child: Text("No subscription URLs configured".tl));
     }
-    final installed = ComicSource.installed().map((e) => e.key).toSet();
+    final installed = ComicSource.all().map((e) => e.key).toSet();
     return ListView.builder(
       itemCount: _urls.length,
       itemBuilder: (context, index) =>
@@ -587,6 +503,13 @@ List<String> _readUrls() =>
         .whereType<String>()
         .toList();
 
+bool _isHttpUrl(String url) {
+  final uri = Uri.tryParse(url);
+  return uri != null &&
+      (uri.scheme == 'http' || uri.scheme == 'https') &&
+      uri.host.isNotEmpty;
+}
+
 class _SubscriptionUrls extends StatefulWidget {
   const _SubscriptionUrls();
 
@@ -625,10 +548,7 @@ class _SubscriptionUrlsState extends State<_SubscriptionUrls> {
   void _addUrl() {
     if (_saving) return;
     final url = _controller.text.trim();
-    final uri = Uri.tryParse(url);
-    if (uri == null ||
-        (uri.scheme != 'http' && uri.scheme != 'https') ||
-        uri.host.isEmpty) {
+    if (!_isHttpUrl(url)) {
       setState(() => _inputError = "Invalid URL");
       return;
     }
@@ -979,7 +899,6 @@ class _SliverComicSourceState extends State<_SliverComicSource> {
         SliverPadding(padding: const EdgeInsets.only(top: 16)),
         SliverToBoxAdapter(
           child: ListTile(
-            subtitle: source.isEnabled ? null : Text('Disabled'.tl),
             title: Row(
               children: [
                 Text(source.name, style: ts.s18),

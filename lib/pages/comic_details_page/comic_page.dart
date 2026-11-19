@@ -245,9 +245,6 @@ class _ComicPageState extends LoadingState<ComicPage, ComicDetails>
     if (comicSource == null) {
       return const Res.error('Comic source not found');
     }
-    if (!comicSource.isEnabled) {
-      return Res.error('Comic source is disabled'.tl);
-    }
     isAddToLocalFav = LocalFavoritesManager().isExist(
       widget.id,
       ComicType(widget.sourceKey.hashCode),

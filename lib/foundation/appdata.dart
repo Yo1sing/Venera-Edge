@@ -254,14 +254,6 @@ class Settings with ChangeNotifier {
   void removeComicSourceListUrl(String value) =>
       _change('comicSourceListUrls', {'action': 'remove', 'value': value});
 
-  bool isComicSourceEnabled(String key) =>
-      !(_data['disabledComicSources'] as List? ?? const []).contains(key);
-
-  void setComicSourceEnabled(String key, bool enabled) => _change(
-    'disabledComicSources',
-    {'action': enabled ? 'remove' : 'add', 'value': key},
-  );
-
   void _change(String key, _Edit change) => _app._edit([
     {'scope': 'global', 'key': key, 'change': change},
   ]);
