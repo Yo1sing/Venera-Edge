@@ -17,6 +17,7 @@ analyzer:
     - linux/**
     - .tools/**
     - rust_builder/cargokit/**
+    - examples/
 include: package:flutter_lints/flutter.yaml
 
 linter:
