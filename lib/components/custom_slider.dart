@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:venera_edge/foundation/app.dart';
 
 /// patched slider.dart with RtL support

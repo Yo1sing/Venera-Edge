@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'package:cupertino_ui/cupertino_ui.dart'
+    show GlobalCupertinoLocalizations;
 import 'package:desktop_webview_window/desktop_webview_window.dart';
-import 'package:prism_ui/color.dart' as prism;
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:prism_ui/color.dart' as prism;
 import 'package:venera_edge/foundation/log.dart';
 import 'package:venera_edge/pages/auth_page.dart';
 import 'package:venera_edge/pages/main_page.dart';

@@ -3,7 +3,7 @@ import 'dart:math';
 import 'dart:ui' as ui show Codec;
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:venera_edge/foundation/log.dart';
 
 abstract class BaseImageProvider<T extends BaseImageProvider<T>>
@@ -68,7 +68,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
 
       try {
         final buffer = await ImmutableBuffer.fromUint8List(data);
-        return await decode(
+        return decode(
           buffer,
           getTargetSize: enableResize ? _getTargetSize : null,
         );

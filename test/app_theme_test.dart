@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:prism_ui/color.dart' as prism;
@@ -290,8 +290,14 @@ void main() {
         locales: locales,
       ),
     );
-    expect(find.byTooltip('Blue'), findsOneWidget);
-    expect(find.byTooltip('Gray'), findsOneWidget);
+    for (final color in ['Blue', 'Gray']) {
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is Tooltip && widget.message == color,
+        ),
+        findsOneWidget,
+      );
+    }
     expect(find.byType(prism.Switch), findsOneWidget);
     await tester.tap(find.text('Color Style'));
     await tester.pumpAndSettle();

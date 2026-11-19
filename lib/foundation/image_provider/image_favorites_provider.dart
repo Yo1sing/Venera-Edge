@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:venera_edge/foundation/app.dart';
 import 'package:venera_edge/foundation/comic_type.dart';
 import 'package:venera_edge/foundation/history.dart';
