@@ -21,10 +21,36 @@ The AltStore source is initialized without upstream releases. After publishing t
 - Login to comment, rate, and other operations if the source supports
 
 ## Build from source
+
+On Windows, run this once after installing Git for Windows and before cloning the repository:
+
+```sh
+git config --global core.longpaths true
+```
+
+Flutter uses Git to check out `flutter_inappwebview` into the Pub cache, where
+some Android Java source paths reach the default Windows path limit. If you
+already cloned Venera Edge, enable this setting before Flutter first fetches
+its dependencies. You can keep your existing clone.
+
 1. Clone the repository
 2. Install flutter, see [flutter.dev](https://flutter.dev/docs/get-started/install)
 3. Install rust, see [rustup.rs](https://rustup.rs/)
-4. Build for your platform: e.g. `flutter build apk`
+4. On Windows, install LLVM with `winget install --id LLVM.LLVM --exact`.
+   The Rust backend uses `bindgen` to load `libclang.dll` during the build.
+   Set `LIBCLANG_PATH` to the LLVM `bin` directory in the terminal where you
+   will run Flutter. For the default install location, use one of these commands:
+
+   ```powershell
+   $env:LIBCLANG_PATH = 'C:\Program Files\LLVM\bin'
+   ```
+
+   ```bash
+   # Git Bash or MSYS2
+   export LIBCLANG_PATH='C:/Program Files/LLVM/bin'
+   ```
+
+5. Build for your platform: e.g. `flutter build apk`
 
 See the [backend architecture and build guide](doc/backend_architecture.md)
 for the Rust toolchain, FRB generation, native tests, and platform verification.
