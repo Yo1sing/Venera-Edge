@@ -63,6 +63,9 @@ void main() {
   testWidgets(
     'subscription batch keeps failures selected and skips duplicate keys',
     (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 800);
+      addTearDown(tester.view.reset);
       final directory = Directory.systemTemp.createTempSync('venera_catalog_');
       final downloads = <String>[];
       var failBeta = true;
@@ -149,15 +152,35 @@ void main() {
         await tester.tap(find.byIcon(Icons.add_circle_outline));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Link'));
-        await waitFor(find.text('Alpha mirror'));
         await waitFor(find.text('Beta'));
+        await waitFor(find.byIcon(Icons.refresh).at(1));
         await tester.pumpAndSettle();
+        final primary = find.textContaining('/primary.json');
+        final mirror = find.textContaining('/mirror.json');
+        expect(find.text('Alpha mirror'), findsNothing);
 
         await tester.tap(find.text('Beta'));
+        await tester.tap(primary);
         await tester.pump();
+        expect(find.text('Beta'), findsNothing);
+        expect(find.text('Add selected (1)'), findsOneWidget);
         await tester.tap(find.text('Select All'));
         await tester.pump();
         expect(find.text('Add selected (2)'), findsOneWidget);
+
+        await tester.tap(primary);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<CheckboxListTile>(
+                find.widgetWithText(CheckboxListTile, 'Beta'),
+              )
+              .value,
+          isTrue,
+        );
+        await tester.tap(mirror);
+        await waitFor(find.text('Alpha mirror'));
+        await tester.pumpAndSettle();
         await tester.tap(find.text('Alpha mirror'));
         await tester.pump();
         await tester.tap(find.text('Add selected (2)'));

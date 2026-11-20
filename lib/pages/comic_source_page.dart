@@ -320,6 +320,7 @@ class _ComicSourceList extends StatefulWidget {
 class _ComicSourceListState extends State<_ComicSourceList> {
   final _manager = ComicSourceManager();
   late List<String> _urls;
+  final _expandedUrls = <String>{};
   final _catalogs = <String, List<_CatalogSource>>{};
   final _failedUrls = <String>{};
   final _loads = <String, HttpCancellation>{};
@@ -331,6 +332,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   void initState() {
     super.initState();
     _urls = _readUrls();
+    _expandedUrls.addAll(_urls.take(1));
     appdata.settings.addListener(_syncUrls);
     _manager.addListener(_syncInstalled);
     for (final url in _urls) {
@@ -357,6 +359,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     final current = urls.toSet();
     setState(() {
       for (final url in previous.difference(current)) {
+        _expandedUrls.remove(url);
         _loads.remove(url)?.cancel();
         _catalogs.remove(url);
         _failedUrls.remove(url);
@@ -364,6 +367,7 @@ class _ComicSourceListState extends State<_ComicSourceList> {
       _selected.removeWhere(
         (_, source) => !current.contains(source.subscription),
       );
+      if (_urls.isEmpty) _expandedUrls.addAll(urls.take(1));
       _urls = urls;
     });
     for (final url in urls) {
@@ -512,7 +516,8 @@ class _ComicSourceListState extends State<_ComicSourceList> {
         Expanded(
           child: CustomScrollView(
             slivers: [
-              for (final url in _urls) ..._buildRepository(url, installed),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              for (final url in _urls) _buildRepository(url, installed),
             ],
           ),
         ),
@@ -591,49 +596,112 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     );
   }
 
-  Iterable<Widget> _buildRepository(String url, Set<String> installed) sync* {
+  Widget _buildRepository(String url, Set<String> installed) {
     final entries = _catalogs[url];
-    yield SliverToBoxAdapter(
-      child: ListTile(
-        leading: const Icon(Icons.link),
-        title: Tooltip(
-          message: url,
-          child: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis),
+    final expanded = _expandedUrls.contains(url);
+    return SliverPadding(
+      key: ValueKey(url),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      sliver: DecoratedSliver(
+        decoration: ShapeDecoration(
+          color: Theme.of(context).cardColor,
+          shape: prism.AppShape.lg,
         ),
-        trailing: IconButton(
-          tooltip: 'Refresh'.tl,
-          onPressed: _installation != null || entries == null
-              ? null
-              : () => _load(url),
-          icon: const Icon(Icons.refresh),
+        sliver: SliverMainAxisGroup(
+          slivers: [
+            SliverToBoxAdapter(
+              child: _buildRepositoryHeader(url, expanded, entries == null),
+            ),
+            if (expanded && entries != null) ...[
+              const SliverToBoxAdapter(
+                child: Divider(height: 1, indent: 16, endIndent: 16),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
+                sliver: _buildRepositoryEntries(url, entries, installed),
+              ),
+            ],
+          ],
         ),
       ),
     );
-    if (entries == null) {
-      yield SliverToBoxAdapter(
-        child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ).fixWidth(24).fixHeight(24).paddingVertical(8),
-      );
-    } else if (_failedUrls.contains(url)) {
-      yield SliverToBoxAdapter(
+  }
+
+  Widget _buildRepositoryHeader(String url, bool expanded, bool loading) {
+    return Material(
+      type: MaterialType.transparency,
+      shape: prism.AppShape.lg,
+      clipBehavior: Clip.antiAlias,
+      child: Semantics(
+        expanded: expanded,
+        child: ListTile(
+          contentPadding: const EdgeInsetsDirectional.fromSTEB(14, 6, 10, 6),
+          leading: Icon(Icons.link, color: context.colorScheme.primary),
+          title: Tooltip(
+            message: url,
+            child: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Refresh'.tl,
+                onPressed: _installation != null || loading
+                    ? null
+                    : () => _load(url),
+                icon: loading
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+              ),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeInOut,
+                child: const Icon(Icons.expand_more),
+              ),
+            ],
+          ),
+          onTap: () => setState(() {
+            if (expanded) {
+              _expandedUrls.remove(url);
+            } else {
+              _expandedUrls.add(url);
+            }
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRepositoryEntries(
+    String url,
+    List<_CatalogSource> entries,
+    Set<String> installed,
+  ) {
+    if (_failedUrls.contains(url)) {
+      return SliverToBoxAdapter(
         child: ListTile(
           leading: const Icon(Icons.error_outline),
           title: Text('Unable to load comic source list'.tl),
           subtitle: Text('Tap refresh to retry'.tl),
         ),
       );
-    } else if (entries.isEmpty) {
-      yield SliverToBoxAdapter(
+    }
+    if (entries.isEmpty) {
+      return SliverToBoxAdapter(
         child: ListTile(title: Text('No sources found'.tl)),
       );
-    } else {
-      yield SliverList.builder(
-        itemCount: entries.length,
-        itemBuilder: (context, index) => _buildEntry(entries[index], installed),
-      );
     }
-    yield const SliverToBoxAdapter(child: Divider(height: 1));
+    return SliverList.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) => Material(
+        type: MaterialType.transparency,
+        child: _buildEntry(entries[index], installed),
+      ),
+    );
   }
 
   Widget _buildEntry(_CatalogSource source, Set<String> installed) {
