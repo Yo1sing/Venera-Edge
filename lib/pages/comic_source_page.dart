@@ -6,7 +6,14 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
 import 'package:material_ui/material_ui.dart';
 import 'package:prism_ui/prism_ui.dart'
     as prism
-    show IconButton, PopupAnchor, PopupMenu, PopupMenuItem, Switch;
+    show
+        AppShape,
+        IconButton,
+        PopupAnchor,
+        PopupMenu,
+        PopupMenuItem,
+        SnapSheetRoute,
+        Switch;
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera_edge/components/components.dart';
@@ -676,72 +683,110 @@ class _SubscriptionUrls extends StatefulWidget {
 }
 
 class _SubscriptionUrlsState extends State<_SubscriptionUrls> {
-  final _controller = TextEditingController();
-  String? _inputError;
   bool _saving = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save(VoidCallback edit, {bool clearInput = false}) async {
-    if (_saving) return;
+  Future<bool> _save(VoidCallback edit) async {
+    if (_saving) return false;
     setState(() => _saving = true);
     try {
       edit();
       await appdata.saveData();
-      if (mounted && clearInput) _controller.clear();
+      return true;
     } catch (error, stack) {
       Log.error('Save subscription URLs', error, stack);
-      if (mounted) {
-        context.showMessage(message: "Unable to save subscription URLs".tl);
-      }
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _addUrl() {
-    if (_saving) return;
-    final url = _controller.text.trim();
-    if (!_isHttpUrl(url)) {
-      setState(() => _inputError = "Invalid URL");
-      return;
+  Future<void> _openAddSheet() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final sheet = _AddSubscriptionUrlSheet(
+      onAdd: (url) => _save(() {
+        // A failed save can leave the URL in the settings preview.
+        if (!_readUrls().contains(url)) {
+          appdata.settings.addComicSourceListUrl(url);
+        }
+      }),
+    );
+    if (context.width > 500) {
+      await navigator.push(SideBarRoute<void>(sheet, width: 420));
+    } else {
+      await navigator.push(
+        prism.SnapSheetRoute<void>(
+          fitsContent: true,
+          sheetBarrierColor: context.colorScheme.scrim.withValues(alpha: 0.4),
+          barrierLabel: MaterialLocalizations.of(
+            context,
+          ).modalBarrierDismissLabel,
+          builder: (_, _) => SafeArea(top: false, child: sheet),
+        ),
+      );
     }
-    if (_readUrls().contains(url)) {
-      setState(() => _inputError = "This URL is already added");
-      return;
+  }
+
+  Future<void> _removeUrl(String url) async {
+    final removed = await _save(
+      () => appdata.settings.removeComicSourceListUrl(url),
+    );
+    if (!removed && mounted) {
+      context.showMessage(message: 'Unable to save subscription URLs'.tl);
     }
-    setState(() => _inputError = null);
-    _save(() => appdata.settings.addComicSourceListUrl(url), clearInput: true);
   }
 
   @override
   Widget build(BuildContext context) {
     return PopUpWidgetScaffold(
-      title: "Subscription URLs".tl,
+      title: 'Subscription URLs'.tl,
+      tailing: [
+        prism.IconButton(
+          tooltip: 'Add subscription URL'.tl,
+          icon: const Icon(Icons.add_circle_outline),
+          onPressed: _saving ? null : _openAddSheet,
+        ),
+      ],
       body: ListenableBuilder(
         listenable: appdata.settings,
         builder: (context, _) {
           final urls = _readUrls();
-          return ListView.builder(
-            itemCount: urls.length + 1,
+          if (urls.isEmpty) {
+            return Center(
+              child: Text(
+                'No subscription URLs configured'.tl,
+                textAlign: TextAlign.center,
+              ).paddingHorizontal(16),
+            );
+          }
+          return ListView.separated(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12,
+              16,
+              16 + context.padding.bottom,
+            ),
+            itemCount: urls.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
-              if (index == 0) return _buildInput();
-              final url = urls[index - 1];
-              return ListTile(
-                leading: const Icon(Icons.link),
-                title: SelectableText(url),
-                trailing: IconButton(
-                  tooltip: "Remove".tl,
-                  onPressed: _saving
-                      ? null
-                      : () => _save(
-                          () => appdata.settings.removeComicSourceListUrl(url),
-                        ),
-                  icon: const Icon(Icons.delete_outline),
+              final url = urls[index];
+              return Card(
+                key: ValueKey(url),
+                margin: EdgeInsets.zero,
+                shape: prism.AppShape.lg,
+                child: ListTile(
+                  contentPadding: const EdgeInsetsDirectional.fromSTEB(
+                    16,
+                    8,
+                    8,
+                    8,
+                  ),
+                  leading: Icon(Icons.link, color: context.colorScheme.primary),
+                  title: SelectableText(url),
+                  trailing: IconButton(
+                    tooltip: 'Remove'.tl,
+                    onPressed: _saving ? null : () => _removeUrl(url),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
                 ),
               );
             },
@@ -750,36 +795,115 @@ class _SubscriptionUrlsState extends State<_SubscriptionUrls> {
       ),
     );
   }
+}
 
-  Widget _buildInput() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextField(
-          controller: _controller,
-          readOnly: _saving,
-          keyboardType: TextInputType.url,
-          decoration: InputDecoration(
-            labelText: "URL of index.json".tl,
-            errorText: _inputError?.tl,
-            suffixIcon: IconButton(
-              tooltip: "Add".tl,
-              onPressed: _saving ? null : _addUrl,
-              icon: const Icon(Icons.add),
-            ),
+class _AddSubscriptionUrlSheet extends StatefulWidget {
+  const _AddSubscriptionUrlSheet({required this.onAdd});
+
+  final Future<bool> Function(String url) onAdd;
+
+  @override
+  State<_AddSubscriptionUrlSheet> createState() =>
+      _AddSubscriptionUrlSheetState();
+}
+
+class _AddSubscriptionUrlSheetState extends State<_AddSubscriptionUrlSheet> {
+  final _controller = TextEditingController();
+  String? _inputError;
+  String? _failedUrl;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    final url = _controller.text.trim();
+    if (!_isHttpUrl(url)) {
+      setState(() => _inputError = 'Invalid URL');
+      return;
+    }
+    if (url != _failedUrl && _readUrls().contains(url)) {
+      setState(() => _inputError = 'This URL is already added');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _inputError = null;
+    });
+    final saved = await widget.onAdd(url);
+    if (!mounted) return;
+    if (saved && ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _submitting = false;
+        _failedUrl = saved ? null : url;
+        _inputError = saved ? null : 'Unable to save subscription URLs';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_submitting,
+      child: Material(
+        type: MaterialType.transparency,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 12,
+            children: [
+              Text(
+                'Add subscription URL'.tl,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              TextField(
+                controller: _controller,
+                readOnly: _submitting,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'URL of index.json'.tl,
+                  errorText: _inputError?.tl,
+                  errorMaxLines: 3,
+                ),
+                onChanged: (_) {
+                  if (_inputError != null) setState(() => _inputError = null);
+                },
+                onSubmitted: (_) => _submit(),
+              ),
+              Text(
+                "The URL should point to an 'index.json' file. Installed sources are kept when a repository is removed."
+                    .tl,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: Text('Cancel'.tl),
+                  ),
+                  FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    child: Text('Add'.tl),
+                  ),
+                ],
+              ),
+            ],
           ),
-          onChanged: (_) {
-            if (_inputError != null) setState(() => _inputError = null);
-          },
-          onSubmitted: (_) => _addUrl(),
         ),
-        const SizedBox(height: 8),
-        Text(
-          "The URL should point to an 'index.json' file. Installed sources are kept when a repository is removed."
-              .tl,
-        ),
-      ],
-    ).paddingHorizontal(16).paddingVertical(8);
+      ),
+    );
   }
 }
 

@@ -76,10 +76,19 @@ void main() {
       matching: find.byIcon(Icons.add_circle_outline),
     );
     final manage = find.byTooltip('Manage subscription URLs');
+    final addSubscription = find.byTooltip('Add subscription URL');
+    final subscriptionField = find.text('URL of index.json');
     expect(tester.getCenter(manage).dx, lessThan(tester.getCenter(add).dx));
     await tester.tap(manage);
     await tester.pumpAndSettle();
-    expect(find.text('URL of index.json'), findsOneWidget);
+    expect(find.text('Subscription URLs'), findsOneWidget);
+    expect(subscriptionField, findsNothing);
+    await tester.tap(addSubscription);
+    await tester.pumpAndSettle();
+    expect(subscriptionField, findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(subscriptionField, findsNothing);
     App.rootPop();
     await tester.pumpAndSettle();
 
@@ -103,7 +112,10 @@ void main() {
     expect(find.text('No subscription URLs configured'), findsOneWidget);
     await tester.tap(find.text('Add subscription URL'));
     await tester.pumpAndSettle();
-    expect(find.text('URL of index.json'), findsOneWidget);
+    expect(find.text('Subscription URLs'), findsOneWidget);
+    await tester.tap(addSubscription);
+    await tester.pumpAndSettle();
+    expect(subscriptionField, findsOneWidget);
   });
 
   testWidgets('system accent preview follows desktop changes and resume', (
