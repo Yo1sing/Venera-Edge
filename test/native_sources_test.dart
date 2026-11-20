@@ -2,15 +2,23 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
+import 'package:venera_edge/foundation/js_engine.dart';
+import 'package:venera_edge/pages/comic_source_page.dart';
 import 'package:venera_edge/src/rust/api/http.dart';
 import 'package:venera_edge/src/rust/api/media.dart';
 import 'package:venera_edge/src/rust/api/script.dart';
 import 'package:venera_edge/src/rust/api/sources.dart';
 import 'package:venera_edge/src/rust/frb_generated.dart';
-import 'package:venera_edge/foundation/comic_source/comic_source.dart' as models;
+import 'package:venera_edge/foundation/comic_source/comic_source.dart'
+    as models;
 import 'package:venera_edge/foundation/script_bridge.dart';
+import 'package:venera_edge/utils/prism_localizations.dart';
+import 'package:venera_edge/utils/translations.dart';
 
 String options(String directory) => jsonEncode({
   'data_path': directory,
@@ -48,8 +56,138 @@ void main() {
     );
     return;
   }
+  TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() => RustLib.init(externalLibrary: ExternalLibrary.open(library)));
   tearDownAll(RustLib.dispose);
+
+  testWidgets(
+    'subscription batch keeps failures selected and skips duplicate keys',
+    (tester) async {
+      final directory = Directory.systemTemp.createTempSync('venera_catalog_');
+      final downloads = <String>[];
+      var failBeta = true;
+      HttpServer? server;
+
+      Map<String, String> entry(String key, String name, String fileName) => {
+        'key': key,
+        'name': name,
+        'version': '1.0.0',
+        'fileName': fileName,
+      };
+
+      Future<void> waitFor(Finder finder) async {
+        for (var attempt = 0; attempt < 100; attempt++) {
+          await tester.pump(const Duration(milliseconds: 50));
+          if (finder.evaluate().isNotEmpty) return;
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 25)),
+          );
+        }
+        expect(finder, findsWidgets);
+      }
+
+      try {
+        await tester.runAsync(() async {
+          final listener = server = await HttpServer.bind(
+            InternetAddress.loopbackIPv4,
+            0,
+          );
+          final base = 'http://127.0.0.1:${listener.port}';
+          listener.listen((request) async {
+            final path = request.uri.path;
+            if (path == '/primary.json') {
+              request.response.write(
+                jsonEncode([
+                  entry('alpha', 'Alpha', 'alpha.js'),
+                  entry('beta', 'Beta', 'beta.js'),
+                ]),
+              );
+            } else if (path == '/mirror.json') {
+              request.response.write(
+                jsonEncode([entry('alpha', 'Alpha mirror', 'mirror.js')]),
+              );
+            } else {
+              downloads.add(path);
+              if (path == '/beta.js' && failBeta) {
+                request.response.statusCode = HttpStatus.notFound;
+              } else {
+                final key = path == '/beta.js' ? 'beta' : 'alpha';
+                request.response.write(
+                  "class Fixture extends ComicSource { name='$key'; key='$key'; version='1.0.0'; }",
+                );
+              }
+            }
+            await request.response.close();
+          });
+          App.dataPath = App.cachePath = directory.path;
+          await File('${directory.path}/appdata.json').writeAsString(
+            jsonEncode({
+              'settings': {
+                'language': 'en-US',
+                'proxy': 'direct',
+                'comicSourceListUrls': [
+                  '$base/primary.json',
+                  '$base/mirror.json',
+                ],
+              },
+            }),
+          );
+          await AppTranslation.init();
+          await appdata.init();
+          await JsEngine().init();
+          await models.ComicSourceManager().init();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            navigatorKey: App.rootNavigatorKey,
+            localizationsDelegates: const [PrismLocalizations.delegate],
+            home: const ComicSourcePage(),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.add_circle_outline));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Link'));
+        await waitFor(find.text('Alpha mirror'));
+        await waitFor(find.text('Beta'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Beta'));
+        await tester.pump();
+        await tester.tap(find.text('Select All'));
+        await tester.pump();
+        expect(find.text('Add selected (2)'), findsOneWidget);
+        await tester.tap(find.text('Alpha mirror'));
+        await tester.pump();
+        await tester.tap(find.text('Add selected (2)'));
+        await waitFor(find.text('Unable to add comic sources'));
+        await tester.pumpAndSettle();
+        expect(downloads, ['/beta.js', '/mirror.js']);
+        expect(models.ComicSource.all().map((source) => source.key), ['alpha']);
+
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+        expect(find.byTooltip('Added'), findsNWidgets(2));
+        failBeta = false;
+        await tester.tap(find.text('Add selected (1)'));
+        await waitFor(find.text('Add selected (0)'));
+        expect(downloads, ['/beta.js', '/mirror.js', '/beta.js']);
+        expect(models.ComicSource.all().map((source) => source.key), [
+          'alpha',
+          'beta',
+        ]);
+        await tester.pump(const Duration(seconds: 2));
+      } finally {
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.runAsync(() async {
+          JsEngine().dispose();
+          await server?.close(force: true);
+          await directory.delete(recursive: true);
+        });
+      }
+    },
+  );
 
   test(
     'source URL operations preserve old files on download failure, invalid scripts and cancellation',

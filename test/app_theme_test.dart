@@ -50,7 +50,7 @@ void main() {
   });
   const locales = [Locale('en')];
 
-  testWidgets('comic source add menu opens the file picker and URL dialog', (
+  testWidgets('comic source actions open the file picker and subscriptions', (
     tester,
   ) async {
     const filePicker = MethodChannel('plugins.flutter.io/file_selector');
@@ -75,6 +75,13 @@ void main() {
       of: find.byType(SliverAppbar),
       matching: find.byIcon(Icons.add_circle_outline),
     );
+    final manage = find.byTooltip('Manage subscription URLs');
+    expect(tester.getCenter(manage).dx, lessThan(tester.getCenter(add).dx));
+    await tester.tap(manage);
+    await tester.pumpAndSettle();
+    expect(find.text('URL of index.json'), findsOneWidget);
+    App.rootPop();
+    await tester.pumpAndSettle();
 
     await tester.tap(add);
     await tester.pumpAndSettle();
@@ -93,17 +100,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Link'));
     await tester.pumpAndSettle();
-    expect(find.text('URL'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'file:///source.js');
-    await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
-    expect(find.text('Invalid URL'), findsOneWidget);
-
-    App.rootPop();
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Comic Source list'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Subscription URLs'));
+    expect(find.text('No subscription URLs configured'), findsOneWidget);
+    await tester.tap(find.text('Add subscription URL'));
     await tester.pumpAndSettle();
     expect(find.text('URL of index.json'), findsOneWidget);
   });

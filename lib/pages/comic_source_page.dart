@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io' as io;
 import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show AnyhowException;
 import 'package:material_ui/material_ui.dart';
 import 'package:prism_ui/prism_ui.dart'
     as prism
@@ -112,6 +114,12 @@ class _BodyState extends State<_Body> {
           title: Text('Comic Source'.tl),
           style: AppbarStyle.shadow,
           actions: [
+            prism.IconButton(
+              tooltip: 'Manage subscription URLs'.tl,
+              icon: const Icon(Icons.link),
+              onPressed: () =>
+                  showPopUpWidget(context, const _SubscriptionUrls()),
+            ),
             prism.PopupAnchor(
               targetBuilder: (open) => prism.IconButton(
                 tooltip: 'Add comic source'.tl,
@@ -120,13 +128,10 @@ class _BodyState extends State<_Body> {
               ),
               popupBuilder: (_) => prism.PopupMenu(
                 items: [
-                  prism.PopupMenuItem(
-                    label: 'File'.tl,
-                    onPressed: _selectFile,
-                  ),
+                  prism.PopupMenuItem(label: 'File'.tl, onPressed: _selectFile),
                   prism.PopupMenuItem(
                     label: 'Link'.tl,
-                    onPressed: _addFromLink,
+                    onPressed: _openCatalog,
                   ),
                 ],
               ),
@@ -247,10 +252,7 @@ class _BodyState extends State<_Body> {
           FilledButton.tonalIcon(
             icon: const Icon(Icons.article_outlined),
             label: Text("Comic Source list".tl),
-            onPressed: () => showPopUpWidget(
-              App.rootContext,
-              _ComicSourceList(handleAddSource),
-            ),
+            onPressed: _openCatalog,
           ),
           FilledButton.tonalIcon(
             icon: const Icon(Icons.help_outline),
@@ -263,23 +265,7 @@ class _BodyState extends State<_Body> {
     );
   }
 
-  Future<void> _addFromLink() async {
-    String? link;
-    await showInputDialog(
-      context: context,
-      title: 'Add comic source'.tl,
-      hintText: 'URL'.tl,
-      confirmText: 'Add',
-      onConfirm: (value) {
-        final url = value.trim();
-        if (!_isHttpUrl(url)) return 'Invalid URL'.tl;
-        link = url;
-        return null;
-      },
-    );
-    final url = link;
-    if (mounted && url != null) await handleAddSource(url);
-  }
+  void _openCatalog() => showPopUpWidget(context, const _ComicSourceList());
 
   void _selectFile() async {
     final file = await selectFile(ext: ["js"]);
@@ -307,53 +293,39 @@ class _BodyState extends State<_Body> {
       "https://github.com/Yo1sing/Venera-Edge/blob/master/doc/comic_source.md",
     );
   }
-
-  Future<void> handleAddSource(String url) async {
-    if (url.isEmpty) return;
-    final cancellation = HttpCancellation();
-    _operations.add(cancellation);
-    var cancelled = false;
-    final controller = showLoadingDialog(
-      context,
-      barrierDismissible: false,
-      onCancel: () {
-        cancelled = true;
-        cancellation.cancel();
-      },
-    );
-    try {
-      await ComicSourceManager().installUrl(url, cancellation);
-      App.forceRebuild();
-    } catch (error, stack) {
-      if (mounted && !cancelled) context.showMessage(message: error.toString());
-      Log.error('Add comic source', error, stack);
-    } finally {
-      controller.close();
-      _operations.remove(cancellation);
-      cancellation.dispose();
-    }
-  }
 }
 
-class _ComicSourceList extends StatefulWidget {
-  const _ComicSourceList(this.onAdd);
+typedef _CatalogSource = ({
+  String subscription,
+  String key,
+  String name,
+  String url,
+  String details,
+});
 
-  final Future<void> Function(String) onAdd;
+class _ComicSourceList extends StatefulWidget {
+  const _ComicSourceList();
 
   @override
   State<_ComicSourceList> createState() => _ComicSourceListState();
 }
 
 class _ComicSourceListState extends State<_ComicSourceList> {
+  final _manager = ComicSourceManager();
   late List<String> _urls;
-  final _catalogs = <String, List<dynamic>?>{};
+  final _catalogs = <String, List<_CatalogSource>>{};
   final _failedUrls = <String>{};
   final _loads = <String, HttpCancellation>{};
+  final _selected = <String, _CatalogSource>{};
+  HttpCancellation? _installation;
+  bool _cancelling = false;
+
   @override
   void initState() {
     super.initState();
     _urls = _readUrls();
     appdata.settings.addListener(_syncUrls);
+    _manager.addListener(_syncInstalled);
     for (final url in _urls) {
       _load(url);
     }
@@ -362,6 +334,8 @@ class _ComicSourceListState extends State<_ComicSourceList> {
   @override
   void dispose() {
     appdata.settings.removeListener(_syncUrls);
+    _manager.removeListener(_syncInstalled);
+    _installation?.cancel();
     for (final cancellation in _loads.values) {
       cancellation.cancel();
     }
@@ -373,12 +347,16 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     final urls = _readUrls();
     if (listEquals(_urls, urls)) return;
     final previous = _urls.toSet();
+    final current = urls.toSet();
     setState(() {
-      for (final url in previous.difference(urls.toSet())) {
+      for (final url in previous.difference(current)) {
         _loads.remove(url)?.cancel();
         _catalogs.remove(url);
         _failedUrls.remove(url);
       }
+      _selected.removeWhere(
+        (_, source) => !current.contains(source.subscription),
+      );
       _urls = urls;
     });
     for (final url in urls) {
@@ -386,19 +364,35 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     }
   }
 
+  void _syncInstalled() {
+    setState(
+      () => _selected.removeWhere((key, _) => _manager.find(key) != null),
+    );
+  }
+
   Future<void> _load(String url) async {
     _loads.remove(url)?.cancel();
     final cancellation = HttpCancellation();
     _loads[url] = cancellation;
     setState(() {
-      _catalogs[url] = null;
+      _catalogs.remove(url);
       _failedUrls.remove(url);
+      _selected.removeWhere((_, source) => source.subscription == url);
     });
     try {
-      final entries = await ComicSourceManager().catalog(url, cancellation);
+      final entries = await _manager.catalog(url, cancellation);
       if (!mounted || !identical(_loads[url], cancellation)) return;
       setState(() {
-        _catalogs[url] = entries;
+        _catalogs[url] = [
+          for (final entry in entries)
+            (
+              subscription: url,
+              key: entry['key'] as String,
+              name: entry['name'] as String,
+              url: entry['url'] as String,
+              details: [entry['version'], ?entry['description']].join('\n'),
+            ),
+        ];
       });
     } catch (error, stack) {
       if (!mounted || !identical(_loads[url], cancellation)) return;
@@ -415,15 +409,70 @@ class _ComicSourceListState extends State<_ComicSourceList> {
     }
   }
 
+  Future<void> _installSelected() async {
+    if (_installation != null || _selected.isEmpty) return;
+    final sources = _selected.values.toList();
+    final cancellation = HttpCancellation();
+    setState(() {
+      _installation = cancellation;
+      _cancelling = false;
+    });
+    var added = 0;
+    final failures = <String>[];
+    try {
+      for (final source in sources) {
+        if (!mounted || _cancelling) break;
+        if (_manager.find(source.key) != null) continue;
+        try {
+          await _manager.installUrl(source.url, cancellation);
+          added++;
+          if (mounted) setState(() => _selected.remove(source.key));
+        } catch (error, stack) {
+          if (!mounted || _cancelling) break;
+          Log.error('Add comic source', error, stack);
+          final message = error is AnyhowException
+              ? error.message.split('\n\nStack backtrace:').first
+              : error.toString();
+          failures.add('${source.name}\n$message');
+        }
+      }
+    } finally {
+      cancellation.dispose();
+      if (mounted) setState(() => _installation = null);
+      if (added > 0) App.forceRebuild();
+    }
+    if (!mounted) return;
+    final summary = 'Comic sources added (@n)'.tlParams({'n': added});
+    if (failures.isNotEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Unable to add comic sources'.tl),
+          scrollable: true,
+          content: Text([if (added > 0) summary, ...failures].join('\n\n')),
+          actions: [
+            TextButton(onPressed: dialogContext.pop, child: Text('OK'.tl)),
+          ],
+        ),
+      );
+    } else if (added > 0) {
+      context.showMessage(message: summary);
+    }
+  }
+
+  void _openSubscriptions() =>
+      showPopUpWidget(context, const _SubscriptionUrls());
+
   @override
   Widget build(BuildContext context) {
+    final busy = _installation != null;
     return PopUpWidgetScaffold(
       title: "Comic Source list".tl,
       tailing: [
         IconButton(
-          tooltip: "Subscription URLs".tl,
+          tooltip: 'Manage subscription URLs'.tl,
           icon: const Icon(Icons.link),
-          onPressed: () => showPopUpWidget(context, const _SubscriptionUrls()),
+          onPressed: busy ? null : _openSubscriptions,
         ),
       ],
       body: buildBody(),
@@ -432,68 +481,177 @@ class _ComicSourceListState extends State<_ComicSourceList> {
 
   Widget buildBody() {
     if (_urls.isEmpty) {
-      return Center(child: Text("No subscription URLs configured".tl));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 12,
+          children: [
+            Text(
+              'No subscription URLs configured'.tl,
+              textAlign: TextAlign.center,
+            ),
+            FilledButton.tonalIcon(
+              onPressed: _openSubscriptions,
+              icon: const Icon(Icons.add),
+              label: Text('Add subscription URL'.tl),
+            ),
+          ],
+        ).paddingHorizontal(16),
+      );
     }
-    final installed = ComicSource.all().map((e) => e.key).toSet();
-    return ListView.builder(
-      itemCount: _urls.length,
-      itemBuilder: (context, index) =>
-          _buildRepository(_urls[index], installed),
-    );
-  }
-
-  Widget _buildRepository(String url, Set<String> installed) {
-    final entries = _catalogs[url];
+    final installed = _manager.all().map((source) => source.key).toSet();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          leading: const Icon(Icons.link),
-          title: Text(url, maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: IconButton(
-            tooltip: "Refresh".tl,
-            onPressed: () => _load(url),
-            icon: const Icon(Icons.refresh),
+        Expanded(
+          child: CustomScrollView(
+            slivers: [
+              for (final url in _urls) ..._buildRepository(url, installed),
+            ],
           ),
         ),
-        if (entries == null)
-          Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ).fixWidth(24).fixHeight(24).paddingVertical(8)
-        else if (_failedUrls.contains(url))
-          ListTile(
-            leading: const Icon(Icons.error_outline),
-            title: Text("Unable to load comic source list".tl),
-            subtitle: Text("Tap refresh to retry".tl),
-          )
-        else if (entries.isEmpty)
-          ListTile(title: Text("No sources found".tl))
-        else
-          ...entries.map((entry) => _buildEntry(entry, installed)),
         const Divider(height: 1),
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: _buildActions(installed),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildEntry(dynamic entry, Set<String> installed) {
-    final key = entry["key"]?.toString() ?? "";
-    final name = entry["name"]?.toString() ?? key;
-    var description = entry["version"]?.toString() ?? "";
-    if (entry["description"] != null) {
-      description = "$description\n${entry["description"]}";
+  Widget _buildActions(Set<String> installed) {
+    final installation = _installation;
+    if (installation != null) {
+      return Row(
+        spacing: 12,
+        children: [
+          Expanded(
+            child: LinearProgressIndicator(
+              semanticsLabel: 'Adding comic sources'.tl,
+            ),
+          ),
+          TextButton(
+            onPressed: _cancelling
+                ? null
+                : () {
+                    setState(() => _cancelling = true);
+                    installation.cancel();
+                  },
+            child: Text('Cancel'.tl),
+          ),
+        ],
+      );
     }
-    return ListTile(
-      title: Text(name),
-      subtitle: Text(description),
-      trailing: installed.contains(key)
-          ? const Icon(Icons.check, size: 20).paddingRight(8)
-          : Button.filled(
-              child: Text("Add".tl),
-              onPressed: () async {
-                await widget.onAdd(entry["url"] as String);
-                if (mounted) setState(() {});
-              },
-            ).fixHeight(32),
+    final available = <String, _CatalogSource>{};
+    for (final url in _urls) {
+      for (final source in _catalogs[url] ?? const <_CatalogSource>[]) {
+        if (!installed.contains(source.key)) {
+          available.putIfAbsent(source.key, () => source);
+        }
+      }
+    }
+    final allSelected =
+        available.isNotEmpty && _selected.length == available.length;
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          TextButton(
+            onPressed: available.isEmpty
+                ? null
+                : () => setState(() {
+                    if (allSelected) {
+                      _selected.clear();
+                    } else {
+                      for (final entry in available.entries) {
+                        _selected.putIfAbsent(entry.key, () => entry.value);
+                      }
+                    }
+                  }),
+            child: Text((allSelected ? 'Deselect All' : 'Select All').tl),
+          ),
+          FilledButton(
+            onPressed: _selected.isEmpty ? null : _installSelected,
+            child: Text('Add selected (@n)'.tlParams({'n': _selected.length})),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Iterable<Widget> _buildRepository(String url, Set<String> installed) sync* {
+    final entries = _catalogs[url];
+    yield SliverToBoxAdapter(
+      child: ListTile(
+        leading: const Icon(Icons.link),
+        title: Tooltip(
+          message: url,
+          child: Text(url, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ),
+        trailing: IconButton(
+          tooltip: 'Refresh'.tl,
+          onPressed: _installation != null || entries == null
+              ? null
+              : () => _load(url),
+          icon: const Icon(Icons.refresh),
+        ),
+      ),
+    );
+    if (entries == null) {
+      yield SliverToBoxAdapter(
+        child: Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ).fixWidth(24).fixHeight(24).paddingVertical(8),
+      );
+    } else if (_failedUrls.contains(url)) {
+      yield SliverToBoxAdapter(
+        child: ListTile(
+          leading: const Icon(Icons.error_outline),
+          title: Text('Unable to load comic source list'.tl),
+          subtitle: Text('Tap refresh to retry'.tl),
+        ),
+      );
+    } else if (entries.isEmpty) {
+      yield SliverToBoxAdapter(
+        child: ListTile(title: Text('No sources found'.tl)),
+      );
+    } else {
+      yield SliverList.builder(
+        itemCount: entries.length,
+        itemBuilder: (context, index) => _buildEntry(entries[index], installed),
+      );
+    }
+    yield const SliverToBoxAdapter(child: Divider(height: 1));
+  }
+
+  Widget _buildEntry(_CatalogSource source, Set<String> installed) {
+    final title = Text(source.name);
+    final subtitle = Text(source.details);
+    if (installed.contains(source.key)) {
+      return ListTile(
+        title: title,
+        subtitle: subtitle,
+        trailing: Tooltip(message: 'Added'.tl, child: const Icon(Icons.check)),
+      );
+    }
+    return CheckboxListTile(
+      title: title,
+      subtitle: subtitle,
+      value: _selected[source.key] == source,
+      onChanged: _installation != null
+          ? null
+          : (checked) => setState(() {
+              if (checked == true) {
+                _selected[source.key] = source;
+              } else {
+                _selected.remove(source.key);
+              }
+            }),
     );
   }
 }
