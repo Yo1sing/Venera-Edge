@@ -68,7 +68,7 @@ abstract class BaseImageProvider<T extends BaseImageProvider<T>>
 
       try {
         final buffer = await ImmutableBuffer.fromUint8List(data);
-        return decode(
+        return await decode(
           buffer,
           getTargetSize: enableResize ? _getTargetSize : null,
         );
