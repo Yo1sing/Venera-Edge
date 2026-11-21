@@ -537,7 +537,13 @@ impl Queue {
                 }
                 Err(anyhow!("Image stream ended without data"))
             };
-            let result = tokio::select! { _=cancellation.cancelled()=>return Err(anyhow!("Download cancelled")), result=work=>result };
+            let result = tokio::select! {
+                _ = cancellation.cancelled() => {
+                    task.cancel_and_wait().await;
+                    return Err(anyhow!("Download cancelled"));
+                }
+                result = work => result,
+            };
             match result {
                 Ok(bytes) => return Ok(bytes),
                 Err(error) if attempt == 2 => return Err(error),

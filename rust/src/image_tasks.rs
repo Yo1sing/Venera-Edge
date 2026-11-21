@@ -74,6 +74,15 @@ impl Task {
                 .evaluate(&format!("__images.cancel({})", json!(self.id)));
         }
     }
+    pub async fn cancel_and_wait(&self) {
+        self.cancel();
+        let mut receiver = self.receiver.lock().await;
+        while let Some(progress) = receiver.recv().await {
+            if progress.error.is_some() || progress.bytes.is_some() {
+                break;
+            }
+        }
+    }
     #[allow(clippy::too_many_arguments)]
     pub fn start(
         engine: Arc<crate::script::Engine>,
