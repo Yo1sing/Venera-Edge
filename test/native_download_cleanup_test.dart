@@ -442,6 +442,7 @@ void main() {
         expect(Directory('${root.path}/local/book/b').existsSync(), false);
       } finally {
         if (!release.isCompleted) release.complete();
+        await platform.timeout(const Duration(seconds: 10));
         runtime.close();
         runtime.dispose();
         download.dispose();
