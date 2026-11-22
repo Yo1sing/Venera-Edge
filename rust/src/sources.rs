@@ -765,6 +765,39 @@ mod tests {
         evaluate(&manager.engine, "ComicSource.sources.sample.version")
     }
     #[tokio::test]
+    async fn source_init_can_update_a_setting_default_without_losing_its_definition() -> Result<()>
+    {
+        let (_directory, manager) = fixture()?;
+        let source = code("1.0.0").replace(
+            "comic={",
+            "settings={base_url:{type:'input',default:'api.example.com'}};\
+             init(){this.settings.base_url='new.example.com'};\
+             get apiUrl(){return `https://${this.loadSetting('base_url')}`};comic={",
+        );
+        manager
+            .install(source, "sample.js".into(), &HttpCancellation::new())
+            .await?;
+        assert_eq!(
+            evaluate(&manager.engine, "ComicSource.sources.sample.apiUrl",)?,
+            "https://new.example.com"
+        );
+        assert_eq!(
+            evaluate(
+                &manager.engine,
+                "__venera.sourceSettings('sample').base_url.type",
+            )?,
+            "input"
+        );
+        assert_eq!(
+            evaluate(
+                &manager.engine,
+                "__venera.sourceSettings('sample').base_url.effectiveValue",
+            )?,
+            "new.example.com"
+        );
+        Ok(())
+    }
+    #[tokio::test]
     async fn invalid_updates_duplicate_keys_and_version_limits_preserve_old_source() -> Result<()> {
         let (_directory, manager) = fixture()?;
         let cancel = HttpCancellation::new();

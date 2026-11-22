@@ -349,6 +349,7 @@ globalThis.__sources = {
             throw Error('Missing prepared source');
         const { source, code, generation, metadata } = candidate;
         Object.defineProperty(ComicSource.sources, metadata.key, { value: source, writable: true, configurable: true, enumerable: true });
+        __venera.rememberSettings(metadata.key);
         this.generations.set(metadata.key, generation);
         this.codes.set(metadata.key, code);
         this.prepared.delete(token);
@@ -383,6 +384,7 @@ globalThis.__sources = {
     },
     remove(key) {
         delete ComicSource.sources[key];
+        __venera.forgetSettings(key);
         this.codes.delete(key);
         this.generations.delete(key);
     },

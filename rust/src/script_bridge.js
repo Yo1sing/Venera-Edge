@@ -62,7 +62,14 @@ globalThis.__venera = (() => {
 
     // A dynamic getter can consult saved settings while calculating its options.
     const resolvingSettings = new Set();
-    function definitions(key) {
+    // Some sources assign runtime values directly to their setting descriptors,
+    // e.g. `this.settings.base_url = fetchedDomain`. Preserve the last valid
+    // descriptor and expose the assigned primitive as its default instead of
+    // destroying the setting control.
+    const rememberedSettings = new Map();
+    const isDefinition = value => value !== null && typeof value === 'object';
+
+    function liveSettings(key) {
         if (resolvingSettings.has(key)) return null;
         resolvingSettings.add(key);
         try {
@@ -70,6 +77,44 @@ globalThis.__venera = (() => {
         } finally {
             resolvingSettings.delete(key);
         }
+    }
+
+    function rememberSettings(key) {
+        try {
+            const settings = liveSettings(key);
+            if (!isDefinition(settings)) return;
+            const remembered = {};
+            for (const [name, field] of Object.entries(settings))
+                if (isDefinition(field)) remembered[name] = field;
+            rememberedSettings.set(key, remembered);
+        }
+        catch (_) {
+            // A dynamic settings getter must not make activation fail.
+        }
+    }
+
+    function definitions(key) {
+        const settings = liveSettings(key);
+        const previous = rememberedSettings.get(key);
+        if (!isDefinition(settings))
+            return previous ?? settings;
+        const fields = {};
+        const remembered = {};
+        for (const [name, value] of Object.entries(settings)) {
+            const definition = isDefinition(value)
+                ? value
+                : isDefinition(previous?.[name])
+                    ? {...previous[name], default: value}
+                    : value;
+            fields[name] = definition;
+            if (isDefinition(definition)) remembered[name] = definition;
+        }
+        rememberedSettings.set(key, remembered);
+        return fields;
+    }
+
+    function forgetSettings(key) {
+        rememberedSettings.delete(key);
     }
 
     function descriptor(field) {
@@ -96,6 +141,7 @@ globalThis.__venera = (() => {
 
     return {
         pack, unpack,
+        rememberSettings, forgetSettings,
         sourceSettings: key => Object.fromEntries(Object.entries(definitions(key) ?? {}).map(([name, field]) =>
             [name, {...field, effectiveValue: readSetting(key, name, field)}])),
         editSourceSetting: (key, setting_key, value, reset) => sendNative({

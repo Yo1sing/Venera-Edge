@@ -44,9 +44,11 @@ pub fn convert(data: &Value) -> Result<Value> {
             Ok(text.to_string().into())
         }
         "base64" if encode => Ok(STANDARD.encode(bytes(value)?).into()),
-        "base64" => Ok(binary(
-            STANDARD.decode(value.as_str().context("Expected base64 string")?)?,
-        )),
+        "base64" => {
+            let value = value.as_str().context("Expected base64 string")?;
+            let value = value.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
+            Ok(binary(STANDARD.decode(value)?))
+        }
         "md5" => Ok(binary(md_digest::Md5::digest(bytes(value)?))),
         "sha1" => Ok(binary(sha1::Sha1::digest(bytes(value)?))),
         "sha256" => Ok(binary(sha2::Sha256::digest(bytes(value)?))),
@@ -192,6 +194,12 @@ mod tests {
         assert_eq!(
             convert(&json!({"type":"base64","value":[0,255],"isEncode":true}))?,
             "AP8="
+        );
+        assert_eq!(
+            bytes(&convert(
+                &json!({"type":"base64","value":"\u{feff}AP8=\n","isEncode":false})
+            )?)?,
+            vec![0, 255]
         );
         let input = vec![0; 32];
         for mode in ["aes-ecb", "aes-cbc", "aes-cfb", "aes-ofb"] {
