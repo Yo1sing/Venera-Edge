@@ -1024,6 +1024,10 @@ mod tests {
             eval("new HtmlDocument('<p>A<b>B</b></p>').querySelector('p').text")?,
             "AB"
         );
+        assert_eq!(
+            eval("new Map([['group', new Map([['1', 'Chapter 1']])]])")?,
+            json!({"group": {"1": "Chapter 1"}})
+        );
         let function: Value = serde_json::from_str(&engine.evaluate("x=>x+1")?)?;
         let id = function[1].as_u64().unwrap();
         assert_eq!(

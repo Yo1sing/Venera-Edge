@@ -29,6 +29,13 @@ globalThis.__venera = (() => {
         if (value instanceof ArrayBuffer) return ['bytes', Array.from(new Uint8Array(value))];
         if (ArrayBuffer.isView(value)) return ['bytes', Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength))];
         if (value instanceof Date) return ['string', value.toISOString()];
+        if (value instanceof Map) {
+            if (seen.has(value)) throw new Error('Cannot transfer cyclic JavaScript object');
+            seen.add(value);
+            const result = ['object', Array.from(value, ([key, item]) => [String(key), pack(item, seen)])];
+            seen.delete(value);
+            return result;
+        }
         if (seen.has(value)) throw new Error('Cannot transfer cyclic JavaScript object');
         seen.add(value);
         const result = Array.isArray(value) ? ['array', value.map(v => pack(v, seen))]
