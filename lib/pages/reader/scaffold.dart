@@ -615,25 +615,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
         ? "$epName : $pageText"
         : pageText;
 
-    return Positioned(
-      bottom: 13,
-      left: 25,
-      child: Stack(
-        children: [
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              foreground: Paint()
-                ..style = PaintingStyle.stroke
-                ..strokeWidth = 1.4
-                ..color = context.colorScheme.onInverseSurface,
-            ),
-          ),
-          Text(text),
-        ],
-      ),
-    );
+    return Positioned(bottom: 13, left: 25, child: _ReaderStatusText(text));
   }
 
   Widget buildStatusInfo() {
@@ -944,6 +926,31 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
   }
 }
 
+class _ReaderStatusText extends StatelessWidget {
+  const _ReaderStatusText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style.copyWith(fontSize: 14);
+    return Stack(
+      children: [
+        Text(
+          text,
+          style: style.copyWith(
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.4
+              ..color = context.colorScheme.onInverseSurface,
+          ),
+        ),
+        Text(text, style: style),
+      ],
+    );
+  }
+}
+
 class _BatteryWidget extends StatefulWidget {
   @override
   _BatteryWidgetState createState() => _BatteryWidgetState();
@@ -1046,21 +1053,7 @@ class _BatteryWidgetState extends State<_BatteryWidget> {
             );
           }).whereType<Shadow>().toList(),
         ),
-        Stack(
-          children: [
-            Text(
-              '$batteryLevel%',
-              style: TextStyle(
-                fontSize: 14,
-                foreground: Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 1.4
-                  ..color = context.colorScheme.onInverseSurface,
-              ),
-            ),
-            Text('$batteryLevel%'),
-          ],
-        ),
+        _ReaderStatusText('$batteryLevel%'),
       ],
     );
   }
@@ -1102,21 +1095,7 @@ class _ClockWidgetState extends State<_ClockWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Text(
-          _currentTime,
-          style: TextStyle(
-            fontSize: 14,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 1.4
-              ..color = context.colorScheme.onInverseSurface,
-          ),
-        ),
-        Text(_currentTime),
-      ],
-    );
+    return _ReaderStatusText(_currentTime);
   }
 }
 

@@ -121,6 +121,7 @@ class _BodyState extends State<_Body> {
           title: Text('Comic Source'.tl),
           style: AppbarStyle.shadow,
           actions: [
+            const _CheckUpdatesButton(),
             prism.IconButton(
               tooltip: 'Manage subscription URLs'.tl,
               icon: const Icon(Icons.link),
@@ -145,7 +146,6 @@ class _BodyState extends State<_Body> {
             ),
           ],
         ),
-        buildCard(),
         for (final source in ComicSource.all())
           _SliverComicSource(
             key: ValueKey(source.key),
@@ -250,28 +250,6 @@ class _BodyState extends State<_Body> {
     }
   }
 
-  Widget buildCard() {
-    return SliverToBoxAdapter(
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          FilledButton.tonalIcon(
-            icon: const Icon(Icons.article_outlined),
-            label: Text("Comic Source list".tl),
-            onPressed: _openCatalog,
-          ),
-          FilledButton.tonalIcon(
-            icon: const Icon(Icons.help_outline),
-            label: Text("Help".tl),
-            onPressed: help,
-          ),
-          const _CheckUpdatesButton(),
-        ],
-      ).paddingHorizontal(12).paddingVertical(8),
-    );
-  }
-
   void _openCatalog() => showPopUpWidget(context, const _ComicSourceList());
 
   void _selectFile() async {
@@ -293,12 +271,6 @@ class _BodyState extends State<_Body> {
       _operations.remove(cancellation);
       cancellation.dispose();
     }
-  }
-
-  void help() {
-    launchUrlString(
-      "https://github.com/Yo1sing/Venera-Edge/blob/master/doc/comic_source.md",
-    );
   }
 }
 
@@ -1153,15 +1125,15 @@ class _CheckUpdatesButtonState extends State<_CheckUpdatesButton> {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.tonalIcon(
+    return prism.IconButton(
+      tooltip: 'Check updates'.tl,
       icon: isLoading
           ? SizedBox(
-              width: 18,
-              height: 18,
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Icon(Icons.update),
-      label: Text("Check updates".tl),
+          : const Icon(Icons.update),
       onPressed: isLoading ? null : check,
     );
   }
