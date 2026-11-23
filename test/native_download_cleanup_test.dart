@@ -11,12 +11,19 @@ import 'package:venera_edge/network/download.dart' show DownloadQueueView;
 import 'package:venera_edge/utils/io.dart' show copyDirectoryIsolate;
 import 'native_migration_test.dart' show runtimeOptions, httpOptions;
 
+const operationTimeout = Duration(seconds: 15);
+
 Future<void> until(bool Function() check) async {
-  await (() async {
-    while (!check()) {
-      await Future<void>.delayed(const Duration(milliseconds: 20));
+  final elapsed = Stopwatch()..start();
+  while (!check()) {
+    if (elapsed.elapsed >= operationTimeout) {
+      throw TimeoutException(
+        'Download queue condition was not met',
+        operationTimeout,
+      );
     }
-  })().timeout(const Duration(seconds: 15));
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
 
 Map<String, dynamic> item(String base, String root, {bool archive = false}) => {
@@ -78,15 +85,15 @@ Future<void> existing(Directory root) async {
   store.dispose();
 }
 
-Future<void> copyTree(String from, String to) async {
-  await Directory(to).create(recursive: true);
-  await for (final entry in Directory(from).list()) {
-    final name = entry.path.split(Platform.pathSeparator).last;
-    if (entry is Directory) {
-      await copyTree(entry.path, '$to/$name');
-    } else if (entry is File) {
-      await entry.copy('$to/$name');
-    }
+Future<Object?> downloadedChapters(Directory root) async {
+  final store = await LocalStore.open(path: '${root.path}/local.db');
+  try {
+    return jsonDecode(
+      store.find(id: 'comic', comicType: 42)!,
+    )['downloaded_chapters'];
+  } finally {
+    store.close();
+    store.dispose();
   }
 }
 
@@ -139,6 +146,7 @@ void main() {
       final root = await Directory.systemTemp.createTemp(
         'venera_cancel_restart_',
       );
+      addTearDown(() => root.delete(recursive: true));
       await existing(root);
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final base = 'http://127.0.0.1:${server.port}';
@@ -175,31 +183,28 @@ void main() {
       final download = await queue(runtime, root);
       try {
         await download.add(taskJson: jsonEncode(item(base, root.path)));
-        await blocked.future.timeout(const Duration(seconds: 5));
+        await blocked.future.timeout(operationTimeout);
         final oldToken =
             (jsonDecode(download.snapshot()) as List).single['_work'];
-        final cancelled = download.command(
-          key: 'fixture@comic',
-          action: 'cancel',
-        );
-        hold = false;
-        await download.add(taskJson: jsonEncode(item(base, root.path)));
-        await cancelled;
-        await disconnected.future.timeout(const Duration(seconds: 5));
+        await Future.wait([
+          download.command(key: 'fixture@comic', action: 'cancel'),
+          () async {
+            // Requeue once Rust has accepted cancellation, even if cleanup is still running.
+            await until(() {
+              final rows = jsonDecode(download.snapshot()) as List;
+              return rows.isEmpty || rows.single['_cleanupOnly'] == true;
+            });
+            hold = false;
+            await download.add(taskJson: jsonEncode(item(base, root.path)));
+          }(),
+        ]);
+        await disconnected.future.timeout(operationTimeout);
         await until(() {
           final rows = jsonDecode(download.snapshot()) as List;
           if (rows.any((row) => row['_error'] == true)) fail(jsonEncode(rows));
           return rows.isEmpty;
         });
-        final store = await LocalStore.open(path: '${root.path}/local.db');
-        expect(
-          jsonDecode(
-            store.find(id: 'comic', comicType: 42)!,
-          )['downloaded_chapters'],
-          containsAll(['a', 'b']),
-        );
-        store.close();
-        store.dispose();
+        expect(await downloadedChapters(root), containsAll(['a', 'b']));
         expect(await File('${root.path}/local/book/a/0.png').readAsBytes(), [
           1,
           2,
@@ -237,7 +242,6 @@ void main() {
         download.dispose();
         await subscription.cancel();
         await server.close(force: true);
-        await root.delete(recursive: true);
       }
     },
   );
@@ -314,6 +318,7 @@ void main() {
     'SAF cancellation waits for copy receipt and failed cleanup can be retried',
     () async {
       final root = await Directory.systemTemp.createTemp('venera_cancel_saf_');
+      addTearDown(() => root.delete(recursive: true));
       await existing(root);
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final bytes = await File('assets/app_icon.png').readAsBytes();
@@ -339,39 +344,20 @@ void main() {
         while (true) {
           final encoded = await download.nextPlatformEvent();
           if (encoded == null) return;
-          final event = jsonDecode(encoded);
-          final from = event['from'] as String;
-          final to = event['to'] as String?;
+          final event = Map<String, dynamic>.from(jsonDecode(encoded));
+          final operation = event['operation'];
           String? error;
           dynamic value;
-          var stop = false;
           try {
-            switch (event['operation']) {
-              case 'exists':
-                value =
-                    await File(from).exists() || await Directory(from).exists();
-              case 'listFiles':
-                value = await Directory(from)
-                    .list()
-                    .where((entry) => entry is File)
-                    .map(
-                      (entry) => entry.path.split(Platform.pathSeparator).last,
-                    )
-                    .toList();
-              case 'copyDirectory':
-                mirror = to;
-                copying.complete();
-                await release.future;
-                await copyTree(from, to!);
-              case 'removeDirectory':
-                if (failCleanup) throw StateError('provider denied deletion');
-                await Directory(from).delete(recursive: true);
-                stop = true;
-              default:
-                throw StateError(
-                  'Unexpected platform operation ${event['operation']}',
-                );
+            if (operation == 'copyDirectory') {
+              mirror = event['to'] as String;
+              copying.complete();
+              await release.future;
             }
+            if (operation == 'removeDirectory' && failCleanup) {
+              throw StateError('provider denied deletion');
+            }
+            value = await DownloadQueueView.handlePlatformOperation(event);
           } catch (e) {
             error = e.toString();
           }
@@ -380,76 +366,75 @@ void main() {
             error: error,
             valueJson: jsonEncode(value),
           );
-          if (stop) return;
+          if (operation == 'removeDirectory' && error == null) return;
         }
       }();
-      try {
-        await download.add(taskJson: jsonEncode(item(base, root.path)));
-        await copying.future.timeout(const Duration(seconds: 5));
-        final owner = (jsonDecode(download.snapshot()) as List).single['_work'];
-        final cancelling = download
-            .command(key: 'fixture@comic', action: 'cancel')
-            .then<Object?>(
-              (_) {
-                finished = true;
-                return null;
-              },
-              onError: (Object error) {
-                finished = true;
-                return error;
-              },
-            );
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        expect(finished, false);
-        release.complete();
-        expect(await cancelling, isNotNull);
-        final pending = (jsonDecode(download.snapshot()) as List).single;
-        expect(pending['_cleanupOnly'], true);
-        expect(pending['_error'], true);
-        expect(pending['message'], contains('Cleanup pending'));
-        expect(Directory(mirror!).existsSync(), true);
-        final store = await LocalStore.open(path: '${root.path}/local.db');
-        expect(
-          jsonDecode(
-            store.find(id: 'comic', comicType: 42)!,
-          )['downloaded_chapters'],
-          ['a'],
-        );
-        store.close();
-        store.dispose();
-        failCleanup = false;
-        await download.command(key: 'fixture@comic', action: 'resume');
-        await platform;
-        await until(() {
-          final rows = jsonDecode(download.snapshot()) as List;
-          if (rows.any((row) => row['_error'] == true)) fail(jsonEncode(rows));
-          return rows.isEmpty;
-        });
-        expect(Directory(mirror!).existsSync(), false);
-        expect(
-          Directory('${root.path}/download_work/jobs/$owner').existsSync(),
-          false,
-        );
-        expect(await File('${root.path}/local/book/a/0.png').readAsBytes(), [
-          1,
-          2,
-          3,
-        ]);
-        expect(
-          await File('${root.path}/local/book/notes.txt').readAsString(),
-          'user file',
-        );
-        expect(Directory('${root.path}/local/book/b').existsSync(), false);
-      } finally {
+      addTearDown(() async {
         if (!release.isCompleted) release.complete();
-        await platform.timeout(const Duration(seconds: 10));
-        runtime.close();
-        runtime.dispose();
-        download.dispose();
-        await subscription.cancel();
-        await server.close(force: true);
-        await root.delete(recursive: true);
-      }
+        try {
+          await platform.timeout(operationTimeout);
+        } finally {
+          runtime.close();
+          runtime.dispose();
+          download.dispose();
+          await subscription.cancel();
+          await server.close(force: true);
+        }
+      });
+      await download.add(taskJson: jsonEncode(item(base, root.path)));
+      await copying.future.timeout(operationTimeout);
+      final owner = (jsonDecode(download.snapshot()) as List).single['_work'];
+      final cancelling = download
+          .command(key: 'fixture@comic', action: 'cancel')
+          .then<Object?>(
+            (_) {
+              finished = true;
+              return null;
+            },
+            onError: (Object error) {
+              finished = true;
+              return error;
+            },
+          );
+      await until(() {
+        final row = (jsonDecode(download.snapshot()) as List).single;
+        return row['_cleanupOnly'] == true;
+      });
+      expect(finished, false);
+      release.complete();
+      expect(
+        (await cancelling)?.toString(),
+        contains('provider denied deletion'),
+      );
+      final pending = (jsonDecode(download.snapshot()) as List).single;
+      expect(pending['_cleanupOnly'], true);
+      expect(pending['_error'], true);
+      expect(pending['message'], contains('Cleanup pending'));
+      expect(Directory(mirror!).existsSync(), true);
+      expect(await downloadedChapters(root), ['a']);
+      failCleanup = false;
+      await download.command(key: 'fixture@comic', action: 'resume');
+      await platform.timeout(operationTimeout);
+      await until(() {
+        final rows = jsonDecode(download.snapshot()) as List;
+        if (rows.any((row) => row['_error'] == true)) fail(jsonEncode(rows));
+        return rows.isEmpty;
+      });
+      expect(Directory(mirror!).existsSync(), false);
+      expect(
+        Directory('${root.path}/download_work/jobs/$owner').existsSync(),
+        false,
+      );
+      expect(await File('${root.path}/local/book/a/0.png').readAsBytes(), [
+        1,
+        2,
+        3,
+      ]);
+      expect(
+        await File('${root.path}/local/book/notes.txt').readAsString(),
+        'user file',
+      );
+      expect(Directory('${root.path}/local/book/b').existsSync(), false);
     },
   );
   test(

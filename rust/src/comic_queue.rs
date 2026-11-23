@@ -254,12 +254,12 @@ impl Queue {
         }
         // Keep the barrier through transport shutdown, extraction and every SAF receipt.
         // All later generations process durable cleanup requests before they can write.
-        let cleanup = {
+        {
             let _execution = self.execution.lock().await;
-            self.process_cleanup().await
-        };
+            self.process_cleanup().await?;
+        }
         self.schedule();
-        cleanup
+        Ok(())
     }
     async fn process_cleanup(&self) -> Result<()> {
         loop {
@@ -372,8 +372,8 @@ impl Queue {
         let queue = self.clone();
         crate::script::executor().spawn(async move {
             let (item, options, epoch, cancel) = start;
+            let execution = queue.execution.lock().await;
             let result = {
-                let _execution = queue.execution.lock().await;
                 let work = async {
                     queue.process_cleanup().await?;
                     if let Some(item) = &item {
@@ -428,6 +428,8 @@ impl Queue {
                     eprintln!("Download queue persistence failed: {error}");
                 }
             }
+            // A waiting command must not finish while this worker can still persist its snapshot.
+            drop(execution);
             // A failed cleanup is retried by an explicit command or a later open.
             if queue
                 .state
