@@ -4,7 +4,7 @@ repository: https://github.com/Yo1sing/Venera-Edge
 issue_tracker: https://github.com/Yo1sing/Venera-Edge/issues
 publish_to: 'none'
 
-version: 1.6.3+163
+version: 2.0.1+201
 
 environment:
   sdk: '>=3.8.0 <4.0.0'
