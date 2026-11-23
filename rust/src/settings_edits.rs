@@ -227,6 +227,7 @@ fn reader_key(key: &str) -> bool {
     matches!(
         key,
         "readerMode"
+            | "readerWaterfall"
             | "autoPageTurningInterval"
             | "readerScreenPicNumberForLandscape"
             | "readerScreenPicNumberForPortrait"

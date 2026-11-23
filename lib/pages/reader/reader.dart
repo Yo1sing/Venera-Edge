@@ -48,6 +48,8 @@ part 'scaffold.dart';
 
 part 'images.dart';
 
+part 'waterfall.dart';
+
 part 'gesture.dart';
 
 part 'comic_image.dart';
@@ -111,7 +113,30 @@ class _ReaderState extends State<Reader>
     with _ReaderLocation, _ReaderWindow, _VolumeListener, _ImagePerPageHandler {
   @override
   void update() {
-    setState(() {});
+    if (mounted) setState(() {});
+  }
+
+  @override
+  bool get waterfallEnabled =>
+      mode == ReaderMode.continuousTopToBottom &&
+      maxChapter > 1 &&
+      appdata.settings.getReaderSetting(cid, type.sourceKey, 'readerWaterfall') ==
+          true;
+
+  @override
+  bool toNextPage() {
+    final controller = _imageViewController;
+    return controller is _WaterfallModeState
+        ? controller.scrollByViewport(forward: true)
+        : super.toNextPage();
+  }
+
+  @override
+  bool toPrevPage() {
+    final controller = _imageViewController;
+    return controller is _WaterfallModeState
+        ? controller.scrollByViewport(forward: false)
+        : super.toPrevPage();
   }
 
   /// The maximum page number for images only (excluding chapter comments page).
@@ -297,7 +322,7 @@ class _ReaderState extends State<Reader>
             builder: (context) {
               return _ReaderScaffold(
                 child: _ReaderGestureDetector(
-                  child: _ReaderImages(key: Key(chapter.toString())),
+                  child: _ReaderImages(key: ValueKey(_chapterSession)),
                 ),
               );
             },
@@ -368,38 +393,27 @@ class _ReaderState extends State<Reader>
     }
   }
 
-  bool get isFirstChapterOfGroup {
-    if (widget.chapters?.isGrouped ?? false) {
-      int c = chapter - 1;
-      int g = 1;
-      while (c > 0) {
-        c -= widget.chapters!.getGroupByIndex(g - 1).length;
-        g++;
-      }
-      if (c == 0) {
-        return true;
-      } else {
-        return false;
-      }
-    }
-    return chapter == 1;
-  }
+  bool get isFirstChapterOfGroup =>
+      adjacentChapterInGroup(chapter, forward: false) == null;
 
-  bool get isLastChapterOfGroup {
-    if (widget.chapters?.isGrouped ?? false) {
-      int c = chapter;
-      int g = 1;
-      while (c > 0) {
-        c -= widget.chapters!.getGroupByIndex(g - 1).length;
-        g++;
+  bool get isLastChapterOfGroup =>
+      adjacentChapterInGroup(chapter, forward: true) == null;
+
+  int? adjacentChapterInGroup(int from, {required bool forward}) {
+    final target = forward ? from + 1 : from - 1;
+    final chapters = widget.chapters;
+    if (chapters == null || target < 1) return null;
+    if (!chapters.isGrouped) return target <= chapters.length ? target : null;
+
+    var start = 1;
+    for (final group in chapters.groups) {
+      final end = start + chapters.getGroup(group).length;
+      if (from >= start && from < end) {
+        return target >= start && target < end ? target : null;
       }
-      if (c == 0) {
-        return true;
-      } else {
-        return false;
-      }
+      start = end;
     }
-    return chapter == maxChapter;
+    return null;
   }
 
   /// Get the size of the reader.
@@ -547,6 +561,8 @@ abstract mixin class _ImagePerPageHandler {
 }
 
 abstract mixin class _VolumeListener {
+  bool get waterfallEnabled;
+
   bool toNextPage();
 
   bool toPrevPage();
@@ -558,13 +574,13 @@ abstract mixin class _VolumeListener {
   VolumeListener? volumeListener;
 
   void onDown() {
-    if (!toNextPage()) {
+    if (!toNextPage() && !waterfallEnabled) {
       toNextChapter();
     }
   }
 
   void onUp() {
-    if (!toPrevPage()) {
+    if (!toPrevPage() && !waterfallEnabled) {
       toPrevChapter(toLastPage: true);
     }
   }
@@ -591,6 +607,7 @@ abstract mixin class _VolumeListener {
 abstract mixin class _ReaderLocation {
   int _page = 1;
   int? _pendingPage;
+  int _chapterSession = 0;
 
   /// Flag to indicate that the page should jump to the last page after images are loaded.
   bool _jumpToLastPageOnLoad = false;
@@ -651,6 +668,8 @@ abstract mixin class _ReaderLocation {
   int _animationCount = 0;
 
   bool toPage(int page) {
+    final controller = _imageViewController;
+    if (isLoading || controller == null) return false;
     if (_validatePage(page)) {
       if (page == this.page && page != 1 && page != totalPages) {
         return false;
@@ -660,17 +679,21 @@ abstract mixin class _ReaderLocation {
         _pendingPage = page;
         _animationCount++;
         update();
-        _imageViewController!.animateToPage(page).then((_) {
+        controller.animateToPage(page).whenComplete(() {
           _animationCount--;
           if (_pendingPage == page) {
             _pendingPage = null;
+          }
+          if (identical(controller, _imageViewController) &&
+              controller is _WaterfallModeState) {
+            controller.onPositionChanged();
           }
           update();
         });
       } else {
         this.page = page;
         update();
-        _imageViewController!.toPage(page);
+        controller.toPage(page);
       }
       return true;
     }
@@ -696,8 +719,9 @@ abstract mixin class _ReaderLocation {
 
   bool toChapter(int c, {bool toLastPage = false}) {
     if (_validateChapter(c) && !isLoading) {
+      _chapterSession++;
       chapter = c;
-      page = 1;
+      _page = 1;
       _jumpToLastPageOnLoad = toLastPage;
       update();
       return true;
@@ -717,12 +741,19 @@ abstract mixin class _ReaderLocation {
         type.sourceKey,
         'autoPageTurningInterval',
       );
-      autoPageTurningTimer = Timer.periodic(Duration(seconds: interval), (_) {
-        if (page == maxPage) {
-          autoPageTurningTimer!.cancel();
-        }
-        toNextPage();
-      });
+      autoPageTurningTimer = Timer.periodic(
+        Duration(seconds: interval),
+        (timer) {
+          final controller = _imageViewController;
+          if (controller is _WaterfallModeState) {
+            if (!toNextPage() && controller.isAtEnd) timer.cancel();
+          } else {
+            if (page == maxPage) timer.cancel();
+            toNextPage();
+          }
+          if (!timer.isActive) autoPageTurningTimer = null;
+        },
+      );
     }
   }
 }

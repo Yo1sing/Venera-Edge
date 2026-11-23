@@ -20,6 +20,7 @@
   "defaultSearchTarget": null,
   "autoPageTurningInterval": 5,
   "readerMode": "galleryLeftToRight",
+  "readerWaterfall": false,
   "readerScreenPicNumberForLandscape": 1,
   "readerScreenPicNumberForPortrait": 1,
   "enableTapToTurnPages": true,

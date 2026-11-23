@@ -650,12 +650,12 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (result == null) {
       return;
     }
-    var (imageIndex, data) = result;
+    var (chapter, imageIndex, data) = result;
     var fileType = detectFileType(data);
     // Save file name: ComicName_EP{chapter}_P{page}.{ext} to avoid conflict.
     // The chapter index of different group is continuous, so we use chapter number is enough.
     var filename =
-        "${context.reader.widget.name}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
+        "${context.reader.widget.name}_EP${chapter}_P${imageIndex + 1}${fileType.ext}";
     saveFile(data: data, filename: filename);
   }
 
@@ -664,10 +664,10 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     if (result == null) {
       return;
     }
-    var (imageIndex, data) = result;
+    var (chapter, imageIndex, data) = result;
     var fileType = detectFileType(data);
     var filename =
-        "${context.reader.widget.name}_EP${context.reader.chapter}_P${imageIndex + 1}${fileType.ext}";
+        "${context.reader.widget.name}_EP${chapter}_P${imageIndex + 1}${fileType.ext}";
     Share.shareFile(data: data, filename: filename, mime: fileType.mime);
   }
 
@@ -677,6 +677,7 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
         comicId: context.reader.cid,
         comicSource: context.reader.type.sourceKey,
         onChanged: (key) {
+          if (!mounted) return;
           if (key == "readerMode") {
             context.reader.mode = ReaderMode.fromKey(
               appdata.settings.getReaderSetting(
@@ -685,6 +686,9 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
                 key,
               ),
             );
+          }
+          if (key == 'readerMode' || key == 'readerWaterfall') {
+            setFloatingButton(0);
           }
           if (key == "enableTurnPageByVolumeKey") {
             if (appdata.settings.getReaderSetting(
@@ -877,21 +881,21 @@ class _ReaderScaffoldState extends State<_ReaderScaffold> {
     }
   }
 
-  /// Same as [selectImage], but return the image data with its index.
-  /// Returns (imageIndex, imageData) or null if cancelled.
-  Future<(int, Uint8List)?> selectImageToData() async {
+  /// Returns the selected image data with its chapter and index.
+  Future<(int, int, Uint8List)?> selectImageToData() async {
     var i = await selectImage();
-    if (i == null) {
+    if (i == null || !mounted) {
       return null;
     }
     final reader = context.reader;
+    final chapter = reader.chapter;
     final data = await ImageDownloader.loadOriginal(
       reader.images![i],
       reader.type.comicSource?.key,
       reader.cid,
       reader.eid,
     );
-    return (i, data);
+    return mounted ? (chapter, i, data) : null;
   }
 
   Future<Offset?> _showSelectImageOverlay() {

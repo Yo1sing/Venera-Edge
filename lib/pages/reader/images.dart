@@ -1,5 +1,21 @@
 part of 'reader.dart';
 
+Future<List<String>> _loadChapterImages(_ReaderState reader, int chapter) async {
+  final chapters = reader.widget.chapters;
+  if (reader.type == ComicType.local ||
+      LocalManager().isDownloaded(reader.cid, reader.type, chapter, chapters)) {
+    return LocalManager().getImages(reader.cid, reader.type, chapter);
+  }
+
+  final chapterId = chapters?.ids.elementAtOrNull(chapter - 1);
+  final result = await reader.type.comicSource!.loadComicPages!(
+    reader.cid,
+    chapterId,
+  );
+  if (result.error) throw StateError(result.errorMessage ?? 'Error'.tl);
+  return result.data;
+}
+
 class _ReaderImages extends StatefulWidget {
   const _ReaderImages({super.key});
 
@@ -27,69 +43,31 @@ class _ReaderImagesState extends State<_ReaderImages> {
     ImageDownloader.cancelAllLoadingImages();
   }
 
-  /// Handle jumping to last page when _jumpToLastPageOnLoad is true
-  void _handleJumpToLastPage() {
-    if (reader._jumpToLastPageOnLoad) {
-      reader._page = reader.maxPage;
-      reader._jumpToLastPageOnLoad = false;
-    }
-  }
-
-  void load() async {
+  Future<void> load() async {
     if (inProgress) return;
     inProgress = true;
-    if (reader.type == ComicType.local ||
-        (LocalManager().isDownloaded(
-          reader.cid,
-          reader.type,
-          reader.chapter,
-          reader.widget.chapters,
-        ))) {
-      try {
-        var images = await LocalManager().getImages(
-          reader.cid,
-          reader.type,
-          reader.chapter,
-        );
-        setState(() {
-          reader.images = images;
-          reader.isLoading = false;
-          inProgress = false;
-          _handleJumpToLastPage();
-          Future.microtask(() {
-            reader.updateHistory();
-          });
-        });
-      } catch (e) {
-        setState(() {
-          error = e.toString();
-          reader.isLoading = false;
-          inProgress = false;
-        });
-      }
-    } else {
-      var cp = reader.widget.chapters?.ids.elementAtOrNull(reader.chapter - 1);
-      var res = await reader.type.comicSource!.loadComicPages!(
-        reader.widget.cid,
-        cp,
-      );
-      if (res.error) {
-        setState(() {
-          error = res.errorMessage;
-          reader.isLoading = false;
-          inProgress = false;
-        });
-      } else {
-        setState(() {
-          reader.images = res.data;
-          reader.isLoading = false;
-          inProgress = false;
-          _handleJumpToLastPage();
-          Future.microtask(() {
-            reader.updateHistory();
-          });
-        });
-      }
+    final session = reader._chapterSession;
+    try {
+      final images = await _loadChapterImages(reader, reader.chapter);
+      if (!mounted || session != reader._chapterSession) return;
+      if (images.isEmpty) throw StateError('No pages in this chapter'.tl);
+      setState(() {
+        reader.images = images;
+        reader.isLoading = false;
+        inProgress = false;
+        reader._page = reader._jumpToLastPageOnLoad
+            ? reader.maxPage
+            : reader.page.clamp(1, reader.maxPage);
+        reader._jumpToLastPageOnLoad = false;
+        reader.updateHistory();
+      });
+    } catch (e) {
+      if (!mounted || session != reader._chapterSession) return;
+      setState(() {
+        error = e is StateError ? e.message.toString() : e.toString();
+        reader.isLoading = false;
+        inProgress = false;
+      });
     }
     context.readerScaffold.update();
   }
@@ -137,9 +115,9 @@ class _ReaderImagesState extends State<_ReaderImages> {
             '${reader.mode.key}_${reader.imagesPerPage}_${showComments}_$showCommentsAtEnd',
           ),
         );
-      } else {
-        return _ContinuousMode(key: Key(reader.mode.key));
       }
+      if (reader.waterfallEnabled) return const _WaterfallMode();
+      return _ContinuousMode(key: Key(reader.mode.key));
     }
   }
 }
@@ -674,6 +652,17 @@ class _ContinuousModeState extends State<_ContinuousMode>
 
   ScrollController get scrollController => _scrollController!;
 
+  int get itemCount => reader.maxPage + 2;
+
+  int listIndex(int page) => page;
+
+  Widget? boundaryItem(int index) =>
+      index == 0 || index == itemCount - 1 ? const SizedBox() : null;
+
+  ImageProvider imageAt(int index) => _createImageProvider(index, context);
+
+  bool get swipeToChangeChapter => true;
+
   var isCTRLPressed = false;
   static var _isMouseScrolling = false;
   var fingers = 0;
@@ -713,7 +702,9 @@ class _ContinuousModeState extends State<_ContinuousMode>
     cached = List.filled(reader.maxPage + 2, false);
     Future.delayed(
       const Duration(milliseconds: 100),
-      () => cacheImages(reader.page),
+      () {
+        if (mounted) cacheImages(reader.page);
+      },
     );
     super.initState();
   }
@@ -721,6 +712,10 @@ class _ContinuousModeState extends State<_ContinuousMode>
   @override
   void dispose() {
     itemPositionsListener.itemPositions.removeListener(onPositionChanged);
+    _scrollController?.removeListener(onScroll);
+    if (identical(reader._imageViewController, this)) {
+      reader._imageViewController = null;
+    }
     super.dispose();
   }
 
@@ -740,7 +735,8 @@ class _ContinuousModeState extends State<_ContinuousMode>
   double? _futurePosition;
 
   void smoothTo(double offset) {
-    if (HardwareKeyboard.instance.isShiftPressed) {
+    if (HardwareKeyboard.instance.isShiftPressed ||
+        _scrollController?.hasClients != true) {
       return;
     }
     var currentLocation = scrollController.position.pixels;
@@ -774,6 +770,7 @@ class _ContinuousModeState extends State<_ContinuousMode>
     scrollController
         .animateTo(_futurePosition!, duration: duration, curve: Curves.linear)
         .then((_) {
+          if (!mounted || _scrollController?.hasClients != true) return;
           var current = scrollController.position.pixels;
           if (current == target && current == _futurePosition) {
             _futurePosition = null;
@@ -838,7 +835,7 @@ class _ContinuousModeState extends State<_ContinuousMode>
   @override
   Widget build(BuildContext context) {
     Widget widget = ScrollablePositionedList.builder(
-      initialScrollIndex: reader.page,
+      initialScrollIndex: listIndex(reader.page),
       itemScrollController: itemScrollController,
       itemPositionsListener: itemPositionsListener,
       scrollControllerCallback: (scrollController) {
@@ -848,7 +845,7 @@ class _ContinuousModeState extends State<_ContinuousMode>
         _scrollController = scrollController;
         _scrollController!.addListener(onScroll);
       },
-      itemCount: reader.maxPage + 2,
+      itemCount: itemCount,
       addSemanticIndexes: false,
       scrollDirection: reader.mode == ReaderMode.continuousTopToBottom
           ? Axis.vertical
@@ -860,9 +857,8 @@ class _ContinuousModeState extends State<_ContinuousMode>
           ? const ClampingScrollPhysics()
           : const BouncingScrollPhysics(),
       itemBuilder: (context, index) {
-        if (index == 0 || index == reader.maxPage + 1) {
-          return const SizedBox();
-        }
+        final boundary = boundaryItem(index);
+        if (boundary != null) return boundary;
         double? width, height;
         if (reader.mode == ReaderMode.continuousLeftToRight ||
             reader.mode == ReaderMode.continuousRightToLeft) {
@@ -871,11 +867,12 @@ class _ContinuousModeState extends State<_ContinuousMode>
           width = double.infinity;
         }
 
-        ImageProvider image = _createImageProvider(index, context);
+        final image = imageAt(index);
 
         return ColoredBox(
           color: Theme.of(context).scaffoldBackgroundColor,
           child: ComicImage(
+            key: swipeToChangeChapter ? null : ValueKey(image),
             filterQuality: FilterQuality.medium,
             image: image,
             width: width,
@@ -982,7 +979,8 @@ class _ContinuousModeState extends State<_ContinuousMode>
 
         var scale = photoViewController.scale ?? 1.0;
 
-        if (notification is ScrollUpdateNotification &&
+        if (swipeToChangeChapter &&
+            notification is ScrollUpdateNotification &&
             (scale - 1).abs() < 0.05) {
           if (!scrollController.hasClients) return false;
           if (scrollController.position.pixels <=
@@ -1068,8 +1066,9 @@ class _ContinuousModeState extends State<_ContinuousMode>
 
   @override
   Future<void> animateToPage(int page) {
+    if (!itemScrollController.isAttached) return Future.value();
     return itemScrollController.scrollTo(
-      index: page,
+      index: listIndex(page),
       duration: const Duration(milliseconds: 200),
       curve: Curves.ease,
     );
@@ -1130,7 +1129,8 @@ class _ContinuousModeState extends State<_ContinuousMode>
 
   @override
   void toPage(int page) {
-    itemScrollController.jumpTo(index: page);
+    if (!itemScrollController.isAttached) return;
+    itemScrollController.jumpTo(index: listIndex(page));
     _futurePosition = null;
   }
 
@@ -1194,26 +1194,26 @@ class _ContinuousModeState extends State<_ContinuousMode>
 
   @override
   Future<Uint8List?> getImageByOffset(Offset offset) async {
-    var imageKey = getImageKeyByOffset(offset);
-    if (imageKey == null) return null;
-    final reader = context.reader;
+    final image = _imageByOffset(offset);
+    if (image == null) return null;
     return ImageDownloader.loadOriginal(
-      imageKey,
-      reader.type.comicSource?.key,
-      reader.cid,
-      reader.eid,
+      image.imageKey,
+      image.sourceKey,
+      image.cid,
+      image.eid,
     );
   }
 
   @override
-  String? getImageKeyByOffset(Offset offset) {
-    String? imageKey;
+  String? getImageKeyByOffset(Offset offset) => _imageByOffset(offset)?.imageKey;
+
+  ReaderImageProvider? _imageByOffset(Offset offset) {
     for (var imageState in imageStates) {
       if ((imageState as _ComicImageState).containsPoint(offset)) {
-        imageKey = (imageState.widget.image as ReaderImageProvider).imageKey;
+        return imageState.widget.image as ReaderImageProvider;
       }
     }
-    return imageKey;
+    return null;
   }
 }
 
