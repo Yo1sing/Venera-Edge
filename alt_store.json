@@ -33,8 +33,32 @@
           "NSPhotoLibraryUsageDescription": "Used to select images from your photo library when needed, and to save comic images you've collected to your device."
         }
       },
-      "versions": []
+      "versions": [
+        {
+          "version": "2.0.1",
+          "date": "2026-11-23",
+          "localizedDescription": "",
+          "downloadURL": "https://github.com/Yo1sing/Venera-Edge/releases/download/v.2.0.1/venera-edge-ios-2.0.1%2B201.ipa",
+          "size": 24043626
+        }
+      ],
+      "version": "2.0.1",
+      "versionDate": "2026-11-23",
+      "versionDescription": "",
+      "downloadURL": "https://github.com/Yo1sing/Venera-Edge/releases/download/v.2.0.1/venera-edge-ios-2.0.1%2B201.ipa",
+      "size": 24043626
     }
   ],
-  "news": []
+  "news": [
+    {
+      "appID": "io.github.yo1sing.venera.edge",
+      "caption": "Update of Venera Edge just got released!",
+      "date": "2026-11-23T02:30:14Z",
+      "identifier": "release-v.2.0.1",
+      "notify": true,
+      "tintColor": "#0784FC",
+      "title": "v.2.0.1 - Venera Edge  23/11/26",
+      "url": "https://github.com/Yo1sing/Venera-Edge/releases/tag/v.2.0.1"
+    }
+  ]
 }
