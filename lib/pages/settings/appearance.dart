@@ -103,7 +103,7 @@ class AppearanceSettings extends StatelessWidget {
                     title: "Bottom Navigation Style".tl,
                     settingKey: "bottomNavigationStyle",
                     optionTranslation: {
-                      "standard": "Standard".tl,
+                      "standard": "Fixed".tl,
                       "floating": "Floating".tl,
                     },
                   ),
