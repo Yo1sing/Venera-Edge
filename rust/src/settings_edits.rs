@@ -101,8 +101,45 @@ fn sync_legacy_source_list_url(settings: &mut Value) {
     settings["comicSourceListUrl"] = first;
 }
 
+fn normalized_home_layout(value: &Value) -> Option<Value> {
+    let fields = value.as_object()?;
+    let mut layout = json!({});
+    if let Some(compact) = fields.get("compact").and_then(Value::as_bool) {
+        layout["compact"] = compact.into();
+    }
+    if let Some(folders) = fields.get("folders").and_then(Value::as_object) {
+        let valid_folders = folders
+            .iter()
+            .filter(|(id, name)| {
+                name.as_str().is_some_and(|name| {
+                    !name.is_empty() && id.strip_prefix("folder:") == Some(name)
+                })
+            })
+            .map(|(id, name)| (id.clone(), name.clone()))
+            .collect();
+        layout["folders"] = Value::Object(valid_folders);
+    }
+    for key in ["order", "hidden"] {
+        if let Some(ids) = fields.get(key).and_then(Value::as_array) {
+            let mut seen = HashSet::new();
+            // A newer client can have built-in modules this client cannot render.
+            let ids = ids
+                .iter()
+                .filter_map(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .filter(|id| !id.starts_with("folder:") || layout["folders"].get(*id).is_some())
+                .filter(|id| seen.insert(*id))
+                .map(Value::from)
+                .collect();
+            layout[key] = Value::Array(ids);
+        }
+    }
+    Some(layout)
+}
+
 pub fn valid(key: &str, value: &Value) -> bool {
     match key {
+        "homeLayout" => normalized_home_layout(value).as_ref() == Some(value),
         "searchSources" => value.is_null() || strings(value),
         "defaultSearchTarget" | "quickFavorite" | "followUpdatesFolder" => {
             value.is_null() || value.is_string()
@@ -274,6 +311,7 @@ fn normalize_override(value: &Value) -> Value {
 
 pub fn normalized_value(key: &str, value: &Value) -> Option<Value> {
     match key {
+        "homeLayout" => normalized_home_layout(value),
         "comicSpecificSettings" | "deviceSpecificSettings" if value.is_object() => {
             Some(normalize_override(value))
         }

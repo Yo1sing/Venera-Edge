@@ -420,6 +420,71 @@ mod tests {
     }
 
     #[test]
+    fn home_layout_survives_edits_reload_and_sync() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let directory = temp.path().to_str().unwrap();
+        assert_eq!(load(directory)?["settings"]["homeLayout"], json!({}));
+        let layout = json!({
+            "order": ["folder:待读", "images", "random", "history"],
+            "hidden": ["history"],
+            "compact": true,
+            "folders": {"folder:待读": "待读"}
+        });
+        let update = |previous: Value, next: Value| {
+            serde_json::from_value(json!([{
+                "scope": "global", "key": "homeLayout",
+                "change": {"action": "replace", "previous": previous, "value": next}
+            }]))
+        };
+        let edited: Value =
+            serde_json::from_str(&edit(directory, update(json!({}), layout.clone())?)?)?;
+        assert_eq!(edited["rejected"], json!([]));
+        assert_eq!(load(directory)?["settings"]["homeLayout"], layout);
+        let snapshot = read_optional(&temp.path().join("syncdata.json"))?.unwrap();
+        let restored = merge(json!({"settings": {}}), snapshot)?;
+        assert_eq!(restored["settings"]["homeLayout"], layout);
+        // A stale form must not silently overwrite a newer configuration.
+        let result: Value = serde_json::from_str(&edit(
+            directory,
+            update(json!({}), json!({"compact": false}))?,
+        )?)?;
+        assert_eq!(result["rejected"].as_array().unwrap().len(), 1);
+        assert_eq!(load(directory)?["settings"]["homeLayout"], layout);
+        Ok(())
+    }
+
+    #[test]
+    fn home_layout_restores_valid_parts_of_older_backups() -> Result<()> {
+        let remote_layout = json!({
+            "order": ["history", "history", 2, "", "readLater", "folder:Missing", "folder:A"],
+            "hidden": ["folder:A", "folder:A", false],
+            "folders": {"folder:A": "A", "folder:B": "A", "folder:": ""},
+            "compact": "invalid"
+        });
+        assert!(!crate::settings_edits::valid("homeLayout", &remote_layout));
+        let current = json!({"settings": {"homeLayout": {"compact": true}}});
+        let merged = merge(
+            current.clone(),
+            json!({"settings": {"homeLayout": remote_layout}}),
+        )?;
+        assert_eq!(
+            merged["settings"]["homeLayout"],
+            json!({
+                "order": ["history", "readLater", "folder:A"],
+                "hidden": ["folder:A"],
+                "folders": {"folder:A": "A"}
+            })
+        );
+        for old in [json!({}), json!({"homeLayout": false})] {
+            assert_eq!(
+                merge(current.clone(), json!({"settings": old}))?["settings"]["homeLayout"],
+                current["settings"]["homeLayout"]
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn reader_edits_resolve_and_reset_in_scope_order() -> Result<()> {
         let temp = tempfile::tempdir()?;
         let directory = temp.path().to_str().unwrap();

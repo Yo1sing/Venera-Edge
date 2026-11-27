@@ -38,7 +38,9 @@ const _kLeftBarWidth = 256.0;
 const _kTwoPanelChangeWidth = 720.0;
 
 class FavoritesPage extends StatefulWidget {
-  const FavoritesPage({super.key});
+  const FavoritesPage({super.key, this.initialLocalFolder});
+
+  final String? initialLocalFolder;
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -51,12 +53,15 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   FolderList? folderList;
 
+  bool get isHomeShortcut => widget.initialLocalFolder != null;
+
   void setFolder(bool isNetwork, String? folder) {
     setState(() {
       this.isNetwork = isNetwork;
       this.folder = folder;
     });
     folderList?.update();
+    if (isHomeShortcut) return;
     appdata.setImplicitData('favoriteFolder', {
       'name': folder,
       'isNetwork': isNetwork,
@@ -66,21 +71,43 @@ class _FavoritesPageState extends State<FavoritesPage> {
 
   @override
   void initState() {
-    var data = appdata.implicitData['favoriteFolder'];
-    if (data != null) {
+    super.initState();
+    final data = appdata.implicitData['favoriteFolder'];
+    if (isHomeShortcut) {
+      folder = widget.initialLocalFolder;
+    } else if (data != null) {
       folder = data['name'];
       isNetwork = data['isNetwork'] ?? false;
     }
-    if (folder != null
-        && !isNetwork
-        && !LocalFavoritesManager().existsFolder(folder!)) {
+    if (folder != null &&
+        !isNetwork &&
+        !LocalFavoritesManager().existsFolder(folder!)) {
       folder = null;
     }
-    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isHomeShortcut) {
+      return Scaffold(
+        body: ListenableBuilder(
+          listenable: LocalFavoritesManager(),
+          builder: (context, _) {
+            if (LocalFavoritesManager().counts.containsKey(folder)) {
+              return buildBody();
+            }
+            return CustomScrollView(
+              slivers: [
+                SliverAppbar(title: Text(folder ?? widget.initialLocalFolder!)),
+                SliverFillRemaining(
+                  child: Center(child: Text('Favorite folder unavailable'.tl)),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
     return IconTheme(
       data: IconThemeData(color: Theme.of(context).colorScheme.secondary),
       child: Stack(

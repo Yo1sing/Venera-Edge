@@ -85,6 +85,9 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
           }
         });
       }
+    } else if (!manager.counts.containsKey(widget.folder)) {
+      comics = [];
+      searchResults = [];
     } else {
       var folderComics = manager.folderComics(widget.folder);
       if (folderComics < _asyncDataFetchLimit) {
@@ -284,18 +287,21 @@ class _LocalFavoritesPageState extends State<_LocalFavoritesPage> {
             style: context.width < changePoint
                 ? AppbarStyle.shadow
                 : AppbarStyle.blur,
-            leading: Tooltip(
-              message: "Folders".tl,
-              child: context.width <= _kTwoPanelChangeWidth
-                  ? IconButton(
-                      icon: const Icon(Icons.menu),
-                      color: context.colorScheme.primary,
-                      onPressed: favPage.showFolderSelector,
-                    )
-                  : const SizedBox(),
-            ),
+            leading: favPage.isHomeShortcut
+                ? null
+                : Tooltip(
+                    message: "Folders".tl,
+                    child: context.width <= _kTwoPanelChangeWidth
+                        ? IconButton(
+                            icon: const Icon(Icons.menu),
+                            color: context.colorScheme.primary,
+                            onPressed: favPage.showFolderSelector,
+                          )
+                        : const SizedBox(),
+                  ),
             title: GestureDetector(
-              onTap: context.width < _kTwoPanelChangeWidth
+              onTap: !favPage.isHomeShortcut &&
+                      context.width < _kTwoPanelChangeWidth
                   ? favPage.showFolderSelector
                   : null,
               child: Text(title),

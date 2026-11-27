@@ -6,6 +6,7 @@
   "pureBlack": false,
   "theme_mode": "system",
   "bottomNavigationStyle": "floating",
+  "homeLayout": {},
   "newFavoriteAddTo": "end",
   "moveFavoriteAfterRead": "none",
   "proxy": "system",

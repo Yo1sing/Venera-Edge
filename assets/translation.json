@@ -1,5 +1,13 @@
 {
   "zh_CN": {
+    "Customize home": "自定义首页",
+    "Restore defaults": "恢复默认",
+    "Compact home": "紧凑首页",
+    "Reduce control height and spacing": "缩小控件和封面，减少模块间距",
+    "Add favorite folder": "添加收藏夹模块",
+    "No favorite folders": "暂无本地收藏夹",
+    "Favorite folder unavailable": "收藏夹已删除或重命名，请重新添加",
+    "No comics": "暂无漫画",
     "Clear search": "清除搜索",
     "Cut": "剪切",
     "Dialog": "对话框",
@@ -488,6 +496,14 @@
     "Mouse scroll speed": "鼠标滚动速度"
   },
   "zh_TW": {
+    "Customize home": "自訂首頁",
+    "Restore defaults": "還原預設",
+    "Compact home": "緊湊首頁",
+    "Reduce control height and spacing": "縮小控制項與封面，減少模組間距",
+    "Add favorite folder": "新增收藏夾模組",
+    "No favorite folders": "尚無本機收藏夾",
+    "Favorite folder unavailable": "收藏夾已刪除或重新命名，請重新加入",
+    "No comics": "尚無漫畫",
     "Clear search": "清除搜尋",
     "Cut": "剪下",
     "Dialog": "對話框",

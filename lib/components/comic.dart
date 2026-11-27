@@ -1629,8 +1629,14 @@ class _SMClipper extends CustomClipper<Rect> {
 }
 
 class SimpleComicTile extends StatelessWidget {
-  const SimpleComicTile(
-      {super.key, required this.comic, this.onTap, this.withTitle = false, this.heroID});
+  const SimpleComicTile({
+    super.key,
+    required this.comic,
+    this.onTap,
+    this.withTitle = false,
+    this.heroID,
+    this.coverHeight = 136,
+  });
 
   final Comic comic;
 
@@ -1639,6 +1645,8 @@ class SimpleComicTile extends StatelessWidget {
   final bool withTitle;
 
   final int? heroID;
+
+  final double coverHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -1655,8 +1663,8 @@ class SimpleComicTile extends StatelessWidget {
           );
 
     child = Container(
-      width: 98,
-      height: 136,
+      width: coverHeight * 98 / 136,
+      height: coverHeight,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
         color: Theme.of(context).colorScheme.secondaryContainer,
@@ -1696,7 +1704,7 @@ class SimpleComicTile extends StatelessWidget {
           child,
           const SizedBox(height: 4),
           SizedBox(
-            width: 92,
+            width: coverHeight * 92 / 136,
             child: Center(
               child: Text(
                 comic.title.replaceAll('\n', ''),

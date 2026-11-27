@@ -13,7 +13,9 @@ import '../foundation/global_state.dart';
 import 'package:venera_edge/foundation/follow_updates.dart';
 
 class FollowUpdatesWidget extends StatefulWidget {
-  const FollowUpdatesWidget({super.key});
+  const FollowUpdatesWidget({super.key, this.compact = false});
+
+  final bool compact;
 
   @override
   State<FollowUpdatesWidget> createState() => _FollowUpdatesWidgetState();
@@ -57,7 +59,10 @@ class _FollowUpdatesWidgetState
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: widget.compact ? 3 : 8,
+        ),
         child: InkWell(
           onTap: () {
             context.to(() => FollowUpdatesPage());
@@ -67,7 +72,7 @@ class _FollowUpdatesWidgetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                height: 56,
+                height: widget.compact ? 40 : 56,
                 child: Row(
                   children: [
                     Center(child: Text('Follow Updates'.tl, style: Theme.of(context).textTheme.titleMedium)),

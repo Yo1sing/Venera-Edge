@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:venera_edge/foundation/appdata.dart';
 import 'package:venera_edge/pages/categories_page.dart';
 import 'package:venera_edge/pages/search_page.dart';
+import 'package:venera_edge/pages/settings/home_layout_page.dart';
 import 'package:venera_edge/pages/settings/settings_page.dart';
 import 'package:venera_edge/utils/translations.dart';
 
@@ -90,7 +91,13 @@ class _MainPageState extends State<MainPage> {
         });
       },
       paneActions: [
-        if(index != 0)
+        if (index == 0)
+          PaneActionEntry(
+            icon: Icons.tune,
+            label: "Customize home".tl,
+            onTap: () => to(() => const HomeLayoutPage(), preventDuplicate: true),
+          )
+        else
           PaneActionEntry(
             icon: Icons.search,
             label: "Search".tl,

@@ -3,15 +3,18 @@ import 'package:sliver_tools/sliver_tools.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:venera_edge/components/components.dart';
 import 'package:venera_edge/foundation/app.dart';
+import 'package:venera_edge/foundation/appdata.dart';
 import 'package:venera_edge/foundation/comic_source/comic_source.dart';
 import 'package:venera_edge/foundation/consts.dart';
 import 'package:venera_edge/foundation/favorites.dart';
 import 'package:venera_edge/foundation/history.dart';
+import 'package:venera_edge/foundation/home_layout.dart';
 import 'package:venera_edge/foundation/local.dart';
 import 'package:venera_edge/foundation/log.dart';
 import 'package:venera_edge/pages/comic_details_page/comic_page.dart';
 import 'package:venera_edge/pages/comic_source_page.dart';
 import 'package:venera_edge/pages/downloading_page.dart';
+import 'package:venera_edge/pages/favorites/favorites_page.dart';
 import 'package:venera_edge/pages/follow_updates_page.dart';
 import 'package:venera_edge/pages/history_page.dart';
 import 'package:venera_edge/pages/image_favorites_page/image_favorites_page.dart';
@@ -23,26 +26,171 @@ import 'package:venera_edge/utils/translations.dart';
 
 import 'local_comics_page.dart';
 
+class _HomeDensity extends InheritedWidget {
+  const _HomeDensity({required this.compact, required super.child});
+
+  final bool compact;
+
+  @override
+  bool updateShouldNotify(_HomeDensity oldWidget) =>
+      compact != oldWidget.compact;
+}
+
+extension on BuildContext {
+  bool get compactHome =>
+      dependOnInheritedWidgetOfExactType<_HomeDensity>()?.compact ?? false;
+  EdgeInsets get homeMargin =>
+      EdgeInsets.symmetric(horizontal: 16, vertical: compactHome ? 3 : 8);
+  double get homeHeaderHeight => compactHome ? 40 : 56;
+  double get homeCoverHeight => compactHome ? 108 : 132;
+}
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    var widget = SmoothCustomScrollView(
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: appdata.settings,
+    builder: (context, _) => _buildHome(context),
+  );
+
+  Widget _buildHome(BuildContext context) {
+    final layout = HomeLayout.fromJson(appdata.settings['homeLayout']);
+    final modules = <String, Widget>{
+      'search': const _SearchBar(),
+      'sync': const _SyncDataWidget(),
+      'history': const _History(),
+      'local': const _Local(),
+      'updates': FollowUpdatesWidget(compact: layout.compact),
+      'sources': const _ComicSourceWidget(),
+      'images': const ImageFavorites(),
+    };
+    final content = SmoothCustomScrollView(
       slivers: [
         SliverPadding(padding: EdgeInsets.only(top: context.padding.top)),
-        const _SearchBar(),
-        const _SyncDataWidget(),
-        const _History(),
-        const _Local(),
-        const FollowUpdatesWidget(),
-        const _ComicSourceWidget(),
-        const ImageFavorites(),
+        for (final id in layout.order)
+          if (!layout.hidden.contains(id) || id == 'sync')
+            SliverVisibility(
+              key: ValueKey(id),
+              visible: !layout.hidden.contains(id),
+              // The sync widget also handles automatic sync on app resume.
+              maintainState: id == 'sync',
+              sliver: modules[id] ?? _FavoriteFolderPreview(layout.folders[id]!),
+            ),
         if (NaviPane.floatingBottomInsetOf(context) == 0)
           SliverPadding(padding: EdgeInsets.only(top: context.padding.bottom)),
       ],
     );
-    return context.width > changePoint ? widget.paddingHorizontal(8) : widget;
+    final theme = Theme.of(context);
+    return _HomeDensity(
+      compact: layout.compact,
+      child: Theme(
+        data: layout.compact
+            ? theme.copyWith(
+                visualDensity: VisualDensity.compact,
+                listTileTheme: theme.listTileTheme.copyWith(dense: true),
+              )
+            : theme,
+        child: context.width > changePoint
+            ? content.paddingHorizontal(8)
+            : content,
+      ),
+    );
+  }
+}
+
+class _FavoriteFolderPreview extends StatefulWidget {
+  const _FavoriteFolderPreview(this.folder);
+
+  final String folder;
+
+  @override
+  State<_FavoriteFolderPreview> createState() => _FavoriteFolderPreviewState();
+}
+
+class _FavoriteFolderPreviewState extends State<_FavoriteFolderPreview> {
+  final manager = LocalFavoritesManager();
+  Future<List<FavoriteItem>>? _comics;
+
+  @override
+  void initState() {
+    super.initState();
+    manager.addListener(_refresh);
+  }
+
+  void _refresh() => setState(() => _comics = null);
+
+  @override
+  void dispose() {
+    manager.removeListener(_refresh);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = manager.counts[widget.folder];
+    final coverHeight = context.homeCoverHeight;
+    return SliverToBoxAdapter(
+      child: Card(
+        margin: context.homeMargin,
+        child: Column(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: Text(
+                widget.folder,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: switch (count) {
+                null => Text('Favorite folder unavailable'.tl),
+                0 => Text('No comics'.tl),
+                _ => null,
+              },
+              trailing: count == null
+                  ? null
+                  : const Icon(Icons.chevron_right_rounded),
+              onTap: count == null
+                  ? null
+                  : () => context.to(
+                      () => FavoritesPage(initialLocalFolder: widget.folder),
+                    ),
+            ),
+            if (count != null && count > 0)
+              SizedBox(
+                height: coverHeight + 4,
+                child: FutureBuilder<List<FavoriteItem>>(
+                  future: _comics ??= manager.getFolderComicsAsync(
+                    widget.folder,
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: TextButton(
+                          onPressed: _refresh,
+                          child: Text('Retry'.tl),
+                        ),
+                      );
+                    }
+                    final comics = snapshot.data;
+                    if (comics == null) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: comics.length,
+                      itemBuilder: (context, index) => SimpleComicTile(
+                        comic: comics[index],
+                        coverHeight: coverHeight,
+                      ).paddingHorizontal(8).paddingVertical(2),
+                    );
+                  },
+                ),
+              ).paddingHorizontal(8).paddingBottom(context.compactHome ? 4 : 8),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -53,9 +201,9 @@ class _SearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Container(
-        height: App.isMobile ? 52 : 46,
+        height: context.compactHome ? 40 : (App.isMobile ? 52 : 46),
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: context.homeMargin,
         child: Material(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(32),
@@ -125,7 +273,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
     } else if (DataSync().isUploading || DataSync().isDownloading) {
       child = SliverToBoxAdapter(
         child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          margin: context.homeMargin,
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text('Syncing Data'.tl),
@@ -138,7 +286,7 @@ class _SyncDataWidgetState extends State<_SyncDataWidget>
     } else {
       child = SliverToBoxAdapter(
         child: Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          margin: context.homeMargin,
           child: ListTile(
             leading: const Icon(Icons.sync),
             title: Text('Sync Data'.tl),
@@ -240,7 +388,7 @@ class _HistoryState extends State<_History> {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: context.homeMargin,
         child: InkWell(
           onTap: () {
             context.to(() => const HistoryPage());
@@ -249,7 +397,7 @@ class _HistoryState extends State<_History> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 56,
+                height: context.homeHeaderHeight,
                 child: Row(
                   children: [
                     Center(
@@ -272,22 +420,24 @@ class _HistoryState extends State<_History> {
               ).paddingHorizontal(16),
               if (history.isNotEmpty)
                 SizedBox(
-                  height: 136,
+                  height: context.homeCoverHeight + 4,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: history.length,
                     itemBuilder: (context, index) {
-                      final heroID = history[index].id.hashCode;
+                      final comic = history[index];
+                      final heroID = Object.hash('history', comic.type, comic.id);
                       return SimpleComicTile(
-                        comic: history[index],
+                        coverHeight: context.homeCoverHeight,
+                        comic: comic,
                         heroID: heroID,
                         onTap: () {
                           context.to(
                             () => ComicPage(
-                              id: history[index].id,
-                              sourceKey: history[index].type.sourceKey,
-                              cover: history[index].cover,
-                              title: history[index].title,
+                              id: comic.id,
+                              sourceKey: comic.type.sourceKey,
+                              cover: comic.cover,
+                              title: comic.title,
                               heroID: heroID,
                             ),
                           );
@@ -295,7 +445,9 @@ class _HistoryState extends State<_History> {
                       ).paddingHorizontal(8).paddingVertical(2);
                     },
                   ),
-                ).paddingHorizontal(8).paddingBottom(16),
+                )
+                    .paddingHorizontal(8)
+                    .paddingBottom(context.compactHome ? 6 : 16),
             ],
           ),
         ),
@@ -340,7 +492,7 @@ class _LocalState extends State<_Local> {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: context.homeMargin,
         child: InkWell(
           onTap: () {
             context.to(() => const LocalComicsPage());
@@ -349,7 +501,7 @@ class _LocalState extends State<_Local> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 56,
+                height: context.homeHeaderHeight,
                 child: Row(
                   children: [
                     Center(
@@ -374,22 +526,24 @@ class _LocalState extends State<_Local> {
               ).paddingHorizontal(16),
               if (local.isNotEmpty)
                 SizedBox(
-                  height: 136,
+                  height: context.homeCoverHeight + 4,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: local.length,
                     itemBuilder: (context, index) {
-                      final heroID = local[index].id.hashCode;
+                      final comic = local[index];
+                      final heroID = Object.hash('local', comic.sourceKey, comic.id);
                       return SimpleComicTile(
-                        comic: local[index],
+                        coverHeight: context.homeCoverHeight,
+                        comic: comic,
                         heroID: heroID,
                         onTap: () {
                           context.to(
                             () => ComicPage(
-                              id: local[index].id,
-                              sourceKey: local[index].sourceKey,
-                              cover: local[index].cover,
-                              title: local[index].title,
+                              id: comic.id,
+                              sourceKey: comic.sourceKey,
+                              cover: comic.cover,
+                              title: comic.title,
                               heroID: heroID,
                             ),
                           );
@@ -640,7 +794,7 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: context.homeMargin,
         child: InkWell(
           onTap: () {
             context.to(() => const ComicSourcePage());
@@ -649,7 +803,7 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 56,
+                height: context.homeHeaderHeight,
                 child: Row(
                   children: [
                     Center(
@@ -689,7 +843,9 @@ class _ComicSourceWidgetState extends State<_ComicSourceWidget> {
                         child: Text(e),
                       );
                     }).toList(),
-                  ).paddingHorizontal(16).paddingBottom(16),
+                  )
+                      .paddingHorizontal(16)
+                      .paddingBottom(context.compactHome ? 6 : 16),
                 ),
               if (_availableUpdates > 0)
                 Container(
@@ -835,7 +991,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
         imageFavoritesCompute != null && !imageFavoritesCompute!.isEmpty;
     return SliverToBoxAdapter(
       child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: context.homeMargin,
         child: InkWell(
           onTap: () {
             context.to(
@@ -846,7 +1002,7 @@ class _ImageFavoritesState extends State<ImageFavorites> {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 56,
+                height: context.homeHeaderHeight,
                 child: Row(
                   children: [
                     Center(
@@ -905,17 +1061,20 @@ class _ImageFavoritesState extends State<ImageFavorites> {
     const radius = 24.0;
     return InkWell(
       borderRadius: BorderRadius.circular(radius),
-      onTap: () async {
+      onTap: () {
         setState(() {
           displayType = type;
         });
-        await Future.delayed(const Duration(milliseconds: 20));
-        var scrollController = ScrollState.of(context).controller;
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.ease,
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Scrollable.ensureVisible(
+            context,
+            alignment: 1,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.ease,
+          );
+        });
       },
       child: AnimatedContainer(
         width: 96,

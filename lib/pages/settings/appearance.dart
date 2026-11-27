@@ -15,6 +15,14 @@ class AppearanceSettings extends StatelessWidget {
             sliver: SliverList.list(
               children: [
                 Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.tune),
+                    title: Text('Customize home'.tl),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.to(() => const HomeLayoutPage()),
+                  ),
+                ),
+                Card(
                   child: Column(
                     children: [
                       SelectSetting(
